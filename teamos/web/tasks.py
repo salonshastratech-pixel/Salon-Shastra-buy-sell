@@ -27,6 +27,9 @@ def index():
                       (g.user["id"], g.user["id"]))
     else:
         rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.assignee_id = ?", (g.user["id"],))
+    if not can("crm.view"):
+        # Same rule as the task detail page: seller-linked tasks need crm.view unless assigned to you.
+        rows = [t for t in rows if t["entity_type"] != "opportunity" or t["assignee_id"] == g.user["id"]]
     if view != "done":
         rows = _sort(rows)
     for t in rows:

@@ -115,3 +115,13 @@ def test_evidence_review_requires_reviewer(login, db):
     assert r.status_code == 403
     login("lead@t.test").post(f"/sellers/{opp_id}/evidence", {"field_key": "asking_price", "status": "verified"})
     assert db.scalar("SELECT evidence_status FROM field_provenance WHERE field_key = 'asking_price'") == "verified"
+
+
+def test_finance_team_task_list_hides_seller_linked_tasks(login):
+    from conftest import SELLER_FORM
+    admin = login("admin@t.test")
+    assert admin.post("/sellers/new", SELLER_FORM).status_code == 302
+    assert b"Test Salon" in admin.get("/tasks/?view=all").data
+    for view in ("all", "mine", "created", "done"):
+        body = login("fin@t.test").get(f"/tasks/?view={view}").data
+        assert b"Test Salon" not in body and b"Test Owner" not in body, view

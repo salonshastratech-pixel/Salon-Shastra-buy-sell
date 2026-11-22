@@ -35,7 +35,9 @@ class TestMFA:
         assert secret.replace(" ", "")[:4] in page.replace(" ", "")
         assert c.post("/mfa/setup", {"code": "000000"}).status_code == 200
         assert db.scalar("SELECT mfa_enabled_at FROM users WHERE email = 'admin@t.test'") is None
-        r = c.post("/mfa/setup", {"code": mfa.current_code(secret)})
+        setup_at = time.time()
+        used_code = mfa.current_code(secret, setup_at)
+        r = c.post("/mfa/setup", {"code": used_code})
         assert b"recovery codes" in r.data
         assert db.scalar("SELECT COUNT(*) FROM mfa_recovery_codes WHERE used_at IS NULL") == 8
         assert c.get("/admin/users").status_code == 200
@@ -44,9 +46,11 @@ class TestMFA:
         c2 = self._login(app, "admin@t.test")
         assert c2.get("/admin/users").headers["Location"].endswith("/mfa")
         # replaying the code already used is refused
-        assert c2.post("/mfa", {"code": mfa.current_code(secret)}).status_code == 401
-        # next time-step code works
-        assert c2.post("/mfa", {"code": mfa.current_code(secret, time.time() + 30)}).status_code == 302
+        # (replay the exact code used at setup — re-reading "current" could cross a 30 s boundary and be a new code)
+        assert c2.post("/mfa", {"code": used_code}).status_code == 401
+        # the code for the step after the one used works
+        last_step = db.scalar("SELECT mfa_last_step FROM users WHERE email = 'admin@t.test'")
+        assert c2.post("/mfa", {"code": mfa.current_code(secret, (last_step + 1) * 30)}).status_code == 302
         assert c2.get("/admin/users").status_code == 200
 
     def test_recovery_code_single_use(self, app, db):
