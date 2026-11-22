@@ -53,7 +53,7 @@
       {% if can_docs %}<a class="btn sm" href="{{ url_for('forms.document', doc_id=d.id) }}">Download</a>{% else %}<span class="badge warn">Restricted</span>{% endif %}
       <span class="badge {{ 'ok' if d.review_status == 'reviewed' else 'bad' if d.review_status == 'rejected' else 'grey' }}">{{ d.review_status }}</span></div>
     {% else %}<p class="small muted">No documents uploaded.</p>{% endfor %}
-    {% if docs and not can_docs %}<p class="small muted">{% if opp.kind == 'buyer' %}Buyer documents (e.g. funding proof) are visible to reviewers or someone with an explicit grant.{% else %}Seller documents are visible to the record's primary owner, approvers or someone with an explicit grant.{% endif %}</p>{% endif %}
+    {% if docs and not can_docs %}<p class="small muted">{% if opp.kind == 'buyer' %}Buyer documents (e.g. funding proof) are visible to team members with access to buyer records.{% else %}Seller documents are visible to the record's primary owner, approvers or someone with an explicit grant.{% endif %}</p>{% endif %}
   </div>
   <div class="card"><h2>Consent given in this form</h2>
     {% for k, v in consent.items() %}<div class="small">{{ k|replace('_',' ')|capitalize }}: {% if v %}<span class="badge ok">Granted</span>{% else %}<span class="badge grey">Not given</span>{% endif %}</div>

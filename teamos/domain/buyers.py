@@ -89,8 +89,10 @@ def preferences(db, mandate_id: int) -> dict[tuple[str, str], str]:
 
 
 def can_view_funding_evidence(db, user: dict, opp: dict) -> bool:
-    """Buyer funding proof detail (PRD §3.2): reviewers/approvers, or an explicit grant for this case."""
-    return (user_can(db, user, "evidence.review")
+    """Buyer funding proof (evidence notes + uploaded proof). Founder decision D-22 (23 Nov 2026): visible to the
+    whole team by default — anyone who can open buyer records. Roles without CRM access (finance) need an explicit
+    grant. Recording a funding review stays reviewer-only (set_funding_review)."""
+    return (user_can(db, user, "crm.view")
             or user_can(db, user, "buyer.view_funding", "opportunity", opp["id"]))
 
 

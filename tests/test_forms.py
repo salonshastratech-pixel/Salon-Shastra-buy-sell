@@ -246,14 +246,17 @@ def test_uploads_are_encrypted_and_only_authorised_people_can_download(app, db, 
     assert p.get(f"/forms/documents/{doc['id']}").status_code == 302  # anonymous → login
 
 
-def test_buyer_funding_proof_visible_to_reviewers_only(app, db, login):
+def test_buyer_funding_proof_visible_to_the_team_not_finance(app, db, login):
+    """D-22 (founder, 23 Nov 2026): the team sees buyers' proof of funds by default."""
     c, opp_id = new_buyer(login, db)
     token, _ = send(c, opp_id, "targeted", docs=["funding_proof"])
     public(app).post(f"/f/i/{token}", data={"doc__funding_proof": (io.BytesIO(PDF), "bank.pdf"), "action": "submit"},
                      content_type="multipart/form-data")
     doc_id = db.scalar("SELECT id FROM documents")
-    assert c.get(f"/forms/documents/{doc_id}").status_code == 403  # buyer-team member owns it but is not a reviewer
+    assert c.get(f"/forms/documents/{doc_id}").data == PDF  # buyer-team member
+    assert login("seller@t.test").get(f"/forms/documents/{doc_id}").data == PDF  # any team member
     assert login("lead@t.test").get(f"/forms/documents/{doc_id}").data == PDF
+    assert login("fin@t.test").get(f"/forms/documents/{doc_id}").status_code == 403  # no CRM access
     assert db.scalar("SELECT funding_status FROM buyer_mandates") == "not_reviewed"  # a document is not verification
 
 

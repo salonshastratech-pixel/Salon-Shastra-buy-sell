@@ -122,37 +122,45 @@ def test_uat05_one_contact_with_seller_and_buyer_needs_keeps_separate_opportunit
 
 
 # -- UAT-31 ----------------------------------------------------------------------------
-def test_uat31_seller_executive_sees_buyer_record_but_not_private_funding_evidence(db, login):
+def test_uat31_seller_executive_sees_buyer_record_including_funding_proof_but_no_company_finance(db, login):
+    """D-22 (founder, 23 Nov 2026): the team sees buyers' proof of funds by default."""
     b, opp_id = make_buyer(login)
     fill_qualifying_data(b, opp_id)
     b.post(f"/buyers/{opp_id}/preferences", {"pref__gender_format__unisex": "must"})
     lead = login("lead@t.test")
-    secret = "Bank statement 10 Nov shows 32L; loan letter pending"
-    assert lead.post(f"/buyers/{opp_id}/funding", {"status": "staff_reviewed", "note": secret}).status_code == 302
+    evidence = "Bank statement 10 Nov shows 32L; loan letter pending"
+    assert lead.post(f"/buyers/{opp_id}/funding", {"status": "staff_reviewed", "note": evidence}).status_code == 302
     seller_exec = login("seller@t.test")
     for tab in ("overview", "requirements", "qualification", "matches", "history"):
         r = seller_exec.get(f"/buyers/{opp_id}?tab={tab}")
         assert r.status_code == 200, tab
-        assert secret.encode() not in r.data, tab
+        assert b"/admin/finance" not in r.data, tab  # no company finance anywhere on the page
     qual = seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
-    assert b"Staff-reviewed" in qual and b"Seriousness" in qual  # status + qualification are visible
+    assert b"Staff-reviewed" in qual and b"Seriousness" in qual and evidence.encode() in qual
     assert b"Must have" in seller_exec.get(f"/buyers/{opp_id}?tab=requirements").data
     assert b"No match history yet" in seller_exec.get(f"/buyers/{opp_id}?tab=matches").data
-    # the reviewer sees the evidence; the finance role sees no buyer CRM at all
-    assert secret.encode() in lead.get(f"/buyers/{opp_id}?tab=qualification").data
+    assert seller_exec.get("/admin/finance").status_code == 403  # Salon Shastra's own finance stays admin-only
     fin = login("fin@t.test")
     assert fin.get("/buyers/").status_code == 403 and fin.get(f"/buyers/{opp_id}").status_code == 403
 
 
-def test_funding_evidence_can_be_granted_for_one_case(db, login):
+def test_team_sees_funding_evidence_but_only_reviewers_record_the_review(db, login):
     b, opp_id = make_buyer(login)
     login("admin@t.test").post(f"/buyers/{opp_id}/funding", {"status": "verified", "note": "CA letter seen"})
     seller_exec = login("seller@t.test")
-    assert b"CA letter seen" not in seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
-    admin_id, seller_id = user(db, "admin@t.test")["id"], user(db, "seller@t.test")["id"]
-    db.insert("user_grants", {"user_id": seller_id, "capability": "buyer.view_funding", "scope_type": "opportunity",
-                              "scope_id": opp_id, "granted_by": admin_id, "reason": "covering", "created_at": "2026-01-01"})
     assert b"CA letter seen" in seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
+    assert b"Record funding review" not in seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
+    assert seller_exec.post(f"/buyers/{opp_id}/funding", {"status": "insufficient", "note": "x"}).status_code == 403
+    assert db.scalar("SELECT funding_status FROM buyer_mandates WHERE opportunity_id = ?", (opp_id,)) == "verified"
+    # a role without CRM access (finance) sees it only with an explicit per-case grant
+    from teamos.domain import buyers as BB
+    fin = user(db, "fin@t.test")
+    o = BB.load(db, opp_id)
+    assert not BB.can_view_funding_evidence(db, fin, o)
+    db.insert("user_grants", {"user_id": fin["id"], "capability": "buyer.view_funding", "scope_type": "opportunity",
+                              "scope_id": opp_id, "granted_by": user(db, "admin@t.test")["id"], "reason": "audit",
+                              "created_at": "2026-01-01"})
+    assert BB.can_view_funding_evidence(db, fin, o)
 
 
 # -- Mandate model ---------------------------------------------------------------------

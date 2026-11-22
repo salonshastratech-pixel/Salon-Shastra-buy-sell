@@ -226,14 +226,14 @@
       <p>Status: <strong>{{ BF.FUNDING_LABELS.get(mandate.funding_status) }}</strong>{% if funding_reviewer %} · by {{ funding_reviewer }} {{ mandate.funding_reviewed_at|rel }}{% endif %}</p>
       <div class="facts">{{ bfact('Declared source', 'funding_source', 'enum') }}{{ bfact('Money available', 'cash_ready', 'enum') }}{{ bfact('Amount ready now', 'cash_ready_amount', 'inr') }}</div>
       {% if can_funding_detail %}
-        {% if mandate.funding_note %}<h3>Evidence notes <span class="badge warn">Restricted</span></h3><p class="small">{{ mandate.funding_note }}</p>{% endif %}
+        {% if mandate.funding_note %}<h3>Evidence notes <span class="badge grey">Team only</span></h3><p class="small">{{ mandate.funding_note }}</p>{% endif %}
         {% if can_review %}
         <form method="post" action="{{ url_for('buyers.funding', opp_id=opp.id) }}">{{ csrf() }}
           <div class="field"><label>Set funding status</label><select name="status">{% for v, l in BF.FUNDING_STATUSES %}<option value="{{ v }}" {{ 'selected' if mandate.funding_status == v }}>{{ l }}</option>{% endfor %}</select></div>
           <div class="field"><label>What evidence was seen, and its limitations</label><textarea name="note" placeholder="e.g. Bank statement dated 10 Nov shows ₹32 L; loan sanction letter pending">{{ mandate.funding_note or '' }}</textarea></div>
           <button class="btn">Record funding review</button></form>{% endif %}
-      {% else %}<p class="small muted">Funding evidence detail is restricted to reviewers and explicit grants. You can see the status only.</p>{% endif %}
-      <p class="small muted">Buyers and staff data entry can never set this — only a reviewer action does, and it is audited.</p>
+      {% else %}<p class="small muted">Funding evidence is visible to team members with access to buyer records. You can see the status only.</p>{% endif %}
+      <p class="small muted">The whole team can see funding evidence. Only a reviewer (team lead or admin) can record the funding review — buyers and staff data entry can never set it, and every change is audited.</p>
     </div>
   </div>
 </div>
