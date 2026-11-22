@@ -5,6 +5,7 @@ Names, phone numbers (+91 90000 0xxxx range) and businesses are invented. Not fo
 import os
 from datetime import timedelta
 
+from teamos.domain import buyers as BY
 from teamos.domain import sellers as S
 from teamos.domain import tasks as T
 from teamos.security import hash_password
@@ -31,6 +32,12 @@ def _in(**kw):
 
 def seed(db):
     if db.scalar("SELECT COUNT(*) FROM users WHERE is_synthetic = 1"):
+        if not db.scalar("SELECT COUNT(*) FROM opportunities WHERE kind = 'buyer' AND is_synthetic = 1"):
+            seed_buyers(db)  # demo database created before Milestone 3
+            db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
+                       "(SELECT id FROM opportunities WHERE kind = 'buyer' AND is_synthetic = 1)")
+            print("Synthetic demo buyers added (Milestone 3).")
+            return
         print("Demo data already present — skipping.")
         return
     ids = {}
@@ -165,7 +172,117 @@ def seed(db):
         T.create_task(db, shaheen, title="Confirm whether any active buyer accepts Madhapur men's format",
                       assignee_id=harika["id"], due_at=_ago(hours=20), task_type="collect_info", priority="normal",
                       entity_type="opportunity", entity_id=o2, is_synthetic=1)
+    seed_buyers(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
         print(f"  {email:40s} {role}")
+
+
+def seed_buyers(db):
+    """Milestone 3: synthetic buyers / investors. Phones are in the reserved +91 90000 002xx demo range."""
+    u = {r["email"].split("@")[0]: r for r in db.all("SELECT * FROM users WHERE is_synthetic = 1")}
+    founder, harika, lead, shaheen = u["founder"], u["harika"], u["lead"], u["shaheen"]
+
+    def new_buyer(actor, dd=None, **kw):
+        base = {"city": "Hyderabad", "source": "manual_call", "consent_contact": "1", "is_synthetic": 1,
+                "owner_id": str(harika["id"])}
+        base.update(kw)
+        return BY.create_lead(db, actor, base, dedupe_decision=dd)["opportunity_id"]
+
+    def first_task(oid):
+        return db.scalar("SELECT id FROM tasks WHERE entity_id = ? AND status = 'open' ORDER BY id", (oid,))
+
+    # 1. Fully qualified acquirer — ready for the Match Desk (M5) ----------------------
+    b1 = new_buyer(founder, full_name="Arjun Rao (demo)", phone="9000000201", locality="Kondapur", source="referral",
+                   need_type="acquire_operating", decision_maker="yes", all_in_max="35L", purchase_window="90d",
+                   consent_share_criteria="1")
+    BY.log_call(db, harika, BY.load(db, b1), "connected",
+                "Runs one salon in Miyapur; wants a second unisex outlet in the west.",
+                first_task(b1), "Send detailed buyer form", _in(days=1))
+    sections = {
+        "intent": {"investor_type": "individual", "salon_background": "operator"},
+        "budget": {"budget_min": "15L", "budget_max": "25L", "all_in_max": "35L", "includes_deposit": "yes",
+                   "includes_stock": "yes", "includes_working_capital": "no", "finance_dependence": "none"},
+        "funding": {"funding_source": "self", "cash_ready": "now", "cash_ready_amount": "30L"},
+        "geography": {"relocate_willing": "no", "max_commute_km": "15"},
+        "salon": {"chairs_min": "6", "chairs_min__importance": "flexible", "chairs_max": "10",
+                  "area_min_sqft": "900", "area_min_sqft__importance": "prefer", "staff_continuity_need": "partial",
+                  "staff_continuity_need__importance": "must"},
+        "business": {"min_monthly_sales": "8L", "min_monthly_sales__importance": "prefer", "turnaround_ok": "no",
+                     "max_monthly_rent": "1.2L", "max_monthly_rent__importance": "must", "min_lease_years_left": "2",
+                     "min_lease_years_left__importance": "must", "liability_tolerance": "low"},
+        "timing": {"involvement": "owner_operator", "visit_availability": "weekends",
+                   "transition_support_need": "yes", "transition_support_need__importance": "prefer"},
+        "authority": {"payment_approver": "Self", "decision_timeline": "Within a week of a good visit",
+                      "must_haves": "Ground floor, parking, at least 2 wash stations",
+                      "deal_breakers": "Pending rent arrears or litigation"},
+    }
+    for sec, vals in sections.items():
+        BY.update_fields(db, harika, BY.load(db, b1), vals, sec)
+    BY.set_choice_preferences(db, harika, BY.load(db, b1), {
+        "pref__gender_format__unisex": "must", "pref__gender_format__men": "avoid",
+        "pref__gender_format__women": "flexible", "pref__business_model__independent": "prefer",
+        "pref__business_model__franchise": "flexible", "pref__positioning__premium": "prefer",
+        "pref__positioning__value": "avoid", "pref__sale_structure__entity": "prefer",
+        "pref__sale_structure__asset": "flexible", "pref__sale_structure__partial_stake": "avoid"})
+    for loc in ("Gachibowli", "Madhapur"):
+        BY.add_locality(db, harika, BY.load(db, b1), "preferred", "Hyderabad", loc)
+    BY.add_locality(db, harika, BY.load(db, b1), "excluded", "Hyderabad", "Old City", "Too far to manage daily")
+    for st in ("requirements_captured", "basic_qualified", "funding_review"):
+        BY.change_stage(db, harika, BY.load(db, b1), st, None)
+    BY.set_funding_review(db, lead, BY.load(db, b1), "verified",
+                          "Synthetic: bank statement (Nov) shows Rs 31 L available; no loan needed.")
+    BY.confirm_criteria(db, lead, BY.load(db, b1))
+    BY.change_stage(db, lead, BY.load(db, b1), "qualified_shortlist", None)
+
+    # 2. Investor group — funding evidence requested ----------------------------------
+    b2 = new_buyer(founder, full_name="Deepa Iyer (demo)", phone="9000000202", locality="Jubilee Hills",
+                   source="event", need_type="partnership", decision_maker="shared", all_in_max="60L",
+                   purchase_window="180d")
+    BY.log_call(db, harika, BY.load(db, b2), "connected", "Group of three investors; want a stake in a women's spa.",
+                first_task(b2), "Collect funding proof from the group", _in(days=3))
+    BY.update_fields(db, harika, BY.load(db, b2), {"investor_type": "investor_group"}, "intent")
+    BY.update_fields(db, harika, BY.load(db, b2), {"funding_source": "investor_group", "cash_ready": "within_30d"},
+                     "funding")
+    BY.set_choice_preferences(db, harika, BY.load(db, b2), {"pref__gender_format__women": "must",
+                                                            "pref__positioning__luxury": "prefer",
+                                                            "pref__sale_structure__partial_stake": "must"})
+    BY.add_locality(db, harika, BY.load(db, b2), "preferred", "Hyderabad", "Banjara Hills")
+    for st in ("requirements_captured", "basic_qualified", "funding_review"):
+        BY.change_stage(db, harika, BY.load(db, b2), st, None)
+    BY.set_funding_review(db, lead, BY.load(db, b2), "evidence_requested",
+                          "Asked for each partner's commitment letter")
+
+    # 3. Wants to OPEN a new salon — a separate need, never treated as a resale buyer ----
+    b3 = new_buyer(harika, full_name="Farhan Ali (demo)", phone="9000000203", locality="Kukatpally",
+                   source="landing_page", need_type="new_salon", decision_maker="yes", all_in_max="18L",
+                   purchase_window="later")
+    BY.log_call(db, harika, BY.load(db, b3), "connected",
+                "Wants to start from scratch; open to a resale only if he confirms later.",
+                first_task(b3), "Share new-salon setup checklist", _in(days=4))
+
+    # 4. Buyer's own submission (public form path), incl. an attempt to self-verify (UAT-02 / UAT-09)
+    BY.submit_respondent_form(db, {
+        "full_name": "Lakshmi Prasad (demo)", "phone": "9000000204", "city": "Hyderabad", "locality": "Manikonda",
+        "need_type": "acquire_operating", "all_in_max": "28L", "purchase_window": "30d", "chairs_min": "5",
+        "consent_contact": "1", "funding_status": "verified", "qualified_by_salon_shastra": "yes"},
+        source="landing_page", is_synthetic=1)
+
+    # 5. A seller who also wants to buy — separate opportunity under the same contact (UAT-05)
+    imran = db.scalar("SELECT id FROM contacts WHERE phone_normalized = '+919000000102' AND is_synthetic = 1 "
+                      "ORDER BY id LIMIT 1")
+    if imran:
+        b5 = new_buyer(shaheen, dd=f"link:{imran}", full_name="Imran Shaikh", phone="9000000102",
+                       locality="Hitech City", source="whatsapp", need_type="acquire_operating", decision_maker="yes",
+                       all_in_max="25L", purchase_window="180d", owner_id=str(shaheen["id"]))
+        BY.add_note(db, shaheen, BY.load(db, b5), "Selling the Madhapur men's salon (SL-00002) and wants a larger "
+                    "unisex salon. @Harika can you take the buy side?")
+
+    # 6. Exploring only — on hold with a follow-up --------------------------------------
+    b6 = new_buyer(harika, full_name="Ravi Kiran (demo)", phone="9000000206", locality="Uppal", source="meta_lead",
+                   need_type="exploring", purchase_window="later")
+    BY.log_call(db, harika, BY.load(db, b6), "connected", "Just researching prices for next year.", first_task(b6),
+                "Check in", _in(days=1))
+    BY.change_stage(db, harika, BY.load(db, b6), "exploring_only", "Researching only; revisit in 90 days",
+                    _in(days=90))

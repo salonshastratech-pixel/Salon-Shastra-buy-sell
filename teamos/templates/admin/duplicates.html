@@ -5,8 +5,8 @@
 {% for r in rows %}
 <div class="card"><div class="card-h"><h2>{{ r.a_name }} ↔ {{ r.b_name }}</h2><span class="badge {{ 'warn' if r.status == 'open' else 'grey' }}">{{ r.status|replace('_',' ') }}</span></div>
   <div class="grid g2 small">
-    <div><span class="mono">{{ r.a_phone }}</span> · {% for o in r.a_opps %}<a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> {% endfor %}<div class="muted">New contact</div></div>
-    <div><span class="mono">{{ r.b_phone }}</span> · {% for o in r.b_opps %}<a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> {% endfor %}<div class="muted">Existing contact</div></div>
+    <div><span class="mono">{{ r.a_phone }}</span> · {% for o in r.a_opps %}<a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> {% endfor %}<div class="muted">New contact</div></div>
+    <div><span class="mono">{{ r.b_phone }}</span> · {% for o in r.b_opps %}<a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> {% endfor %}<div class="muted">Existing contact</div></div>
   </div>
   <p class="small">Reason: {{ r.reason }}{% if r.rationale %} · Resolution: {{ r.rationale }}{% endif %}</p>
   {% if r.status == 'open' %}

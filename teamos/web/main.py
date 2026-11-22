@@ -3,13 +3,17 @@ from flask import Blueprint, g, redirect, render_template, request, url_for
 
 from ..db import get_db
 from ..domain import tasks as T
-from ..domain.sellers import STAGE_LABELS
+from ..domain.buyers import STAGE_LABELS as BUYER_STAGE_LABELS
+from ..domain.sellers import STAGE_LABELS as SELLER_STAGE_LABELS
 from ..security import login_required, require
 from datetime import timedelta
 
 from ..timeutil import ist_day_bounds, now_iso, now_utc, to_iso
 
 bp = Blueprint("main", __name__)
+
+# Shared screens list sellers and buyers together; stage codes like 'new' mean the same in both funnels.
+STAGE_LABELS = {**SELLER_STAGE_LABELS, **BUYER_STAGE_LABELS}
 
 TASK_SELECT = (
     "SELECT t.*, u.full_name AS assignee_name, o.ref_code, o.id AS opp_id, o.kind AS opp_kind, "
@@ -88,9 +92,15 @@ def team_board():
     review_queue = db.all("SELECT o.id, o.ref_code, b.name AS salon_name, l.approval_state FROM seller_listings l "
                           "JOIN opportunities o ON o.id = l.opportunity_id JOIN salon_businesses b ON b.id = l.business_id "
                           "WHERE l.approval_state IN ('in_review','re_review_required') ORDER BY l.updated_at")
+    buyer_queue = db.all("SELECT o.id, o.ref_code, c.full_name AS contact_name, m.funding_status, "
+                         "m.criteria_reviewed_version, m.data_version FROM buyer_mandates m "
+                         "JOIN opportunities o ON o.id = m.opportunity_id JOIN contacts c ON c.id = o.contact_id "
+                         "WHERE o.status = 'active' AND (m.funding_status = 'evidence_requested' OR "
+                         "(m.criteria_reviewed_version IS NOT NULL AND m.criteria_reviewed_version <> m.data_version) "
+                         "OR o.stage IN ('form_received','funding_review')) ORDER BY o.updated_at")
     dup_open = db.scalar("SELECT COUNT(*) FROM duplicate_reviews WHERE status = 'open'")
     return render_template("team.html", users=users, overdue=overdue, due_today=due_today, later=later,
-                           exceptions=exceptions, unowned=unowned, review_queue=review_queue, dup_open=dup_open,
+                           exceptions=exceptions, unowned=unowned, review_queue=review_queue, buyer_queue=buyer_queue, dup_open=dup_open,
                            who=who, STAGE_LABELS=STAGE_LABELS)
 
 
@@ -110,7 +120,8 @@ def search():
             params += [f"%{digits[-10:]}%", f"%{digits[-10:]}%"]
         results = db.all(
             "SELECT o.id, o.ref_code, o.kind, o.stage, o.status, c.full_name AS contact_name, c.phone_normalized, "
-            "b.name AS salon_name, b.locality, b.city, u.full_name AS owner_name FROM opportunities o "
+            "b.name AS salon_name, COALESCE(b.locality, c.locality) AS locality, COALESCE(b.city, c.city) AS city, "
+            "u.full_name AS owner_name FROM opportunities o "
             "JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id "
             "LEFT JOIN users u ON u.id = o.primary_owner_id WHERE lower(c.full_name) LIKE ? OR lower(b.name) LIKE ? "
             "OR lower(b.locality) LIKE ? OR lower(o.ref_code) LIKE ? OR lower(b.city) LIKE ?" + phone_clause +
@@ -135,7 +146,9 @@ def dictionary():
 @bp.route("/planned/<module>")
 @login_required
 def planned(module):
-    names = {"buyers": ("Buyers / Investors", "Milestone 3"), "match": ("Match Desk", "Milestone 5"),
+    if module == "buyers":  # shipped in Milestone 3
+        return redirect(url_for("buyers.index"))
+    names = {"match": ("Match Desk", "Milestone 5"),
              "forms": ("Forms & Data Requests", "Milestone 4"), "inbox": ("WhatsApp Team Inbox", "Milestone 7"),
              "deals": ("Deals / Workrooms", "Milestone 6"), "reports": ("Reports", "Milestone 7")}
     if module not in names:

@@ -21,6 +21,13 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 3 — buyers
+Open **Buyers / Investors** (left menu). Best roles to try:
+* `harika@` — buyer-team member: create a buyer, edit the mandate (Requirements tab), rank localities, set Must/Prefer/Avoid.
+* `lead@` — reviewer: *Qualification* tab → record funding review, confirm criteria, move a buyer to *Qualified to shortlist*.
+* `shaheen@` — seller-team member opening a buyer record: sees qualification and preferences, not funding evidence.
+* `accounts@` — finance: no access to buyers at all.
+
 Records created during the review walkthrough are prefixed `DEMO` (SL-00008, a few tasks, one extra user). Records you add
 through the UI are not auto-badged "synthetic" — only seeded ones are.
 

@@ -1,0 +1,261 @@
+{% extends "base.html" %}{% from "macros.html" import csrf, stage_badge %}
+{% macro bfact(label, key, kind='text') -%}
+{%- set value = mandate[key] -%}{%- set st = prov.get(key, {}).get('answer_state') -%}
+<div class="fact"><div class="k">{{ label }}</div><div class="v">
+{%- if value is not none and value != '' -%}
+  {%- if kind == 'inr' -%}{{ value|inr }}{%- elif kind == 'enum' -%}{{ BF.option_label(key, value) }}{%- else -%}{{ value }}{%- endif -%}
+{%- elif st and st != 'value' -%}<span class="unknown">{{ SF.ANSWER_STATE_LABELS[st] }}</span>
+{%- else -%}<span class="missing">Not provided</span>{%- endif -%}
+</div></div>
+{%- endmacro %}
+{% macro imp_badge(imp) -%}
+{%- set cls = {'must': 'bad', 'prefer': 'info', 'flexible': 'grey', 'avoid': 'warn', 'not_important': 'grey'} -%}
+<span class="badge {{ cls.get(imp, 'grey') }}">{{ BF.IMPORTANCE_LABELS.get(imp, imp) }}</span>
+{%- endmacro %}
+{% block title %}{{ opp.ref_code }} · {{ opp.contact_name }}{% endblock %}
+{% block content %}
+<div class="ph">
+  <div>
+    <div class="small muted"><a href="{{ url_for('buyers.index') }}">Buyers / Investors</a> / {{ opp.ref_code }}</div>
+    <h1>{{ opp.contact_name }}</h1>
+    <div class="inline sub">{{ stage_badge(opp.stage, STAGE_LABELS) }}
+      {% if mandate.need_type %}<span class="badge {{ 'warn' if mandate.need_type == 'new_salon' else 'info' }}">{{ BF.option_label('need_type', mandate.need_type) }}</span>{% endif %}
+      <span>{{ mandate.preferred_city or opp.contact_city }}</span> · <span>Owner: <strong>{{ opp.owner_name or 'Unassigned' }}</strong></span>
+      · <span>Source: {{ SOURCE_LABELS.get(opp.source, opp.source) }}{% if opp.source_detail %} ({{ opp.source_detail }}){% endif %}</span>
+      {% if opp.is_synthetic %}<span class="badge syn">synthetic demo record</span>{% endif %}
+      {% if opp.do_not_contact %}<span class="badge bad">Do not contact</span>{% endif %}</div>
+  </div>
+  <div class="actions"><span class="badge {{ 'ok' if score.score >= 80 else 'warn' if score.score >= 60 else 'grey' }}">Seriousness {{ score.score }}/100</span>
+    <span class="badge info">Requirements {{ comp.pct }}%</span></div>
+</div>
+
+<nav class="tabs">
+  {% for k, l in [('overview','Overview'),('requirements','Requirements & mandate'),('qualification','Qualification'),('matches','Matches'),('history','History')] %}
+  <a href="{{ url_for('buyers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
+</nav>
+
+{% if tab == 'overview' %}
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-h"><h2>Next action</h2></div>
+      {% if tasks %}
+      <ul class="tasks">{% for t in tasks %}<li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}"><div><div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div>
+        <div class="meta">{{ t.assignee_name }} · due {{ t.due_at|ist }} ({{ t.due_at|rel }})</div></div>
+        <div><a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a></div></li>{% endfor %}</ul>
+      {% elif opp.status != 'closed' %}<div class="flash error">No next action. Add one below so this buyer isn't lost.</div>{% endif %}
+      {% if opp.status != 'closed' %}
+      <details class="disclose"><summary>+ Add a task</summary>
+        <form method="post" action="{{ url_for('buyers.add_task', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+          <div class="field full"><label>What needs to happen?</label><input name="title" required placeholder="e.g. Collect bank statement showing available funds"></div>
+          <div class="field"><label>Who</label><select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == current_user.id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at" required></div>
+          <div class="field"><label>Type</label><select name="task_type">{% for v, l in [('follow_up','Follow-up'),('call','Call'),('collect_info','Collect information'),('review','Review'),('visit','Visit')] %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Priority</label><select name="priority">{% for p in ['normal','high','urgent','low'] %}<option value="{{ p }}">{{ p|title }}</option>{% endfor %}</select></div>
+          <div class="full"><button class="btn primary">Add task</button></div>
+        </form></details>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Log a call</h2>{% if opp.last_contact_at %}<span class="small muted">Last contact {{ opp.last_contact_at|rel }}</span>{% endif %}</div>
+      {% if opp.do_not_contact %}<p class="muted">This contact asked not to be contacted. Calls cannot be logged as outreach.</p>{% else %}
+      <form method="post" action="{{ url_for('buyers.call', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        <div class="field"><label>Outcome</label><select name="outcome" required><option value="">Choose…</option>{% for v, l in CALL_OUTCOMES %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Also complete task</label><select name="complete_task_id"><option value="">— none —</option>{% for t in tasks %}<option value="{{ t.id }}" {{ 'selected' if loop.first and t.task_type in ('first_contact','call','review') }}>{{ t.title }}</option>{% endfor %}</select></div>
+        <div class="field full"><label>What was said</label><textarea name="note" placeholder="Budget, must-haves, objections, commitments"></textarea></div>
+        <div class="field"><label>Next action</label><input name="next_title" placeholder="e.g. Send detailed buyer form"></div>
+        <div class="field"><label>Next action due (IST)</label><input type="datetime-local" name="next_due"></div>
+        <div class="full"><button class="btn primary">Save call</button> <span class="small muted">A next action is required unless another task stays open.</span></div>
+      </form>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Mandate at a glance</h2><a class="small" href="{{ url_for('buyers.detail', opp_id=opp.id, tab='requirements') }}">Edit requirements →</a></div>
+      <div class="facts">
+        {{ bfact('Hard all-in ceiling', 'all_in_max', 'inr') }}
+        {{ bfact('Price band — from', 'budget_min', 'inr') }}
+        {{ bfact('Price band — up to', 'budget_max', 'inr') }}
+        {{ bfact('Outside finance', 'finance_dependence', 'enum') }}
+        {{ bfact('Money available', 'cash_ready', 'enum') }}
+        {{ bfact('Decision maker', 'decision_maker', 'enum') }}
+        {{ bfact('Buy within', 'purchase_window', 'enum') }}
+        {{ bfact('Involvement', 'involvement', 'enum') }}
+        {{ bfact('Minimum chairs', 'chairs_min') }}
+        {{ bfact('Max monthly rent', 'max_monthly_rent', 'inr') }}
+      </div>
+      <h3>Where</h3>
+      <div class="small">{% for l in locs.preferred %}<span class="badge info">#{{ l.rank_order }} {{ l.locality }}</span> {% else %}<span class="missing">No ranked localities yet</span>{% endfor %}
+        {% for l in locs.excluded %}<span class="badge warn">Not {{ l.locality }}</span> {% endfor %}</div>
+      {% if choice_prefs %}<h3>Format &amp; structure</h3><div class="small">{% for dim, choice, imp in choice_prefs %}{{ BF.option_label(dim, choice) }} {{ imp_badge(imp) }} &nbsp; {% endfor %}</div>{% endif %}
+      <p class="small muted">All values are buyer-declared. Funding evidence and the effective criteria are confirmed only by a reviewer (Qualification tab).</p>
+    </div>
+
+    <div class="card">
+      <h2>Notes &amp; activity</h2>
+      <form method="post" action="{{ url_for('buyers.note', opp_id=opp.id) }}">{{ csrf() }}
+        <div class="field"><textarea name="body" placeholder="Internal note. Use @firstname to notify a colleague." required></textarea></div>
+        <button class="btn">Add note</button></form>
+      <ul class="timeline">{% for a in timeline[:15] %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body or '' }}</div>
+        <div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul>
+      {% if timeline|length > 15 %}<a href="{{ url_for('buyers.detail', opp_id=opp.id, tab='history') }}">Full history →</a>{% endif %}
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Contact</h2>
+      <p><strong>{{ opp.contact_name }}</strong><br><span class="mono">{{ opp.phone_normalized }}</span>{% if opp.email %}<br>{{ opp.email }}{% endif %}</p>
+      <h3>Consent</h3>
+      {% for purpose, label in [('service_contact','Service contact'),('share_teaser','Share criteria with sellers'),('marketing','Marketing')] %}{% set c = consents.get(purpose) %}
+      <div class="small">{{ label }}: {% if c and c.granted %}<span class="badge ok">Granted</span> <span class="muted">{{ c.captured_at|ist('%d %b %Y') }} · {{ c.source }}</span>{% elif c %}<span class="badge bad">Refused / withdrawn</span>{% else %}<span class="badge grey">Not recorded</span>{% endif %}</div>{% endfor %}
+      {% if other_opps %}<h3>Other opportunities for this contact</h3>{% for o in other_opps %}<div class="small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> · {{ o.kind }}{% if o.salon_name %} · {{ o.salon_name }}{% endif %} · {{ ALL_STAGE_LABELS.get(o.stage, o.stage) }}</div>{% endfor %}
+      <p class="small muted">Each need stays its own opportunity with its own stage and history.</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Qualification</h2><a class="small" href="{{ url_for('buyers.detail', opp_id=opp.id, tab='qualification') }}">Details →</a></div>
+      <div class="stat"><div class="n">{{ score.score }}/100</div><div class="l">{{ score.band }} · advisory</div></div>
+      <p class="small">Funding: <strong>{{ BF.FUNDING_LABELS.get(mandate.funding_status) }}</strong><br>
+      Criteria: {% if criteria_state == 'current' %}<span class="badge ok">Confirmed</span>{% elif criteria_state == 'stale' %}<span class="badge warn">Changed since review</span>{% else %}<span class="badge grey">Not reviewed</span>{% endif %}</p>
+    </div>
+
+    <div class="card">
+      <h2>Stage</h2>
+      <form method="post" action="{{ url_for('buyers.stage', opp_id=opp.id) }}">{{ csrf() }}
+        <div class="field"><select name="to" id="stage-to">{% for t in transitions %}<option value="{{ t.code }}" {{ 'disabled' if not t.allowed }} data-reason="{{ '1' if t.code in ('nurture','exploring_only','unqualified','closed_lost','do_not_contact','closed_won') else '0' }}" data-followup="{{ '1' if t.code in ('nurture','exploring_only') else '0' }}">{{ t.label }}{% if not t.allowed %} — {{ t.why }}{% endif %}</option>{% endfor %}</select></div>
+        <div class="field" id="stage-reason"><label>Reason</label><input name="reason"></div>
+        <div class="field" id="stage-followup"><label>Follow-up date (IST)</label><input type="datetime-local" name="follow_up_due"></div>
+        <button class="btn">Move stage</button>
+      </form>
+    </div>
+
+    {% if can('crm.assign') %}
+    <div class="card"><h2>Hand off</h2>
+      <form method="post" action="{{ url_for('buyers.assign', opp_id=opp.id) }}">{{ csrf() }}
+        <div class="field"><label>New primary owner</label><select name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == opp.primary_owner_id }}>{{ u.full_name }}{{ ' (buyer team)' if u.team == 'buyer' }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Context for the new owner</label><input name="reason" required></div>
+        <button class="btn">Reassign</button></form></div>
+    {% endif %}
+  </div>
+</div>
+
+{% elif tab == 'requirements' %}
+<div class="card"><div class="card-h"><h2>Requirements completeness {{ comp.pct }}%</h2><span class="small muted">{{ comp.answered }} of {{ comp.total }} questions answered</span></div>
+  <div class="meter"><span class="w{{ (comp.pct // 5) * 5 }}"></span></div>
+  {% if comp.missing_material %}<p class="small">Highest-value questions still open: {% for f in comp.missing_material[:8] %}<span class="badge warn">{{ f.label }}</span> {% endfor %}</p>{% endif %}
+  <p class="small muted">"Not provided" means not asked yet. Use the answer state for <em>Unknown</em>, <em>Prefer to discuss</em> etc. — a blank is never treated as a pass.{% if criteria_state == 'current' %} Changing anything here sends the confirmed criteria back for review.{% endif %}</p>
+</div>
+
+<div class="card" id="localities">
+  <div class="card-h"><h2>Where — ranked localities &amp; exclusions</h2></div>
+  <div class="split">
+    <div><h3>Preferred (ranked)</h3>
+      <ul class="loc-list">{% for l in locs.preferred %}<li><span><span class="rank">#{{ l.rank_order }}</span> {{ l.locality }}, {{ l.city }}{% if l.note %} <span class="small muted">— {{ l.note }}</span>{% endif %}</span>
+        <span class="inline">{% for act, lbl in [('up','↑'),('down','↓'),('remove','Remove')] %}<form method="post" action="{{ url_for('buyers.locality', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="locality_id" value="{{ l.id }}"><button class="btn sm" name="action" value="{{ act }}" title="{{ act }}">{{ lbl }}</button></form>{% endfor %}</span></li>
+      {% else %}<li class="empty">No preferred localities yet.</li>{% endfor %}</ul></div>
+    <div><h3>Excluded</h3>
+      <ul class="loc-list">{% for l in locs.excluded %}<li><span>{{ l.locality }}, {{ l.city }}{% if l.note %} <span class="small muted">— {{ l.note }}</span>{% endif %}</span>
+        <form method="post" action="{{ url_for('buyers.locality', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="locality_id" value="{{ l.id }}"><button class="btn sm" name="action" value="remove">Remove</button></form></li>
+      {% else %}<li class="empty">No exclusions recorded.</li>{% endfor %}</ul></div>
+  </div>
+  <form method="post" action="{{ url_for('buyers.locality', opp_id=opp.id) }}" class="inline">{{ csrf() }}
+    <input type="hidden" name="action" value="add">
+    <select name="kind"><option value="preferred">Add preferred</option><option value="excluded">Add exclusion</option></select>
+    <input name="locality" placeholder="Locality, e.g. Gachibowli" required>
+    <input name="city" value="{{ mandate.preferred_city or opp.contact_city or 'Hyderabad' }}" required>
+    <input name="note" placeholder="Why (optional)">
+    <button class="btn">Add</button></form>
+</div>
+
+<form method="post" action="{{ url_for('buyers.save_preferences', opp_id=opp.id) }}" class="card">{{ csrf() }}
+  <div class="card-h"><h2>Format &amp; deal-structure preferences</h2></div>
+  <p class="small muted">For each option: Must have, Prefer, Flexible, Avoid or Not important. Leave blank if not discussed yet — blank is not the same as "not important".</p>
+  {% for dim, dlabel, opts in BF.CHOICE_DIMENSIONS %}
+  <h3>{{ dlabel }}</h3>
+  <div class="pref-grid">{% for v, l in opts %}<label class="small">{{ l }}</label>
+    <select name="pref__{{ dim }}__{{ v }}"><option value="">— blank —</option>{% for iv, il in BF.IMPORTANCE %}<option value="{{ iv }}" {{ 'selected' if prefs.get((dim, v)) == iv }}>{{ il }}</option>{% endfor %}</select>{% endfor %}</div>
+  {% endfor %}
+  <p></p><button class="btn primary">Save preferences</button>
+</form>
+
+{% for sk, slabel in SECTIONS %}
+<form method="post" action="{{ url_for('buyers.save_section', opp_id=opp.id, section=sk) }}" class="card">{{ csrf() }}
+  <div class="card-h"><h2>{{ slabel }}</h2><span class="small muted">{{ comp.sections[sk].answered }}/{{ comp.sections[sk].total }}</span></div>
+  {% for f in BF.fields_in(sk) %}{% set p = prov.get(f.key) %}
+  <div class="intake-row">
+    <div class="lbl">{{ f.label }}{% if f.unit %} <span class="muted">({{ f.unit }})</span>{% endif %}{% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}</div>
+    <div>
+      {% if f.ftype == 'enum' %}<select name="{{ f.key }}" data-value-for="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if mandate[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
+      {% elif f.ftype == 'textarea' %}<textarea name="{{ f.key }}" data-value-for="{{ f.key }}">{{ mandate[f.key] or '' }}</textarea>
+      {% else %}<input name="{{ f.key }}" value="{{ '' if mandate[f.key] is none else mandate[f.key] }}" data-value-for="{{ f.key }}" {% if f.ftype == 'inr' %}placeholder="₹ e.g. 25L"{% endif %}>
+        {% if f.ftype == 'inr' and mandate[f.key] is not none %}<div class="help">{{ mandate[f.key]|inr(false) }}</div>{% endif %}{% endif %}
+    </div>
+    <div><select name="{{ f.key }}__state" title="Answer state"><option value="">Not provided</option>{% for v, l in SF.ANSWER_STATES %}<option value="{{ v }}" {{ 'selected' if p and p.answer_state == v }}>{{ l }}</option>{% endfor %}</select></div>
+    <div>{% if f.importance %}<select name="{{ f.key }}__importance" title="How much does this matter?"><option value="">Importance…</option>{% for iv, il in BF.IMPORTANCE %}<option value="{{ iv }}" {{ 'selected' if prefs.get((f.key, '')) == iv }}>{{ il }}</option>{% endfor %}</select>
+      {% elif p %}<span class="badge grey">{{ SF.EVIDENCE_LABELS.get(p.evidence_status, p.evidence_status) }}</span>{% endif %}</div>
+  </div>
+  {% endfor %}
+  <p></p><button class="btn primary">Save {{ slabel|lower }}</button>
+</form>
+{% endfor %}
+
+{% elif tab == 'qualification' %}
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-h"><h2>Seriousness {{ score.score }}/100 — {{ score.band }}</h2></div>
+      {% for f in score.factors %}<div class="score-row"><div><strong>{{ f.name }}</strong></div><div class="right">{{ f.points }} / {{ f.max }}</div><div class="why">{{ f.reason }}</div></div>{% endfor %}
+      <p class="small muted">{{ score.advisory }} Missing answers earn nothing.<br>{{ score.version }} · data last changed {{ score.data_updated_at|rel }}{% if score.reviewer %} · criteria reviewed by {{ score.reviewer }} {{ score.reviewed_at|rel }}{% endif %}.</p>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Effective criteria</h2>
+      <p>{% if criteria_state == 'current' %}<span class="badge ok">Confirmed</span> at data version {{ mandate.criteria_reviewed_version }} by {{ score.reviewer }}, {{ mandate.criteria_reviewed_at|rel }}.
+      {% elif criteria_state == 'stale' %}<span class="badge warn">Changed since review</span> Confirmed at version {{ mandate.criteria_reviewed_version }}; requirements are now at version {{ mandate.data_version }}.
+      {% else %}<span class="badge grey">Not reviewed</span> Requirements are buyer-declared and have not been confirmed by a reviewer.{% endif %}</p>
+      {% if criteria_blockers %}<p class="small unknown">Before confirming, capture: {{ criteria_blockers|join(', ') }}.</p>{% endif %}
+      {% if can_review %}<form method="post" action="{{ url_for('buyers.confirm_criteria', opp_id=opp.id) }}">{{ csrf() }}<button class="btn primary" {{ 'disabled' if criteria_blockers }}>Confirm current requirements</button></form>
+      {% else %}<p class="small muted">Only a reviewer (team lead or admin) can confirm the effective criteria.</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Funding position</h2>
+      <p>Status: <strong>{{ BF.FUNDING_LABELS.get(mandate.funding_status) }}</strong>{% if funding_reviewer %} · by {{ funding_reviewer }} {{ mandate.funding_reviewed_at|rel }}{% endif %}</p>
+      <div class="facts">{{ bfact('Declared source', 'funding_source', 'enum') }}{{ bfact('Money available', 'cash_ready', 'enum') }}{{ bfact('Amount ready now', 'cash_ready_amount', 'inr') }}</div>
+      {% if can_funding_detail %}
+        {% if mandate.funding_note %}<h3>Evidence notes <span class="badge warn">Restricted</span></h3><p class="small">{{ mandate.funding_note }}</p>{% endif %}
+        {% if can_review %}
+        <form method="post" action="{{ url_for('buyers.funding', opp_id=opp.id) }}">{{ csrf() }}
+          <div class="field"><label>Set funding status</label><select name="status">{% for v, l in BF.FUNDING_STATUSES %}<option value="{{ v }}" {{ 'selected' if mandate.funding_status == v }}>{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label>What evidence was seen, and its limitations</label><textarea name="note" placeholder="e.g. Bank statement dated 10 Nov shows ₹32 L; loan sanction letter pending">{{ mandate.funding_note or '' }}</textarea></div>
+          <button class="btn">Record funding review</button></form>{% endif %}
+      {% else %}<p class="small muted">Funding evidence detail is restricted to reviewers and explicit grants. You can see the status only.</p>{% endif %}
+      <p class="small muted">Buyers and staff data entry can never set this — only a reviewer action does, and it is audited.</p>
+    </div>
+  </div>
+</div>
+
+{% elif tab == 'matches' %}
+<div class="card">
+  <h2>Matches</h2>
+  <p>No match history yet. Ranked salon recommendations for this buyer arrive with the <strong>Match Desk in Milestone 5</strong>. Nothing here is simulated.</p>
+  <p class="small muted">The requirements captured on this record — all-in ceiling, ranked localities and exclusions, Must/Prefer/Avoid preferences — are the inputs it will use. Only buyers with confirmed criteria and reviewed funding can be qualified to shortlist.</p>
+</div>
+
+{% elif tab == 'history' %}
+<div class="split"><div>
+  <div class="card"><h2>Stage history</h2>
+    <ul class="timeline">{% for h in history %}<li><div>{{ STAGE_LABELS.get(h.from_stage, h.from_stage or '—') }} → <strong>{{ STAGE_LABELS.get(h.to_stage, h.to_stage) }}</strong>{% if h.reason %}: {{ h.reason }}{% endif %}</div><div class="who">{{ h.actor_name or 'System' }} · {{ h.at|ist }}</div></li>{% endfor %}</ul></div>
+  <div class="card"><h2>All activity</h2>
+    <ul class="timeline">{% for a in timeline %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body or '' }}</div><div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul></div>
+</div><div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Requirement changes</h2></div><div class="table-wrap"><table class="small">
+    <tr><th>v</th><th>Field</th><th>From</th><th>To</th><th>By</th></tr>
+    {% for c in changes %}<tr><td>{{ c.data_version }}</td><td>{{ BF.BY_KEY[c.field_key].label if c.field_key in BF.BY_KEY else c.field_key|replace('_',' ') }}</td>
+      <td>{{ c.old_value if c.old_value is not none else (c.old_state or '—') }}</td><td>{{ c.new_value if c.new_value is not none else (c.new_state or '—') }}</td>
+      <td>{{ c.actor_name or 'Buyer (form)' }}<div class="muted">{{ c.at|ist }}</div></td></tr>
+    {% else %}<tr><td colspan="5" class="empty">No changes yet.</td></tr>{% endfor %}</table></div></div>
+</div></div>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,8 @@
 # Salon Shastra TeamOS — Business Exchange, Match Desk & Team Command Center
 
 Internal operating platform for Salon Shastra's salon buy–sell team. Milestone 1: foundation, access control and
-seller management. See `docs/` for architecture, roadmap, decisions and feature status.
+seller management; Milestone 2: production hardening; **Milestone 3: buyer / investor management**. See `docs/` for
+architecture, roadmap, decisions and feature status.
 
 ## Run locally (5 minutes)
 
@@ -24,6 +25,12 @@ In development you can switch off two-step sign-in for the demo admin with `expo
 (empty). Production always enforces it for Super Admin and Finance.
 
 Try **Spreadsheet import** as `lead@` with `docs/samples/sample_seller_leads.csv`.
+
+Buyers (M3): open **Buyers / Investors**. Sign in as `harika@` (buyer team) to work mandates, and as `lead@` to
+review funding and confirm criteria (*Qualification* tab). `BY-…` demo records cover a fully qualified acquirer, an
+investor group awaiting funding proof, a *new salon* need, a buyer's own submission that tried to self-verify, a
+seller who also wants to buy, and an *exploring only* lead. An existing demo database gets the buyers by re-running
+`seed-demo` after `migrate`.
 
 Background worker: `python3 manage.py worker` (or `--once`). Backups: `python3 manage.py backup` and
 `python3 manage.py verify-backup <file>`. Deployment: `deploy/RUNBOOK.md`.

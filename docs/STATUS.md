@@ -1,4 +1,33 @@
-# Feature status — Milestone 2 (22 Nov 2026, v0.2.0)
+# Feature status — Milestone 3 (23 Nov 2026, v0.3.0)
+
+Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
+
+## Milestone 3 — buyer / investor management (awaiting founder review)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Buyer opportunities (`BY-`), quick screen, duplicate check | **Built** | Same contact can hold seller + several buyer mandates, each with its own stage and history (UAT-05). Duplicate mobile → link or flag, never silent merge. |
+| Acquisition mandate (§7.2 / §7.2A) | **Built** | 38 canonical fields in 8 sections with answer states and buyer-declared provenance; hard **all-in ceiling**; inclusions (deposit / stock / working capital); change log and data version. |
+| Ranked localities + exclusions | **Built** | Add, rank up/down, remove; duplicates refused; ranking changes are versioned. |
+| Must / Prefer / Flexible / Avoid / Not important | **Built** | Per option for format, model, positioning and deal structure; per criterion for scalar needs (min chairs, area, rent, lease, sales, years, staff, transition). Blank ≠ not important. |
+| Reviewer-only funding review | **Built** | Status team-visible; evidence notes restricted to reviewers or a per-case `buyer.view_funding` grant (UAT-31). Buyer or staff payloads can't set it — ignored and audited (UAT-09). |
+| Criteria confirmation | **Built** | Reviewer confirms the current data version; any later change marks it "changed since review" and re-opens the queue. |
+| Seriousness score (§7.3) | **Built** | 6 factors / 100 with reasons, version, freshness and reviewer; missing answers score 0; evidence points need a reviewer. Advisory only. |
+| Buyer funnel (§7.1) | **Built** | Gates for requirements captured, basic qualified, funding review and qualified to shortlist; *new salon* need never qualifies as a resale buyer; holding stages need a follow-up. Stages needing M5/M6 are shown but blocked, not simulated. |
+| Respondent submission path (UAT-02) | **Partial** | Server-side path built and tested (routing to buyer team, review task, no approvals). The public form page/link ships in Milestone 4. |
+| Shared screens | **Built** | My Day, Team Command Center (new buyer review queue), Tasks, Search, Duplicates and Field dictionary handle buyers. |
+| Matches tab | **Planned (M5)** | Honest empty state — no match history is simulated. |
+| PostgreSQL replay for the new SQL | **Not run** | No PostgreSQL on this machine. The new migration avoids SQLite-only syntax (list view groups localities in Python instead of `group_concat`). Re-run `scripts/pg_replay.py` before deployment. |
+
+Tests: 88 automated tests pass (73 from M1/M2 incl. two review fixes, 15 new for M3). Verified by hand in a real browser.
+
+## Fixed during the M2 review (before M3)
+* Finance role could read seller names / refs through *Tasks → All open (team)*. The list now applies the same rule as the task page. Regression test added.
+* MFA replay test was timing-flaky (could cross a 30-second boundary). The app logic was correct; the test now replays the exact code.
+
+---
+
+# Milestone 2 status (22 Nov 2026, v0.2.0)
 
 Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
 
@@ -23,5 +52,5 @@ answer states, evidence review, all-in cost, financials, SWOT, readiness, stages
 re-review), tasks, My Day, Team Command Center, search, field dictionary.
 
 ## Not built yet
-Buyers (M3), forms & data requests (M4), Match Desk (M5), deals, teasers and admin finance ledger (M6), WhatsApp and
+Forms & data requests (M4), Match Desk (M5), deals, teasers and admin finance ledger (M6), WhatsApp and
 reporting (M7). Menu entries show the milestone. Nothing is mocked. **WhatsApp is not connected.**

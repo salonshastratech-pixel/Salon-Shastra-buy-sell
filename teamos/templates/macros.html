@@ -16,14 +16,14 @@
     <div class="why">{{ t.why }}</div>
     <div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div>
     <div class="meta">
-      {% if t.ref_code %}<a href="{{ url_for('sellers.detail', opp_id=t.opp_id) }}">{{ t.ref_code }}</a> · {{ t.salon_name or '' }} · {% endif %}
+      {% if t.ref_code %}<a href="{{ opp_url(t.opp_kind, t.opp_id) }}">{{ t.ref_code }}</a> · {{ t.salon_name or t.contact_name or '' }} · {% endif %}
       Due {{ t.due_at|ist }} ({{ t.due_at|rel }})
       {% if show_assignee %} · <strong>{{ t.assignee_name }}</strong>{% endif %}
       {% if t.is_synthetic %} <span class="badge syn">synthetic</span>{% endif %}
     </div>
   </div>
   <div class="inline">
-    {% if t.opp_id %}<a class="btn sm" href="{{ url_for('sellers.detail', opp_id=t.opp_id) }}">Open</a>{% endif %}
+    {% if t.opp_id %}<a class="btn sm" href="{{ opp_url(t.opp_kind, t.opp_id) }}">Open</a>{% endif %}
     <a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a>
   </div>
 </li>

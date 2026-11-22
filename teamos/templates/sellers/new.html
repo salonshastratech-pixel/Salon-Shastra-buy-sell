@@ -13,7 +13,7 @@
     <div class="card">
       <strong>{{ d.full_name }}</strong> <span class="mono small">{{ d.phone_normalized }}</span> <span class="badge warn">{{ d.reason }}</span>
       {% if d.is_synthetic %}<span class="badge syn">synthetic</span>{% endif %}
-      <div class="small">{% for o in d.opportunities %}<a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> {{ o.kind }} · {{ o.salon_name or '' }} · {{ STAGE_LABELS.get(o.stage, o.stage) }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
+      <div class="small">{% for o in d.opportunities %}<a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> {{ o.kind }} · {{ o.salon_name or '' }} · {{ STAGE_LABELS.get(o.stage, o.stage) }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
       <label class="check"><input type="radio" name="dedupe_decision" value="link:{{ d.id }}" required> Same person — add this as a new opportunity under their existing contact (their details are not changed)</label>
     </div>
     {% endfor %}

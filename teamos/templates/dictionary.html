@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Field dictionary{% endblock %}
 {% block content %}
-<div class="ph"><div><h1>Seller field dictionary</h1><div class="sub">Generated from code (<span class="mono">teamos/domain/seller_fields.py</span>) — the single source for forms, validation, privacy and matching inputs. For founder/PM review.</div></div></div>
+<div class="ph"><div><h1>Field dictionary</h1><div class="sub">Generated from code (<span class="mono">teamos/domain/seller_fields.py</span>, <span class="mono">buyer_fields.py</span>) — the single source for forms, validation, privacy and matching inputs. For founder/PM review.</div></div></div>
+<h2>Seller listing</h2>
 {% for sk, slabel in SF.SECTIONS %}
 <div class="card flush"><div class="card-h"><h2 class="small">&nbsp;&nbsp;{{ slabel }}</h2></div><div class="table-wrap"><table>
 <tr><th>Field key</th><th>Question / label</th><th>Type</th><th>Privacy</th><th>Material (re-review)</th><th>Matching input</th><th>Shown when</th><th>Notes</th></tr>
@@ -13,6 +14,22 @@
 <td class="small">{{ f.show_if[0] ~ ' = ' ~ f.show_if[1] if f.show_if else 'Always' }}</td><td class="small muted">{{ f.help }}</td></tr>{% endfor %}
 </table></div></div>
 {% endfor %}
+<h2>Buyer / investor mandate</h2>
+{% for sk, slabel in BF.SECTIONS %}
+<div class="card flush"><div class="card-h"><h2 class="small">&nbsp;&nbsp;{{ slabel }}</h2></div><div class="table-wrap"><table>
+<tr><th>Field key</th><th>Question / label</th><th>Type</th><th>Importance asked</th><th>Material</th><th>Matching input</th><th>Notes</th></tr>
+{% for f in BF.fields_in(sk) %}<tr>
+<td class="mono">buyer.{{ f.key }}</td><td>{{ f.label }}</td>
+<td>{{ f.ftype }}{% if f.options %}<div class="small muted">{{ f.options|map('last')|join(' / ') }}</div>{% endif %}</td>
+<td>{{ 'Must / Prefer / Flexible / Avoid' if f.importance else '—' }}</td>
+<td>{{ 'Yes' if f.material else '—' }}</td><td>{{ 'Yes' if f.matching else '—' }}</td><td class="small muted">{{ f.help }}</td></tr>{% endfor %}
+</table></div></div>
+{% endfor %}
+<div class="card"><h2>Buyer preference dimensions</h2>
+<p>Each option is rated {% for k, v in BF.IMPORTANCE %}<span class="badge grey">{{ v }}</span> {% endfor %} — blank means not discussed, which is different from "Not important".</p>
+<table class="small">{% for dim, label, opts in BF.CHOICE_DIMENSIONS %}<tr><td class="mono">buyer.pref.{{ dim }}</td><td>{{ label }}</td><td class="muted">{{ opts|map('last')|join(' / ') }}</td></tr>{% endfor %}
+<tr><td class="mono">buyer.localities</td><td>Ranked preferred localities + exclusions</td><td class="muted">city, locality, rank, note</td></tr></table>
+<p class="small muted">Reviewer-only (never accepted from buyer or staff data entry): {{ BF.PRIVILEGED_KEYS|sort|join(', ') }}.</p></div>
 <div class="card"><h2>Answer states</h2><p>Every field distinguishes: {% for k, v in SF.ANSWER_STATES %}<span class="badge grey">{{ v }}</span> {% endfor %} — and a blank field means <em>not provided</em>. ₹0 is a real value, never a stand-in for unknown.</p>
 <h2>Evidence status</h2><p>{% for k, v in SF.EVIDENCE_STATUSES %}<span class="badge info">{{ v }}</span> {% endfor %} — only reviewers can move a fact beyond seller-declared.</p></div>
 {% endblock %}

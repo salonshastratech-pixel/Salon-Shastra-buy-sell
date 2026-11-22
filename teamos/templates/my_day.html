@@ -24,7 +24,7 @@
     <div class="card">
       <div class="card-h"><h2>Your records with no next action</h2><span class="badge bad">{{ no_next|length }}</span></div>
       <p class="small muted">Every active opportunity needs an owner and a next step. Add one so nothing slips.</p>
-      <ul class="tasks">{% for o in no_next %}<li class="task"><div><div class="t"><a href="{{ url_for('sellers.detail', opp_id=o.id) }}">{{ o.ref_code }} · {{ o.salon_name }}</a></div><div class="meta">{{ o.contact_name }} · {{ STAGE_LABELS.get(o.stage) }}</div></div><div><a class="btn sm" href="{{ url_for('sellers.detail', opp_id=o.id) }}">Add next action</a></div></li>{% endfor %}</ul>
+      <ul class="tasks">{% for o in no_next %}<li class="task"><div><div class="t"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }} · {{ o.salon_name or o.contact_name }}</a></div><div class="meta">{{ o.contact_name }} · {{ STAGE_LABELS.get(o.stage) }}</div></div><div><a class="btn sm" href="{{ opp_url(o.kind, o.id) }}">Add next action</a></div></li>{% endfor %}</ul>
     </div>
     {% endif %}
     <div class="card">

@@ -11,13 +11,14 @@ import logging
 
 from . import logging_setup, timeutil
 from .db import close_db, get_db, migrate, open_standalone
+from .domain import buyer_fields as BF
 from .domain import seller_fields as SF
 from .domain.common import format_inr
 from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.2.0-m2"
+__version__ = "0.3.0-m3"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -95,7 +96,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["ist"] = timeutil.fmt_ist
     app.jinja_env.filters["rel"] = timeutil.relative
     app.jinja_env.globals.update(
-        can=can, SF=SF, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__,
+        can=can, SF=SF, BF=BF, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__,
         now_iso=timeutil.now_iso,
         # A global (not context variable) so imported macros can read it.
         csrf_value=lambda: g.session["csrf_token"] if g.get("session") else "",
@@ -113,8 +114,8 @@ def create_app(overrides: dict | None = None) -> Flask:
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL", (g.user["id"],))
         return ctx
 
-    from .web import admin, auth, imports, main, sellers, tasks
-    for bp in (auth.bp, main.bp, sellers.bp, tasks.bp, admin.bp, imports.bp):
+    from .web import admin, auth, buyers, imports, main, sellers, tasks
+    for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp):
         app.register_blueprint(bp)
     return app
 
@@ -124,3 +125,11 @@ def _make_error_handler(code, title):
         msg = getattr(e, "description", "") if code == 400 else ""
         return render_template("error.html", code=code, title=title, message=msg), code
     return handler
+
+
+def _opp_url(kind: str | None, opp_id, **kw) -> str:
+    """Link to an opportunity's own screen (sellers and buyers live in separate modules)."""
+    from flask import url_for
+    if not opp_id:
+        return "#"
+    return url_for("buyers.detail" if kind == "buyer" else "sellers.detail", opp_id=opp_id, **kw)

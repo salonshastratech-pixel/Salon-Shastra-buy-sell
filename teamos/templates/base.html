@@ -22,7 +22,7 @@
       {% if can('crm.view') %}
       <div class="group">Opportunities</div>
       <a href="{{ url_for('sellers.index') }}" class="{{ 'on' if ep.startswith('sellers.') }}">Sellers</a>
-      <a href="{{ url_for('main.planned', module='buyers') }}" class="planned">Buyers / Investors <span class="tag">M3</span></a>
+      <a href="{{ url_for('buyers.index') }}" class="{{ 'on' if ep.startswith('buyers.') }}">Buyers / Investors</a>
       <a href="{{ url_for('main.planned', module='forms') }}" class="planned">Forms &amp; Requests <span class="tag">M4</span></a>
       <a href="{{ url_for('main.planned', module='match') }}" class="planned">Match Desk <span class="tag">M5</span></a>
       <a href="{{ url_for('main.planned', module='deals') }}" class="planned">Deals <span class="tag">M6</span></a>

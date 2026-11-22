@@ -34,7 +34,7 @@
     var upd = function () {
       var opt = stageSel.options[stageSel.selectedIndex];
       document.querySelector('#stage-reason').classList.toggle('hide', !(opt && opt.dataset.reason === '1'));
-      document.querySelector('#stage-followup').classList.toggle('hide', stageSel.value !== 'nurture');
+      document.querySelector('#stage-followup').classList.toggle('hide', !(opt && (opt.dataset.followup === '1' || stageSel.value === 'nurture')));
     };
     stageSel.addEventListener('change', upd); upd();
   }

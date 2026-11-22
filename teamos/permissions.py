@@ -25,6 +25,7 @@ CAPABILITIES = {
     "evidence.review": "Mark facts as staff-reviewed / document-supported / verified / disputed",
     "listing.approve": "Approve or reject a seller listing; close a deal as won",
     "seller.view_restricted": "See restricted seller fields (personal sale reasons, private notes)",
+    "buyer.view_funding": "See buyer funding-proof detail (evidence notes and limitations)",
     "duplicates.resolve": "Resolve duplicate-contact review items",
     "users.manage": "Create, deactivate users and grant capabilities",
     "audit.view": "View the audit log",
