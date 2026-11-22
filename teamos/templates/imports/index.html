@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Imports{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Spreadsheet import</h1><div class="sub">Bring seller leads from Excel or Google Sheets exports. You'll see every row before anything is saved.</div></div></div>
+<div class="split">
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Recent imports</h2></div><div class="table-wrap"><table>
+    <tr><th>#</th><th>File</th><th>Rows</th><th>Created</th><th>Status</th><th>By</th><th>When</th></tr>
+    {% for b in batches %}<tr class="row-link"><td><a href="{{ url_for('imports.preview', batch_id=b.id) }}">{{ b.id }}</a></td><td><a href="{{ url_for('imports.preview', batch_id=b.id) }}">{{ b.filename }}</a></td>
+    <td>{{ b.total_rows }}</td><td>{{ b.created_count if b.created_count is not none else '—' }}</td>
+    <td><span class="badge {{ 'ok' if b.status == 'committed' else 'grey' if b.status == 'discarded' else 'info' }}">{{ b.status }}</span></td>
+    <td>{{ b.uploader }}</td><td class="small">{{ b.created_at|ist }}</td></tr>{% else %}<tr><td colspan="7" class="empty">No imports yet.</td></tr>{% endfor %}
+  </table></div></div>
+  <div class="card"><h2>Upload</h2>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.upload') }}">{{ csrf() }}
+      <div class="field"><label>CSV or XLSX (max 5 MB, 2,000 rows)</label><input type="file" name="file" accept=".csv,.xlsx" required></div>
+      <button class="btn primary">Upload &amp; preview</button></form>
+    <h3>Columns we recognise</h3>
+    <p class="small">{% for k, (label, syn) in TARGETS.items() %}<span class="badge {{ 'warn' if k in REQUIRED else 'grey' }}">{{ label }}</span> {% endfor %}</p>
+    <p class="small muted">Orange = required. You can re-map any column on the preview screen. Imported contacts get <strong>no</strong> contact consent by default — legacy data needs a permission basis (decision D-17).</p></div>
+</div>
+{% endblock %}

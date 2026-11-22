@@ -1,0 +1,24 @@
+{% extends "bare.html" %}{% from "macros.html" import csrf %}
+{% block title %}Two-step sign-in{% endblock %}
+{% block content %}
+<div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Two-step sign-in</small></div>
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+{% if mode == 'setup' %}
+  <h2>Protect your account</h2>
+  <p class="small">Your role can see sensitive company information, so an authenticator app is required.</p>
+  <ol class="small"><li>Open Google Authenticator, Microsoft Authenticator or Authy.</li>
+  <li>Add an account → <em>Enter a setup key</em>. Name: Salon Shastra TeamOS. Key:</li></ol>
+  <p class="mono">{{ secret }}</p>
+  <p class="small muted">Time-based · 6 digits. On a phone you can also <a href="{{ uri }}">open the setup link</a>.</p>
+  <form method="post">{{ csrf() }}<div class="field"><label>Enter the 6-digit code shown</label><input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus></div><button class="btn primary">Turn on two-step sign-in</button></form>
+{% elif mode == 'codes' %}
+  <h2>Save your recovery codes</h2>
+  <p class="small">If you lose your phone, each code below lets you in once. Store them somewhere safe — they won't be shown again.</p>
+  <p class="mono">{% for c in codes %}{{ c }}<br>{% endfor %}</p>
+  <a class="btn primary" href="{{ url_for('main.my_day') }}">I've saved them — continue</a>
+{% else %}
+  <h2>Enter your code</h2>
+  <form method="post">{{ csrf() }}<div class="field"><label>6-digit code from your authenticator app, or a recovery code</label><input name="code" autocomplete="one-time-code" required autofocus></div><button class="btn primary">Verify</button></form>
+{% endif %}
+<form method="post" action="{{ url_for('auth.logout') }}">{{ csrf() }}<p></p><button class="btn link small">Sign out</button></form>
+{% endblock %}

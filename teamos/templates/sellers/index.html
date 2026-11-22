@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% from "macros.html" import stage_badge, approval_badge %}
+{% block title %}Sellers{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Sellers</h1><div class="sub">Shared team pipeline. Ownership shows accountability, not access.</div></div>
+<div class="actions">{% if can('crm.create') %}<a class="btn primary" href="{{ url_for('sellers.new') }}">+ New seller lead</a>{% endif %}</div></div>
+
+<form class="card inline" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Name, mobile, salon, locality, SL-…">
+  <select name="stage"><option value="">Any stage</option>{% for c, l in STAGES %}<option value="{{ c }}" {{ 'selected' if c == stage }}>{{ l }}</option>{% endfor %}</select>
+  <select name="owner"><option value="">Any owner</option><option value="me" {{ 'selected' if owner == 'me' }}>Me</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if owner == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select>
+  <select name="status">{% for s in ['active','holding','closed','all'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s|title }}</option>{% endfor %}</select>
+  <button class="btn">Filter</button>
+</form>
+
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Ref</th><th>Salon</th><th>Contact</th><th>Stage</th><th>Listing</th><th class="right">Asking</th><th>Owner</th><th>Next action</th></tr>
+{% for r in rows %}
+<tr class="row-link">
+  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
+  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a><div class="small muted">{{ r.locality }}, {{ r.city }}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}</div></td>
+  <td>{{ r.contact_name }}<div class="small muted mono">{{ r.phone_normalized }}</div></td>
+  <td>{{ stage_badge(r.stage, STAGE_LABELS) }}</td>
+  <td>{{ approval_badge(r.approval_state) }}</td>
+  <td class="right nowrap">{{ r.asking_price|inr if r.asking_price is not none else '—' }}</td>
+  <td>{{ r.owner_name or '—' }}</td>
+  <td>{% if r.next_action %}<div class="small">{{ r.next_action }}</div><div class="small {{ 'unknown' if r.next_action_due and r.next_action_due < now_iso() else 'muted' }}">{{ r.next_action_due|rel }}</div>{% elif r.status != 'closed' %}<span class="badge bad">None</span>{% else %}—{% endif %}</td>
+</tr>
+{% else %}<tr><td colspan="8" class="empty">No sellers match these filters.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

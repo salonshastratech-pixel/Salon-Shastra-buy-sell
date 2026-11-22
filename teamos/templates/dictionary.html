@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Field dictionary{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Seller field dictionary</h1><div class="sub">Generated from code (<span class="mono">teamos/domain/seller_fields.py</span>) — the single source for forms, validation, privacy and matching inputs. For founder/PM review.</div></div></div>
+{% for sk, slabel in SF.SECTIONS %}
+<div class="card flush"><div class="card-h"><h2 class="small">&nbsp;&nbsp;{{ slabel }}</h2></div><div class="table-wrap"><table>
+<tr><th>Field key</th><th>Question / label</th><th>Type</th><th>Privacy</th><th>Material (re-review)</th><th>Matching input</th><th>Shown when</th><th>Notes</th></tr>
+{% for f in SF.fields_in(sk) %}<tr>
+<td class="mono">seller.{{ f.key }}</td><td>{{ f.label }}</td>
+<td>{{ f.ftype }}{% if f.options %}<div class="small muted">{{ f.options|map('last')|join(' / ') }}</div>{% endif %}</td>
+<td>{% if f.privacy == 'restricted' %}<span class="badge warn">Restricted</span>{% else %}<span class="badge grey">Operational</span>{% endif %}</td>
+<td>{{ 'Yes' if f.material else '—' }}</td><td>{{ 'Yes' if f.matching else '—' }}</td>
+<td class="small">{{ f.show_if[0] ~ ' = ' ~ f.show_if[1] if f.show_if else 'Always' }}</td><td class="small muted">{{ f.help }}</td></tr>{% endfor %}
+</table></div></div>
+{% endfor %}
+<div class="card"><h2>Answer states</h2><p>Every field distinguishes: {% for k, v in SF.ANSWER_STATES %}<span class="badge grey">{{ v }}</span> {% endfor %} — and a blank field means <em>not provided</em>. ₹0 is a real value, never a stand-in for unknown.</p>
+<h2>Evidence status</h2><p>{% for k, v in SF.EVIDENCE_STATUSES %}<span class="badge info">{{ v }}</span> {% endfor %} — only reviewers can move a fact beyond seller-declared.</p></div>
+{% endblock %}

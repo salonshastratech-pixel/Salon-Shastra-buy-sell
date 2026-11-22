@@ -1,0 +1,253 @@
+{% extends "base.html" %}{% from "macros.html" import csrf, stage_badge, approval_badge, fact %}
+{% block title %}{{ opp.ref_code }} · {{ opp.salon_name }}{% endblock %}
+{% block content %}
+<div class="ph">
+  <div>
+    <div class="small muted"><a href="{{ url_for('sellers.index') }}">Sellers</a> / {{ opp.ref_code }}</div>
+    <h1>{{ opp.salon_name }}</h1>
+    <div class="inline sub">{{ stage_badge(opp.stage, STAGE_LABELS) }} {{ approval_badge(listing.approval_state) }}
+      <span>{{ opp.locality }}, {{ opp.city }}</span> · <span>Owner: <strong>{{ opp.owner_name or 'Unassigned' }}</strong></span>
+      · <span>Source: {{ SOURCE_LABELS.get(opp.source, opp.source) }}</span>
+      {% if opp.is_synthetic %}<span class="badge syn">synthetic demo record</span>{% endif %}
+      {% if opp.do_not_contact %}<span class="badge bad">Do not contact</span>{% endif %}</div>
+  </div>
+  <div class="actions"><span class="badge {{ 'ok' if readiness.score >= 80 else 'warn' if readiness.score >= 60 else 'grey' }}">Readiness {{ readiness.score }}/100</span>
+    <span class="badge info">Intake {{ comp.pct }}%</span></div>
+</div>
+
+<nav class="tabs">
+  {% for k, l in [('overview','Overview'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('history','History')] %}
+  <a href="{{ url_for('sellers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
+</nav>
+
+{% if tab == 'overview' %}
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-h"><h2>Next action</h2></div>
+      {% if tasks %}
+      <ul class="tasks">{% for t in tasks %}<li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}"><div><div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div>
+        <div class="meta">{{ t.assignee_name }} · due {{ t.due_at|ist }} ({{ t.due_at|rel }})</div></div>
+        <div><a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a></div></li>{% endfor %}</ul>
+      {% elif opp.status != 'closed' %}<div class="flash error">No next action. Add one below so this seller isn't lost.</div>{% endif %}
+      {% if opp.status != 'closed' %}
+      <details class="disclose"><summary>+ Add a task</summary>
+        <form method="post" action="{{ url_for('sellers.add_task', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+          <div class="field full"><label>What needs to happen?</label><input name="title" required placeholder="e.g. Collect lease agreement copy"></div>
+          <div class="field"><label>Who</label><select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == current_user.id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at" required></div>
+          <div class="field"><label>Type</label><select name="task_type">{% for v, l in [('follow_up','Follow-up'),('call','Call'),('collect_info','Collect information'),('review','Review'),('visit','Visit')] %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Priority</label><select name="priority">{% for p in ['normal','high','urgent','low'] %}<option value="{{ p }}">{{ p|title }}</option>{% endfor %}</select></div>
+          <div class="full"><button class="btn primary">Add task</button></div>
+        </form></details>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Log a call</h2>{% if opp.last_contact_at %}<span class="small muted">Last contact {{ opp.last_contact_at|rel }}</span>{% endif %}</div>
+      {% if opp.do_not_contact %}<p class="muted">This contact asked not to be contacted. Calls cannot be logged as outreach.</p>{% else %}
+      <form method="post" action="{{ url_for('sellers.call', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        <div class="field"><label>Outcome</label><select name="outcome" required><option value="">Choose…</option>{% for v, l in CALL_OUTCOMES %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Also complete task</label><select name="complete_task_id"><option value="">— none —</option>{% for t in tasks %}<option value="{{ t.id }}" {{ 'selected' if loop.first and t.task_type in ('first_contact','call') }}>{{ t.title }}</option>{% endfor %}</select></div>
+        <div class="field full"><label>What was said</label><textarea name="note" placeholder="Key facts, objections, commitments"></textarea></div>
+        <div class="field"><label>Next action</label><input name="next_title" placeholder="e.g. Call back for lease details"></div>
+        <div class="field"><label>Next action due (IST)</label><input type="datetime-local" name="next_due"></div>
+        <div class="full"><button class="btn primary">Save call</button> <span class="small muted">A next action is required unless another task stays open.</span></div>
+      </form>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Key facts</h2><a class="small" href="{{ url_for('sellers.detail', opp_id=opp.id, tab='intake') }}">Edit intake →</a></div>
+      <div class="facts">
+        {{ fact('Asking price', listing.asking_price, prov.get('asking_price', {}).get('answer_state'), 'inr') }}
+        {{ fact('Format', listing.gender_format, prov.get('gender_format', {}).get('answer_state'), 'enum', 'gender_format') }}
+        {{ fact('Positioning', listing.positioning, prov.get('positioning', {}).get('answer_state'), 'enum', 'positioning') }}
+        {{ fact('Model', listing.business_model, prov.get('business_model', {}).get('answer_state'), 'enum', 'business_model') }}
+        {{ fact('Chairs', listing.chairs, prov.get('chairs', {}).get('answer_state')) }}
+        {{ fact('Carpet area (sq ft)', listing.carpet_area_sqft, prov.get('carpet_area_sqft', {}).get('answer_state')) }}
+        {{ fact('Monthly rent', listing.monthly_rent, prov.get('monthly_rent', {}).get('answer_state'), 'inr') }}
+        {{ fact('Rent deposit', listing.rent_deposit, prov.get('rent_deposit', {}).get('answer_state'), 'inr') }}
+        {{ fact('Lease expiry', listing.lease_expiry, prov.get('lease_expiry', {}).get('answer_state')) }}
+        {{ fact('Lease transfer', listing.lease_transfer_status, prov.get('lease_transfer_status', {}).get('answer_state'), 'enum', 'lease_transfer_status') }}
+        {{ fact('Declared monthly sales', listing.avg_monthly_sales, prov.get('avg_monthly_sales', {}).get('answer_state'), 'inr') }}
+        {{ fact('Sale timeline', listing.sale_timeline, prov.get('sale_timeline', {}).get('answer_state'), 'enum', 'sale_timeline') }}
+      </div>
+      <p class="small muted">All values are seller-declared unless marked otherwise in the intake tab.</p>
+    </div>
+
+    <div class="card">
+      <h2>Notes &amp; activity</h2>
+      <form method="post" action="{{ url_for('sellers.note', opp_id=opp.id) }}">{{ csrf() }}
+        <div class="field"><textarea name="body" placeholder="Internal note. Use @firstname to notify a colleague." required></textarea></div>
+        <button class="btn">Add note</button></form>
+      <ul class="timeline">{% for a in timeline[:15] %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body or '' }}</div>
+        <div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul>
+      {% if timeline|length > 15 %}<a href="{{ url_for('sellers.detail', opp_id=opp.id, tab='history') }}">Full history →</a>{% endif %}
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Contact</h2>
+      <p><strong>{{ opp.contact_name }}</strong><br><span class="mono">{{ opp.phone_normalized }}</span>{% if opp.alt_phone_normalized %}<br><span class="mono">{{ opp.alt_phone_normalized }}</span>{% endif %}{% if opp.email %}<br>{{ opp.email }}{% endif %}</p>
+      <h3>Consent</h3>
+      {% for purpose in ['service_contact','share_teaser','share_identity','marketing'] %}{% set c = consents.get(purpose) %}
+      <div class="small">{{ purpose|replace('_',' ')|capitalize }}: {% if c and c.granted %}<span class="badge ok">Granted</span> <span class="muted">{{ c.captured_at|ist('%d %b %Y') }} · {{ c.source }}</span>{% elif c %}<span class="badge bad">Refused / withdrawn</span>{% else %}<span class="badge grey">Not recorded</span>{% endif %}</div>{% endfor %}
+      {% if other_opps %}<h3>Other opportunities for this contact</h3>{% for o in other_opps %}<div class="small"><a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> · {{ o.kind }} · {{ o.salon_name or '' }} · {{ STAGE_LABELS.get(o.stage, o.stage) }}</div>{% endfor %}{% endif %}
+    </div>
+
+    <div class="card">
+      <h2>All-in buyer cash requirement</h2>
+      {% if cost.known_total is not none %}<div class="stat"><div class="n">{{ cost.known_total|inr }}</div><div class="l">{{ 'Complete' if cost.complete else 'Minimum known total — incomplete' }}</div></div>{% endif %}
+      <table class="small">{% for label, amt, how in cost.lines %}<tr><td>{{ label }}</td><td class="right nowrap">{{ amt|inr if amt is not none else 'Not provided' }}</td><td class="muted">{{ how }}</td></tr>{% endfor %}</table>
+      {% if cost.missing %}<p class="small unknown">Missing: {{ cost.missing|join(', ') }}</p>{% endif %}
+      <p class="small muted">{{ cost.note }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Stage</h2>
+      <form method="post" action="{{ url_for('sellers.stage', opp_id=opp.id) }}">{{ csrf() }}
+        <div class="field"><select name="to" id="stage-to">{% for t in transitions %}<option value="{{ t.code }}" {{ 'disabled' if not t.allowed }} data-reason="{{ '1' if t.code in ('nurture','unqualified','withdrawn','closed_lost','do_not_contact','closed_won') else '0' }}">{{ t.label }}{% if not t.allowed %} — {{ t.why }}{% endif %}</option>{% endfor %}</select></div>
+        <div class="field" id="stage-reason"><label>Reason</label><input name="reason"></div>
+        <div class="field" id="stage-followup"><label>Nurture follow-up date (IST)</label><input type="datetime-local" name="follow_up_due"></div>
+        <button class="btn">Move stage</button>
+      </form>
+    </div>
+
+    {% if can('crm.assign') %}
+    <div class="card"><h2>Hand off</h2>
+      <form method="post" action="{{ url_for('sellers.assign', opp_id=opp.id) }}">{{ csrf() }}
+        <div class="field"><label>New primary owner</label><select name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == opp.primary_owner_id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Context for the new owner</label><input name="reason" required></div>
+        <button class="btn">Reassign</button></form></div>
+    {% endif %}
+  </div>
+</div>
+
+{% elif tab == 'intake' %}
+<div class="card"><div class="card-h"><h2>Intake completeness {{ comp.pct }}%</h2><span class="small muted">{{ comp.answered }} of {{ comp.total }} applicable questions answered</span></div>
+  <div class="meter"><span class="w{{ (comp.pct // 5) * 5 }}"></span></div>
+  {% if comp.missing_material %}<p class="small">Highest-value questions still open: {% for f in comp.missing_material[:8] %}<span class="badge warn">{{ f.label }}</span> {% endfor %}</p>{% endif %}
+  {% if hidden %}<p class="small muted">Some restricted fields are hidden for your role. The primary owner and approvers can see them.</p>{% endif %}
+</div>
+{% for sk, slabel in SECTIONS %}
+<form method="post" action="{{ url_for('sellers.save_section', opp_id=opp.id, section=sk) }}" class="card">{{ csrf() }}
+  <div class="card-h"><h2>{{ slabel }}</h2><span class="small muted">{{ comp.sections[sk].answered }}/{{ comp.sections[sk].total }}</span></div>
+  {% if sk == 'quick' %}
+  <div class="intake-row"><div class="lbl">Salon name</div><div><input name="salon_name" value="{{ opp.salon_name }}"></div><div></div><div></div></div>
+  <div class="intake-row"><div class="lbl">City</div><div><input name="city" value="{{ opp.city }}"></div><div></div><div></div></div>
+  <div class="intake-row"><div class="lbl">Locality</div><div><input name="locality" value="{{ opp.locality }}"></div><div></div><div></div></div>
+  {% endif %}
+  {% for f in SF.fields_in(sk) if f.key not in hidden %}{% set p = prov.get(f.key) %}
+  <div class="intake-row" {% if f.show_if %}data-show-if="{{ f.show_if[0] }}={{ f.show_if[1] }}"{% endif %}>
+    <div class="lbl">{{ f.label }}{% if f.unit %} <span class="muted">({{ f.unit }})</span>{% endif %}{% if f.privacy == 'restricted' %} <span class="badge warn">Restricted</span>{% endif %}{% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}</div>
+    <div>
+      {% if f.ftype == 'enum' %}<select name="{{ f.key }}" data-value-for="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if listing[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
+      {% elif f.ftype == 'textarea' %}<textarea name="{{ f.key }}" data-value-for="{{ f.key }}">{{ listing[f.key] or '' }}</textarea>
+      {% elif f.ftype == 'date' %}<input type="date" name="{{ f.key }}" value="{{ listing[f.key] or '' }}" data-value-for="{{ f.key }}">
+      {% else %}<input name="{{ f.key }}" value="{{ '' if listing[f.key] is none else listing[f.key] }}" data-value-for="{{ f.key }}" {% if f.ftype == 'inr' %}placeholder="₹ e.g. 5L"{% endif %}>
+        {% if f.ftype == 'inr' and listing[f.key] is not none %}<div class="help">{{ listing[f.key]|inr(false) }}</div>{% endif %}{% endif %}
+    </div>
+    <div><select name="{{ f.key }}__state" title="Answer state"><option value="">Not provided</option>{% for v, l in SF.ANSWER_STATES %}<option value="{{ v }}" {{ 'selected' if p and p.answer_state == v }}>{{ l }}</option>{% endfor %}</select></div>
+    <div class="ev">{% if p %}<span class="badge {{ 'ok' if p.evidence_status in ('verified','document_supported') else 'bad' if p.evidence_status == 'disputed' else 'info' if p.evidence_status == 'staff_reviewed' else 'grey' }}">{{ SF.EVIDENCE_LABELS[p.evidence_status] }}</span>{% endif %}</div>
+  </div>
+  {% endfor %}
+  <p></p><button class="btn primary">Save {{ slabel|lower }}</button>
+  {% if listing.approval_state == 'approved' %}<span class="small muted"> Changing a material field will send the approved listing back for re-review.</span>{% endif %}
+</form>
+{% endfor %}
+{% if can_review %}
+<div class="card"><h2>Review evidence</h2>
+  <form method="post" action="{{ url_for('sellers.evidence', opp_id=opp.id) }}" class="inline">{{ csrf() }}
+    <select name="field_key">{% for f in SF.FIELDS if prov.get(f.key) %}<option value="{{ f.key }}">{{ f.label }} — {{ SF.EVIDENCE_LABELS[prov[f.key].evidence_status] }}</option>{% endfor %}</select>
+    <select name="status">{% for v, l in SF.EVIDENCE_STATUSES %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+    <input name="note" placeholder="Evidence reference / note">
+    <button class="btn">Update</button></form>
+  <p class="small muted">Only reviewers can move a fact beyond seller-declared. Editing a value resets it to seller-declared.</p></div>
+{% endif %}
+
+{% elif tab == 'financials' %}
+<div class="split"><div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Monthly operating figures</h2></div><div class="table-wrap"><table>
+    <tr><th>Month</th><th class="right">Revenue</th><th class="right">Operating expenses</th><th class="right">Reported surplus</th><th class="right">Owner drawings</th><th>Evidence</th><th>Source</th></tr>
+    {% for r in fin.rows %}<tr><td>{{ r.month }}</td>
+      <td class="right">{{ r.revenue|inr if r.revenue is not none else '' }}{% if r.revenue is none %}<span class="missing">Not provided</span>{% endif %}</td>
+      <td class="right">{{ r.operating_expenses|inr if r.operating_expenses is not none else '' }}{% if r.operating_expenses is none %}<span class="unknown">Not provided</span>{% endif %}</td>
+      <td class="right">{{ r.surplus|inr if r.surplus is not none else '—' }}</td>
+      <td class="right">{{ r.owner_drawings|inr if r.owner_drawings is not none else '—' }}</td>
+      <td><span class="badge grey">{{ SF.EVIDENCE_LABELS.get(r.evidence_status, r.evidence_status) }}</span></td><td class="small">{{ r.source }}</td></tr>
+    {% else %}<tr><td colspan="7" class="empty">No monthly figures yet.</td></tr>{% endfor %}
+  </table></div></div>
+  {% for w in fin.warnings %}<div class="flash error">{{ w }}</div>{% endfor %}
+</div><div>
+  <div class="card"><h2>Summary</h2>
+    <div class="stat"><div class="n">{{ fin.avg_reported_surplus|inr if fin.avg_reported_surplus is not none else '—' }}</div><div class="l">Average reported operating surplus / month ({{ fin.months_complete }} complete month(s))</div></div>
+    <p class="small muted">Reported operating surplus = reported revenue − reported operating expenses. This is not audited profit or EBITDA. ₹0 and "not provided" are different.</p></div>
+  <div class="card"><h2>Add or replace a month</h2>
+    <form method="post" action="{{ url_for('sellers.financials', opp_id=opp.id) }}">{{ csrf() }}
+      <div class="field"><label>Month</label><input type="month" name="month" required></div>
+      <div class="field"><label>Revenue</label><input name="revenue" placeholder="Leave blank if not provided"></div>
+      <div class="field"><label>Operating expenses</label><input name="expenses" placeholder="Leave blank if not provided"></div>
+      <div class="field"><label>Owner drawings / salary</label><input name="drawings"></div>
+      <div class="field"><label>Source</label><select name="source"><option value="seller_call">Seller on call</option><option value="seller_sheet">Seller spreadsheet</option><option value="pos_report">POS / billing report</option><option value="bank_statement">Bank statement</option></select></div>
+      <button class="btn primary">Save month</button></form></div>
+</div></div>
+
+{% elif tab == 'assessment' %}
+<div class="split"><div>
+  {% for kind, label in [('strength','Strengths'),('weakness','Weaknesses'),('opportunity','Opportunities'),('threat','Threats')] %}
+  <div class="card"><h2>{{ label }}</h2>
+    {% for s in swot if s.kind == kind %}<div class="task"><div><div>{{ s.statement }}</div><div class="meta">Source: {{ s.source|replace('_',' ') }} · confidence {{ s.confidence }}{% if s.open_question %} · <span class="unknown">Open: {{ s.open_question }}</span>{% endif %}</div></div></div>
+    {% else %}<p class="muted small">None recorded.</p>{% endfor %}</div>{% endfor %}
+  <div class="card"><h2>Add SWOT item</h2>
+    <form method="post" action="{{ url_for('sellers.swot', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+      <div class="field"><label>Type</label><select name="kind"><option value="strength">Strength</option><option value="weakness">Weakness</option><option value="opportunity">Opportunity</option><option value="threat">Threat</option></select></div>
+      <div class="field"><label>Source</label><select name="source"><option value="seller">Seller</option><option value="staff_observation">Staff observation</option><option value="document">Document</option><option value="third_party">Third party</option></select></div>
+      <div class="field full"><label>Statement</label><textarea name="statement" required></textarea></div>
+      <div class="field"><label>Confidence</label><select name="confidence"><option>medium</option><option>low</option><option>high</option></select></div>
+      <div class="field"><label>Unresolved question</label><input name="open_question"></div>
+      <div class="full"><button class="btn primary">Add</button></div></form>
+    <p class="small muted">SWOT entries are human-written and attributed. No automated text is presented as verified intelligence.</p></div>
+</div><div>
+  <div class="card"><h2>Seller readiness {{ readiness.score }}/100</h2><p><span class="badge">{{ readiness.band }}</span></p>
+    <table class="small">{% for f in readiness.factors %}<tr><td><strong>{{ f.name }}</strong><div class="muted">{{ f.reason }}</div></td><td class="right nowrap">{{ f.points }} / {{ f.max }}</td></tr>{% endfor %}</table>
+    <p class="small muted">{{ readiness.advisory }}<br>{{ readiness.version }}</p></div>
+</div></div>
+
+{% elif tab == 'approval' %}
+<div class="split"><div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Listing readiness checklist</h2></div><div class="table-wrap"><table>
+    <tr><th>Item</th><th>Status</th><th>Note</th><th></th></tr>
+    {% for c in checklist %}<tr>
+      <td>{{ LISTING_CHECKLIST[c.item_key] }}</td>
+      <td><select name="status" form="cl-{{ c.item_key }}">{% for v, l in SF.CHECKLIST_STATUSES %}<option value="{{ v }}" {{ 'selected' if c.status == v }} {{ 'disabled' if v == 'reviewed' and not can_review }}>{{ l }}</option>{% endfor %}</select></td>
+      <td><input name="note" value="{{ c.note or '' }}" form="cl-{{ c.item_key }}"></td><td><button class="btn sm" form="cl-{{ c.item_key }}">Save</button></td></tr>{% endfor %}
+  </table></div></div>
+  {% for c in checklist %}<form id="cl-{{ c.item_key }}" method="post" action="{{ url_for('sellers.checklist', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="item_key" value="{{ c.item_key }}"></form>{% endfor %}
+  <p class="small muted">Marking an item "Reviewed" requires reviewer rights.</p>
+</div><div>
+  <div class="card"><h2>Approval</h2>
+    <p>Current state: {{ approval_badge(listing.approval_state) }} · data version {{ listing.data_version }}{% if listing.approved_version %} · approved at v{{ listing.approved_version }}{% endif %}</p>
+    {% if blockers %}<p class="small unknown">Not ready: {{ blockers|join('; ') }}</p>{% endif %}
+    {% if listing.approval_state in ('draft','rejected','re_review_required') %}
+    <form method="post" action="{{ url_for('sellers.request_review', opp_id=opp.id) }}">{{ csrf() }}<button class="btn">Submit for approval</button></form>{% endif %}
+    {% if can_approve %}<hr>
+    <form method="post" action="{{ url_for('sellers.decision', opp_id=opp.id) }}">{{ csrf() }}
+      <div class="field"><label>Conditions / reason</label><input name="conditions"></div>
+      <button class="btn primary" name="decision" value="approved">Approve listing</button>
+      <button class="btn danger" name="decision" value="rejected">Reject</button></form>
+    {% else %}<p class="small muted">Only an authorised approver can approve or reject.</p>{% endif %}
+  </div>
+  <div class="card"><h2>Decision history</h2>
+    {% for a in approvals %}<div class="small"><strong>{{ a.decision|replace('_',' ')|capitalize }}</strong> at v{{ a.data_version }} by {{ a.actor_name }} · {{ a.at|ist }}{% if a.conditions %}<div class="muted">{{ a.conditions }}</div>{% endif %}</div>{% else %}<p class="muted small">No decisions yet.</p>{% endfor %}</div>
+</div></div>
+
+{% elif tab == 'history' %}
+<div class="grid g2">
+  <div class="card"><h2>Activity</h2><ul class="timeline">{% for a in timeline %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong> {% endif %}{{ a.body or '' }}</div><div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul></div>
+  <div>
+    <div class="card"><h2>Stage history</h2>{% for h in history %}<div class="small">{{ STAGE_LABELS.get(h.from_stage, '—') }} → <strong>{{ STAGE_LABELS.get(h.to_stage) }}</strong> · {{ h.actor_name }} · {{ h.at|ist }}{% if h.reason %}<div class="muted">{{ h.reason }}</div>{% endif %}</div>{% endfor %}</div>
+    <div class="card"><h2>Field changes</h2>{% for c in changes %}{% if c.field_key not in hidden %}<div class="small">v{{ c.data_version }} · <strong>{{ SF.BY_KEY[c.field_key].label if c.field_key in SF.BY_KEY else c.field_key }}</strong>: {{ c.old_value if c.old_value is not none else (c.old_state or 'not provided') }} → {{ c.new_value if c.new_value is not none else (c.new_state or 'not provided') }} <span class="muted">· {{ c.actor_name }} · {{ c.at|ist }}</span></div>{% endif %}{% else %}<p class="muted small">No changes recorded.</p>{% endfor %}</div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

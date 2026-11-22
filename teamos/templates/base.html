@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}TeamOS{% endblock %} · Salon Shastra</title>
+{% if brand_fonts %}<link rel="stylesheet" href="{{ brand_fonts }}">{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+{% set ep = request.endpoint or '' %}
+<div class="shell">
+  <aside class="side">
+    <div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Business Exchange · TeamOS</small></div>
+    <nav class="nav">
+      <div class="group">Work</div>
+      <a href="{{ url_for('main.my_day') }}" class="{{ 'on' if ep == 'main.my_day' }}">My Day</a>
+      {% if can('crm.view') %}
+      <a href="{{ url_for('main.team_board') }}" class="{{ 'on' if ep == 'main.team_board' }}">Team Command Center</a>
+      {% endif %}
+      <a href="{{ url_for('tasks.index') }}" class="{{ 'on' if ep.startswith('tasks.') }}">Tasks</a>
+      {% if can('crm.view') %}
+      <div class="group">Opportunities</div>
+      <a href="{{ url_for('sellers.index') }}" class="{{ 'on' if ep.startswith('sellers.') }}">Sellers</a>
+      <a href="{{ url_for('main.planned', module='buyers') }}" class="planned">Buyers / Investors <span class="tag">M3</span></a>
+      <a href="{{ url_for('main.planned', module='forms') }}" class="planned">Forms &amp; Requests <span class="tag">M4</span></a>
+      <a href="{{ url_for('main.planned', module='match') }}" class="planned">Match Desk <span class="tag">M5</span></a>
+      <a href="{{ url_for('main.planned', module='deals') }}" class="planned">Deals <span class="tag">M6</span></a>
+      <a href="{{ url_for('main.planned', module='inbox') }}" class="planned">WhatsApp Inbox <span class="tag">M7</span></a>
+      {% if can('crm.import') %}<a href="{{ url_for('imports.index') }}" class="{{ 'on' if ep.startswith('imports.') }}">Spreadsheet import</a>{% endif %}
+      <a href="{{ url_for('main.dictionary') }}" class="{{ 'on' if ep == 'main.dictionary' }}">Field dictionary</a>
+      {% endif %}
+      {% if can('users.manage') or can('audit.view') or can('finance.view') or can('duplicates.resolve') or can('settings.manage') %}
+      <div class="group">Admin</div>
+      {% if can('users.manage') %}<a href="{{ url_for('admin.users') }}" class="{{ 'on' if ep == 'admin.users' }}">Users &amp; access</a>{% endif %}
+      {% if can('duplicates.resolve') %}<a href="{{ url_for('admin.duplicates') }}" class="{{ 'on' if ep == 'admin.duplicates' }}">Duplicate review</a>{% endif %}
+      {% if can('settings.manage') %}<a href="{{ url_for('admin.jobs') }}" class="{{ 'on' if ep == 'admin.jobs' }}">Background jobs</a>{% endif %}
+      {% if can('audit.view') %}<a href="{{ url_for('admin.audit_log') }}" class="{{ 'on' if ep == 'admin.audit_log' }}">Audit log</a>{% endif %}
+      {% if can('finance.view') %}<a href="{{ url_for('admin.finance') }}" class="{{ 'on' if ep == 'admin.finance' }}">Admin Finance</a>{% endif %}
+      {% endif %}
+    </nav>
+  </aside>
+  <div class="main">
+    {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} environment · synthetic demo data · no live integrations connected · v{{ app_version }}</div>{% endif %}
+    <header class="top">
+      <button class="btn sm menu-toggle" type="button">Menu</button>
+      {% if can('crm.view') %}
+      <form class="search" action="{{ url_for('main.search') }}" method="get">
+        <input type="search" name="q" placeholder="Search name, mobile, salon, locality, SL-…" value="{{ request.args.get('q', '') if ep == 'main.search' else '' }}">
+      </form>
+      {% endif %}
+      <div class="me">
+        <a class="bell" href="{{ url_for('main.my_day') }}#notifications">Alerts{% if unread_count %}<b>{{ unread_count }}</b>{% endif %}</a>
+        <span class="hide-sm"><strong>{{ current_user.full_name }}</strong> <span class="muted small">{{ ROLE_LABELS[current_user.role] }}</span></span>
+        <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm">Sign out</button></form>
+      </div>
+    </header>
+    <main class="content">
+      {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

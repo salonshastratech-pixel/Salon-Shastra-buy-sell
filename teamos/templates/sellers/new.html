@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% from "macros.html" import csrf, err %}
+{% block title %}New seller lead{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>New seller lead</h1><div class="sub">Quick screen for a first call. Don't chase full financials yet — the detailed intake comes later.</div></div></div>
+
+<form method="post" class="split">{{ csrf() }}
+<div>
+  {% if duplicates %}
+  <div class="card">
+    <h2>Possible duplicate — nothing has been saved yet</h2>
+    <p class="small muted">We never merge or overwrite automatically. Choose how to proceed.</p>
+    {% for d in duplicates %}
+    <div class="card">
+      <strong>{{ d.full_name }}</strong> <span class="mono small">{{ d.phone_normalized }}</span> <span class="badge warn">{{ d.reason }}</span>
+      {% if d.is_synthetic %}<span class="badge syn">synthetic</span>{% endif %}
+      <div class="small">{% for o in d.opportunities %}<a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> {{ o.kind }} · {{ o.salon_name or '' }} · {{ STAGE_LABELS.get(o.stage, o.stage) }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
+      <label class="check"><input type="radio" name="dedupe_decision" value="link:{{ d.id }}" required> Same person — add this as a new opportunity under their existing contact (their details are not changed)</label>
+    </div>
+    {% endfor %}
+    <label class="check"><input type="radio" name="dedupe_decision" value="new_flagged" required> Different person — create a new contact and send to duplicate review</label>
+  </div>
+  {% endif %}
+
+  <div class="card"><h2>Contact</h2>
+    <div class="form-grid">
+      <div class="field {{ 'has-err' if errors.full_name }}"><label>Contact name *</label><input name="full_name" value="{{ form.full_name or '' }}" required>{{ err(errors, 'full_name') }}</div>
+      <div class="field {{ 'has-err' if errors.phone }}"><label>Mobile *</label><input name="phone" value="{{ form.phone or '' }}" inputmode="tel" placeholder="98xxxxxxxx" required>{{ err(errors, 'phone') }}</div>
+      <div class="field {{ 'has-err' if errors.alt_phone }}"><label>Alternate phone</label><input name="alt_phone" value="{{ form.alt_phone or '' }}" inputmode="tel">{{ err(errors, 'alt_phone') }}</div>
+      <div class="field"><label>Email</label><input type="email" name="email" value="{{ form.email or '' }}"></div>
+    </div>
+  </div>
+
+  <div class="card"><h2>Salon</h2>
+    <div class="form-grid">
+      <div class="field full {{ 'has-err' if errors.salon_name }}"><label>Salon name *</label><input name="salon_name" value="{{ form.salon_name or '' }}" required>{{ err(errors, 'salon_name') }}</div>
+      <div class="field {{ 'has-err' if errors.city }}"><label>City *</label><input name="city" value="{{ form.city or 'Hyderabad' }}" required>{{ err(errors, 'city') }}</div>
+      <div class="field {{ 'has-err' if errors.locality }}"><label>Locality *</label><input name="locality" value="{{ form.locality or '' }}" placeholder="e.g. Kondapur" required>{{ err(errors, 'locality') }}</div>
+      {% for f in SF.FIELDS if f.quick %}
+      <div class="field {{ 'has-err' if errors[f.key] }}"><label>{{ f.label }}</label>
+        {% if f.ftype == 'enum' %}<select name="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if form[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
+        {% else %}<input name="{{ f.key }}" value="{{ form[f.key] or '' }}" {% if f.ftype == 'inr' %}placeholder="e.g. 20L or 2000000"{% endif %}>{% endif %}
+        {% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}{{ err(errors, f.key) }}</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="card"><h2>Source &amp; ownership</h2>
+    <div class="field {{ 'has-err' if errors.source }}"><label>Lead source *</label><select name="source" required><option value="">Choose…</option>{% for v, l in SOURCES %}<option value="{{ v }}" {{ 'selected' if form.source == v }}>{{ l }}</option>{% endfor %}</select>{{ err(errors, 'source') }}</div>
+    <div class="field"><label>Source detail</label><input name="source_note" value="{{ form.source_note or '' }}" placeholder="Campaign, referrer, event…"></div>
+    <div class="field {{ 'has-err' if errors.owner_id }}"><label>Primary owner</label><select name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if (form.owner_id or current_user.id|string) == u.id|string }}>{{ u.full_name }}{{ ' (seller team)' if u.team == 'seller' }}</option>{% endfor %}</select>{{ err(errors, 'owner_id') }}</div>
+    <div class="field"><label>Priority</label><select name="priority">{% for p in ['normal','high','urgent','low'] %}<option value="{{ p }}" {{ 'selected' if form.priority == p }}>{{ p|title }}</option>{% endfor %}</select></div>
+    <label class="check"><input type="checkbox" name="consent_contact" value="1" {{ 'checked' if form.consent_contact }}> Contact consent obtained for follow-up about this enquiry</label>
+    <p class="help small muted">Recorded with source and version. Without it, outbound messaging (M7) will be blocked.</p>
+    <button class="btn primary" type="submit">{{ 'Continue with selected option' if duplicates else 'Create lead' }}</button>
+  </div>
+  <div class="card small muted">A first-contact task (target: within 15 minutes — proposed SLA, pending founder approval) is created for the owner automatically.</div>
+</div>
+</form>
+{% endblock %}

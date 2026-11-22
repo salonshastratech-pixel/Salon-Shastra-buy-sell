@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Background jobs{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Background jobs</h1><div class="sub">Run by the worker process (<span class="mono">python3 manage.py worker</span>). Failed jobs retry with back-off; after 5 attempts they stop and stay here for review.</div></div></div>
+<div class="grid g4">{% for s in ['queued','running','done','dead'] %}<div class="stat {{ 'bad' if s == 'dead' and counts.get(s) }}"><div class="n">{{ counts.get(s, 0) }}</div><div class="l">{{ s|title }}</div></div>{% endfor %}</div><p></p>
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>#</th><th>Kind</th><th>Status</th><th>Attempts</th><th>Run after</th><th>Last error</th><th>Updated</th></tr>
+{% for j in rows %}<tr><td>{{ j.id }}</td><td class="mono">{{ j.kind }}</td><td><span class="badge {{ 'ok' if j.status == 'done' else 'bad' if j.status in ('dead','failed') else 'info' }}">{{ j.status }}</span></td>
+<td>{{ j.attempts }}</td><td class="small">{{ j.run_after|ist }}</td><td class="small mono">{{ (j.last_error or '')[:160] }}</td><td class="small">{{ j.updated_at|ist }}</td></tr>
+{% else %}<tr><td colspan="7" class="empty">No jobs yet. Start the worker to run scheduled sweeps.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

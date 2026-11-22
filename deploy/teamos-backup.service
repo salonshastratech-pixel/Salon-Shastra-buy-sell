@@ -1,0 +1,9 @@
+[Unit]
+Description=Salon Shastra TeamOS nightly encrypted backup
+
+[Service]
+Type=oneshot
+User=postgres
+Environment=PGDATABASE=teamos BACKUP_DIR=/var/backups/teamos BACKUP_PASSFILE=/etc/teamos/backup.key KEEP_DAYS=14
+EnvironmentFile=-/etc/teamos/backup.env
+ExecStart=/opt/teamos/app/deploy/backup.sh

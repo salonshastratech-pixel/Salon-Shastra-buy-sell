@@ -1,0 +1,41 @@
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_value() }}">{% endmacro %}
+
+{% macro stage_badge(stage, labels) -%}
+{%- set cls = 'ok' if stage in ('listing_approved','active_matching','closed_won') else 'bad' if stage in ('closed_lost','do_not_contact','unqualified','withdrawn') else 'grey' if stage == 'nurture' else 'info' -%}
+<span class="badge {{ cls }}">{{ labels.get(stage, stage) }}</span>
+{%- endmacro %}
+
+{% macro approval_badge(state) -%}
+{%- set m = {'draft': ('grey','Draft'), 'in_review': ('info','In review'), 'approved': ('ok','Approved'), 're_review_required': ('warn','Re-review required'), 'rejected': ('bad','Rejected')} -%}
+{%- set v = m.get(state, ('grey', state)) -%}<span class="badge {{ v[0] }}">{{ v[1] }}</span>
+{%- endmacro %}
+
+{% macro task_item(t, show_assignee=false, return_to=None) %}
+<li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}">
+  <div>
+    <div class="why">{{ t.why }}</div>
+    <div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div>
+    <div class="meta">
+      {% if t.ref_code %}<a href="{{ url_for('sellers.detail', opp_id=t.opp_id) }}">{{ t.ref_code }}</a> · {{ t.salon_name or '' }} · {% endif %}
+      Due {{ t.due_at|ist }} ({{ t.due_at|rel }})
+      {% if show_assignee %} · <strong>{{ t.assignee_name }}</strong>{% endif %}
+      {% if t.is_synthetic %} <span class="badge syn">synthetic</span>{% endif %}
+    </div>
+  </div>
+  <div class="inline">
+    {% if t.opp_id %}<a class="btn sm" href="{{ url_for('sellers.detail', opp_id=t.opp_id) }}">Open</a>{% endif %}
+    <a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a>
+  </div>
+</li>
+{% endmacro %}
+
+{% macro fact(label, value, state=None, kind='text', field=None) -%}
+<div class="fact"><div class="k">{{ label }}</div><div class="v">
+{%- if value is not none and value != '' -%}
+  {%- if kind == 'inr' -%}{{ value|inr }}{%- elif kind == 'enum' and field -%}{{ SF.option_label(field, value) }}{%- else -%}{{ value }}{%- endif -%}
+{%- elif state and state != 'value' -%}<span class="unknown">{{ SF.ANSWER_STATE_LABELS[state] }}</span>
+{%- else -%}<span class="missing">Not provided</span>{%- endif -%}
+</div></div>
+{%- endmacro %}
+
+{% macro err(errors, key) %}{% if errors and errors.get(key) %}<div class="err">{{ errors[key] }}</div>{% endif %}{% endmacro %}

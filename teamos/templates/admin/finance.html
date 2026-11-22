@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Admin Finance{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Admin Finance</h1><div class="sub">Salon Shastra's own fees, invoices, collections and costs.</div></div></div>
+<div class="card"><p><strong>Access boundary: built and enforced.</strong> Only roles with <span class="mono">finance.view</span> reach this page; every other attempt — including crafted requests — is denied server-side and written to the audit log.</p>
+<p><strong>Ledger: planned for Milestone 6</strong> (fee agreements, earning triggers, invoices, receipts, outstanding balances). Fee rules, payer and tax treatment are open founder/accountant decisions (D-03 to D-05), so nothing is pre-configured.</p>
+<p class="muted small">Sale consideration belongs to the parties and will never be counted as company revenue.</p></div>
+{% endblock %}

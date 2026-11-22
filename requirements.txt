@@ -1,0 +1,10 @@
+Flask>=3.1,<4
+Werkzeug>=3.1,<4
+Jinja2>=3.1,<4
+openpyxl>=3.1          # .xlsx imports
+cryptography>=42       # encrypted SQLite backups
+# production
+gunicorn>=23
+psycopg[binary]>=3.2
+# dev/test
+pytest>=8

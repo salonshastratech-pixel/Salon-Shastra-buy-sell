@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% from "macros.html" import task_item, stage_badge %}
+{% block title %}Team Command Center{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Team Command Center</h1><div class="sub">Who is working on what, what is due, what is blocked. No company finance is shown here.</div></div>
+{% if who %}<div class="actions"><a class="btn" href="{{ url_for('main.team_board') }}">Show everyone</a></div>{% endif %}</div>
+
+<div class="card flush"><div class="table-wrap"><table>
+  <tr><th>Team member</th><th class="right">Open tasks</th><th class="right">Overdue</th><th class="right">Due today</th><th class="right">Done today</th><th class="right">Active opportunities</th><th></th></tr>
+  {% for u in users %}<tr class="row-link">
+    <td><strong>{{ u.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[u.role] }} · {{ u.team }}</div></td>
+    <td class="right">{{ u.open }}</td><td class="right">{% if u.overdue %}<span class="badge bad">{{ u.overdue }}</span>{% else %}0{% endif %}</td>
+    <td class="right">{{ u.today }}</td><td class="right">{{ u.done_today }}</td><td class="right">{{ u.active_opps }}</td>
+    <td class="right"><a class="btn sm" href="{{ url_for('main.team_board', who=u.id) }}">View work</a></td></tr>{% endfor %}
+</table></div></div>
+
+<div class="split">
+  <div>
+    <div class="card"><div class="card-h"><h2>Overdue</h2><span class="badge {{ 'bad' if overdue else 'grey' }}">{{ overdue|length }}</span></div>
+      <ul class="tasks">{% for t in overdue %}{{ task_item(t, show_assignee=true) }}{% else %}<li class="empty">Nothing overdue.</li>{% endfor %}</ul></div>
+    <div class="card"><div class="card-h"><h2>Due today</h2><span class="badge">{{ due_today|length }}</span></div>
+      <ul class="tasks">{% for t in due_today %}{{ task_item(t, show_assignee=true) }}{% else %}<li class="empty">Nothing else due today.</li>{% endfor %}</ul></div>
+    <details class="card disclose"><summary>Later ({{ later|length }})</summary>
+      <ul class="tasks">{% for t in later %}{{ task_item(t, show_assignee=true) }}{% endfor %}</ul></details>
+  </div>
+  <div>
+    <div class="card"><div class="card-h"><h2>Exceptions: no next action</h2><span class="badge {{ 'bad' if exceptions else 'ok' }}">{{ exceptions|length }}</span></div>
+      <ul class="tasks">{% for o in exceptions %}<li class="task"><div><div class="t small"><a href="{{ url_for('sellers.detail', opp_id=o.id) }}">{{ o.ref_code }} · {{ o.salon_name }}</a></div><div class="meta">{{ o.owner_name or 'Unowned' }} · {{ STAGE_LABELS.get(o.stage) }}</div></div></li>{% else %}<li class="empty">Every active record has a next action.</li>{% endfor %}</ul></div>
+    <div class="card"><div class="card-h"><h2>Approval queue</h2><span class="badge">{{ review_queue|length }}</span></div>
+      <ul class="tasks">{% for r in review_queue %}<li class="task"><div><div class="t small"><a href="{{ url_for('sellers.detail', opp_id=r.id, tab='approval') }}">{{ r.ref_code }} · {{ r.salon_name }}</a></div><div class="meta">{{ r.approval_state|replace('_',' ') }}</div></div></li>{% else %}<li class="empty">No listings awaiting review.</li>{% endfor %}</ul></div>
+    {% if unowned %}<div class="card"><h2>Unowned</h2>{% for o in unowned %}<div><a href="{{ url_for('sellers.detail', opp_id=o.id) }}">{{ o.ref_code }}</a></div>{% endfor %}</div>{% endif %}
+    <div class="card"><h2>Duplicate review</h2><p>{{ dup_open }} open item(s). {% if can('duplicates.resolve') %}<a href="{{ url_for('admin.duplicates') }}">Review</a>{% else %}<span class="muted small">Resolved by an admin.</span>{% endif %}</p></div>
+  </div>
+</div>
+{% endblock %}

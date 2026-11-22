@@ -1,0 +1,7 @@
+{% extends "base.html" if current_user else "bare.html" %}
+{% block title %}{{ code }}{% endblock %}
+{% block content %}
+<div class="card"><h1>{{ code }} · {{ title }}</h1>
+<p class="muted">{{ message or ('You do not have access to this. The attempt has been recorded.' if code == 403 else 'That page does not exist.' if code == 404 else '') }}</p>
+{% if current_user %}<a class="btn" href="{{ url_for('main.my_day') }}">Back to My Day</a>{% else %}<a class="btn" href="{{ url_for('auth.login') }}">Sign in</a>{% endif %}</div>
+{% endblock %}

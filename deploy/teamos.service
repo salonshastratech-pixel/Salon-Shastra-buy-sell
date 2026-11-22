@@ -1,0 +1,20 @@
+[Unit]
+Description=Salon Shastra TeamOS web app
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=teamos
+Group=teamos
+WorkingDirectory=/opt/teamos/app
+EnvironmentFile=/etc/teamos/teamos.env
+ExecStart=/opt/teamos/venv/bin/gunicorn -c deploy/gunicorn.conf.py wsgi:app
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/teamos/app/instance /var/lib/teamos
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

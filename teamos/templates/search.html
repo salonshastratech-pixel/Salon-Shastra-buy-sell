@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% from "macros.html" import stage_badge %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Search</h1><div class="sub">{% if q %}{{ results|length }} result(s) for “{{ q }}”{% else %}Type at least two characters.{% endif %}</div></div></div>
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Ref</th><th>Type</th><th>Contact</th><th>Salon</th><th>Locality</th><th>Stage</th><th>Owner</th></tr>
+{% for r in results %}<tr class="row-link"><td><a href="{{ url_for('sellers.detail', opp_id=r.id) if r.kind == 'seller' else '#' }}">{{ r.ref_code }}</a></td>
+<td>{{ r.kind|title }}</td><td>{{ r.contact_name }}<div class="small muted mono">{{ r.phone_normalized }}</div></td><td>{{ r.salon_name or '—' }}</td>
+<td>{{ r.locality or '' }}{% if r.city %}, {{ r.city }}{% endif %}</td><td>{{ stage_badge(r.stage, STAGE_LABELS) }}</td><td>{{ r.owner_name or '—' }}</td></tr>
+{% else %}<tr><td colspan="7" class="empty">No matches.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

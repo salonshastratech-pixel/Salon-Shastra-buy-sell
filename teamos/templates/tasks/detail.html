@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Task{% endblock %}
+{% block content %}
+<div class="ph"><div><div class="small muted"><a href="{{ url_for('tasks.index') }}">Tasks</a> / #{{ task.id }}</div><h1>{{ task.title }}</h1>
+<div class="sub"><span class="badge {{ 'ok' if task.status == 'done' else 'grey' if task.status == 'cancelled' else 'info' }}">{{ task.status }}</span>
+ {{ task.task_type|replace('_',' ') }} · {{ task.priority }} priority · assigned to <strong>{{ task.assignee_name }}</strong> · due {{ task.due_at|ist }} ({{ task.due_at|rel }})
+ {% if task.ref_code %} · <a href="{{ url_for('sellers.detail', opp_id=task.opp_id) }}">{{ task.ref_code }} {{ task.salon_name }}</a>{% endif %}</div></div></div>
+<div class="split"><div>
+  {% if task.status == 'open' and can_act %}
+  <div class="card"><h2>Complete</h2>
+    <form method="post" action="{{ url_for('tasks.complete', task_id=task.id) }}" class="form-grid">{{ csrf() }}
+      <input type="hidden" name="return_to" value="{{ url_for('sellers.detail', opp_id=task.opp_id) if task.opp_id else '' }}">
+      <div class="field full"><label>Outcome — what happened?</label><textarea name="outcome" required></textarea></div>
+      <div class="field"><label>Next action {% if task.opp_id %}<span class="muted">(required if nothing else is open)</span>{% endif %}</label><input name="next_title"></div>
+      <div class="field"><label>Next due (IST)</label><input type="datetime-local" name="next_due"></div>
+      <div class="field"><label>Next action owner</label><select name="next_assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == task.assignee_id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+      <div class="full"><button class="btn primary">Mark done</button></div></form></div>
+  {% elif task.status == 'open' %}<div class="card muted">Only the assignee, the requester or a team lead can complete this task.</div>
+  {% else %}<div class="card"><h2>Outcome</h2><p>{{ task.outcome }}</p></div>{% endif %}
+  {% if task.status == 'open' and can('crm.assign') %}
+  <div class="card"><h2>Hand over</h2>
+    <form method="post" action="{{ url_for('tasks.reassign', task_id=task.id) }}" class="inline">{{ csrf() }}
+      <select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == task.assignee_id }}>{{ u.full_name }}</option>{% endfor %}</select>
+      <input name="reason" placeholder="Context / reason" required><button class="btn">Reassign</button></form>
+    <p class="small muted">The original assignee and the overdue trail stay in the history.</p></div>{% endif %}
+</div><div>
+  <div class="card"><h2>History</h2><ul class="timeline">{% for e in events %}<li><div><strong>{{ e.event }}</strong> {{ e.detail or '' }}</div><div class="who">{{ e.actor_name or 'System' }} · {{ e.at|ist }}</div></li>{% endfor %}</ul></div>
+</div></div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% from "macros.html" import csrf, task_item %}
+{% block title %}Tasks{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Tasks</h1><div class="sub">One task model for personal and team work.</div></div></div>
+<nav class="tabs">{% for k, l in [('mine','Assigned to me'),('created','Requested by me'),('all','All open (team)'),('done','Closed')] %}<a href="{{ url_for('tasks.index', view=k) }}" class="{{ 'on' if view == k }}">{{ l }}</a>{% endfor %}</nav>
+<div class="split">
+  <div class="card">{% if view == 'done' %}
+    <ul class="tasks">{% for t in rows %}<li class="task"><div><div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div><div class="meta">{{ t.status }} · {{ t.outcome or '' }} · {{ t.updated_at|ist }}</div></div></li>{% else %}<li class="empty">Nothing here.</li>{% endfor %}</ul>
+  {% else %}
+    <ul class="tasks">{% for t in rows %}{{ task_item(t, show_assignee=(view != 'mine')) }}{% else %}<li class="empty">No open tasks.</li>{% endfor %}</ul>
+  {% endif %}</div>
+  <div class="card"><h2>New task</h2>
+    <form method="post" action="{{ url_for('tasks.create') }}">{{ csrf() }}
+      <div class="field"><label>Title</label><input name="title" required></div>
+      <div class="field"><label>Assign to</label><select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == current_user.id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at"></div>
+      <div class="field"><label>Type</label><select name="task_type">{% for v, l in TASK_TYPES %}<option value="{{ v }}" {{ 'selected' if v == 'other' }}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Priority</label><select name="priority">{% for v, l in PRIORITIES %}<option value="{{ v }}" {{ 'selected' if v == 'normal' }}>{{ l }}</option>{% endfor %}</select></div>
+      <button class="btn primary">Create</button></form>
+    <p class="small muted">For work on a seller, create the task from the seller page so it stays linked.</p></div>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+[Unit]
+Description=Salon Shastra TeamOS background worker
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=teamos
+Group=teamos
+WorkingDirectory=/opt/teamos/app
+EnvironmentFile=/etc/teamos/teamos.env
+ExecStart=/opt/teamos/venv/bin/python manage.py worker
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/teamos/app/instance
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

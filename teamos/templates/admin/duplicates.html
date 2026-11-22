@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Duplicate review{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Duplicate review</h1><div class="sub">Possible duplicates flagged at entry. Nothing is merged, overwritten or deleted automatically.</div></div></div>
+{% for r in rows %}
+<div class="card"><div class="card-h"><h2>{{ r.a_name }} ↔ {{ r.b_name }}</h2><span class="badge {{ 'warn' if r.status == 'open' else 'grey' }}">{{ r.status|replace('_',' ') }}</span></div>
+  <div class="grid g2 small">
+    <div><span class="mono">{{ r.a_phone }}</span> · {% for o in r.a_opps %}<a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> {% endfor %}<div class="muted">New contact</div></div>
+    <div><span class="mono">{{ r.b_phone }}</span> · {% for o in r.b_opps %}<a href="{{ url_for('sellers.detail', opp_id=o.id) if o.kind == 'seller' else '#' }}">{{ o.ref_code }}</a> {% endfor %}<div class="muted">Existing contact</div></div>
+  </div>
+  <p class="small">Reason: {{ r.reason }}{% if r.rationale %} · Resolution: {{ r.rationale }}{% endif %}</p>
+  {% if r.status == 'open' %}
+  <form method="post" action="{{ url_for('admin.resolve_duplicate', dup_id=r.id) }}" class="inline">{{ csrf() }}
+    <select name="status"><option value="distinct">Different people</option><option value="same_person_linked">Same person (keep both records, linked)</option></select>
+    <input name="rationale" placeholder="Rationale (required)" required><button class="btn">Resolve</button></form>{% endif %}
+</div>
+{% else %}<div class="card empty">No duplicate candidates.</div>{% endfor %}
+{% endblock %}

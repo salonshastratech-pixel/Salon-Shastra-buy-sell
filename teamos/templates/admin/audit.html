@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Audit log</h1><div class="sub">Append-only record of sensitive actions and denied attempts (latest 300).</div></div>
+<div class="actions">{% for o in ['', 'denied', 'allowed'] %}<a class="btn sm {{ 'primary' if outcome == o }}" href="{{ url_for('admin.audit_log', outcome=o) }}">{{ o|title or 'All' }}</a>{% endfor %}</div></div>
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>When (IST)</th><th>Who</th><th>Action</th><th>Outcome</th><th>Record</th><th>Detail</th></tr>
+{% for a in rows %}<tr><td class="nowrap small">{{ a.at|ist }}</td><td>{{ a.actor_name or '—' }}</td><td class="mono">{{ a.action }}</td>
+<td>{% if a.outcome == 'denied' %}<span class="badge bad">denied</span>{% else %}<span class="badge grey">{{ a.outcome }}</span>{% endif %}</td>
+<td class="small">{{ a.entity_type or '' }}{% if a.entity_id %} #{{ a.entity_id }}{% endif %}</td><td class="mono small">{{ a.detail or '' }}</td></tr>
+{% else %}<tr><td colspan="6" class="empty">No events.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

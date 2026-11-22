@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Salon Shastra TeamOS</title>{% if brand_fonts %}<link rel="stylesheet" href="{{ brand_fonts }}">{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<body><div class="login-wrap"><form class="login" method="post">
+  <div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Business Exchange · TeamOS</small></div>
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  <div class="field"><label for="email">Work email</label><input id="email" type="email" name="email" autocomplete="username" required autofocus></div>
+  <div class="field"><label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required></div>
+  <button class="btn primary" type="submit">Sign in</button>
+  <p class="small muted">Internal team access only. Sessions end after inactivity; disabled accounts lose access immediately.</p>
+</form></div></body></html>

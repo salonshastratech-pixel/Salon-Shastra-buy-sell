@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Users & access{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Users &amp; access</h1><div class="sub">Roles grant defaults; grants add specific, audited exceptions. Matrix: {{ MATRIX_VERSION }}</div></div></div>
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Two-step</th><th>Last login</th><th></th></tr>
+{% for u in rows %}<tr><td><strong>{{ u.full_name }}</strong>{% if u.is_synthetic %} <span class="badge syn">demo</span>{% endif %}</td><td>{{ u.email }}</td>
+<td>{% if u.id != current_user.id %}<form method="post" action="{{ url_for('admin.change_role', user_id=u.id) }}" class="inline">{{ csrf() }}<select name="role">{% for r, l in ROLE_LABELS.items() %}<option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ l }}</option>{% endfor %}</select><button class="btn sm">Set</button></form>{% else %}{{ ROLE_LABELS[u.role] }}{% endif %}</td>
+<td>{{ u.team }}</td><td>{% if u.is_active %}<span class="badge ok">Active</span>{% else %}<span class="badge bad">Disabled</span>{% endif %}</td>
+<td>{% if u.mfa_enabled_at %}<span class="badge ok">On</span>{% if u.id != current_user.id %}<form method="post" action="{{ url_for('admin.reset_mfa', user_id=u.id) }}" data-confirm="Reset two-step sign-in for {{ u.full_name }}?">{{ csrf() }}<button class="btn link small">Reset</button></form>{% endif %}{% else %}<span class="badge grey">Off</span>{% endif %}</td><td class="small">{{ u.last_login_at|ist }}</td>
+<td>{% if u.id != current_user.id %}<form method="post" action="{{ url_for('admin.toggle_active', user_id=u.id) }}" data-confirm="{{ 'Disable' if u.is_active else 'Enable' }} {{ u.full_name }}?">{{ csrf() }}<button class="btn sm {{ 'danger' if u.is_active }}">{{ 'Disable' if u.is_active else 'Enable' }}</button></form>{% endif %}</td></tr>{% endfor %}
+</table></div></div>
+
+<div class="grid g2">
+  <div class="card"><h2>Add team member</h2>
+    <form method="post" action="{{ url_for('admin.create_user') }}" class="form-grid">{{ csrf() }}
+      <div class="field"><label>Full name</label><input name="full_name" required></div>
+      <div class="field"><label>Work email</label><input type="email" name="email" required></div>
+      <div class="field"><label>Role</label><select name="role">{% for r, l in ROLE_LABELS.items() %}<option value="{{ r }}" {{ 'selected' if r == 'team_member' }}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Team</label><select name="team">{% for t in ['seller','buyer','general','finance','admin'] %}<option>{{ t }}</option>{% endfor %}</select></div>
+      <div class="field full"><label>Temporary password</label><input type="password" name="password" required autocomplete="new-password"><div class="help">10+ characters, mixed case and a number.</div></div>
+      <div class="full"><button class="btn primary">Create user</button></div></form></div>
+  <div class="card"><h2>Grant a capability</h2>
+    <form method="post" action="{{ url_for('admin.grant') }}" class="form-grid">{{ csrf() }}
+      <div class="field"><label>User</label><select name="user_id">{% for u in rows if u.is_active %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Capability</label><select name="capability">{% for c, d in CAPABILITIES.items() %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Limit to opportunity ID (optional)</label><input name="scope_id" placeholder="e.g. 12"></div>
+      <div class="field"><label>Expires (optional)</label><input type="datetime-local" name="expires_at"></div>
+      <div class="field full"><label>Reason</label><input name="reason" required></div>
+      <div class="full"><button class="btn primary">Grant</button></div></form></div>
+</div>
+
+<div class="card"><h2>Active grants</h2>{% for g in grants %}<form method="post" action="{{ url_for('admin.revoke', grant_id=g.id) }}" class="inline small">{{ csrf() }}<span>User #{{ g.user_id }} · <strong>{{ g.capability }}</strong>{% if g.scope_id %} on opportunity #{{ g.scope_id }}{% endif %} · {{ g.reason }} · by {{ g.granted_by_name }}{% if g.expires_at %} · expires {{ g.expires_at|ist }}{% endif %}</span><button class="btn sm danger">Revoke</button></form>{% else %}<p class="muted small">No explicit grants.</p>{% endfor %}</div>
+
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Default role matrix</h2></div><div class="table-wrap"><table>
+<tr><th>Capability</th>{% for r, l in ROLE_LABELS.items() %}<th>{{ l }}</th>{% endfor %}</tr>
+{% for c, d in CAPABILITIES.items() %}<tr><td><span class="mono">{{ c }}</span><div class="small muted">{{ d }}</div></td>{% for r in ROLE_LABELS %}<td>{{ '✓' if c in ROLE_CAPABILITIES[r] else '—' }}</td>{% endfor %}</tr>{% endfor %}
+</table></div></div>
+{% endblock %}

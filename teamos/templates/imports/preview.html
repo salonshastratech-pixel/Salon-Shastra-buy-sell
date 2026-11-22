@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Import #{{ batch.id }}{% endblock %}
+{% block content %}
+{% set labels = {'new': ('ok','New'), 'duplicate_crm': ('warn','Already in CRM'), 'duplicate_file': ('warn','Repeated in file'), 'invalid': ('bad','Invalid')} %}
+{% set dec_labels = {'create': 'Create', 'skip': 'Skip', 'link': 'Add as new opportunity for existing contact', 'flag': 'Create & send to duplicate review'} %}
+<div class="ph"><div><div class="small muted"><a href="{{ url_for('imports.index') }}">Imports</a> / #{{ batch.id }}</div>
+  <h1>{{ batch.filename }}</h1><div class="sub">{{ batch.total_rows }} rows · status <strong>{{ batch.status }}</strong>{% if batch.status == 'committed' %} · {{ batch.created_count }} leads created {{ batch.committed_at|ist }}{% endif %}</div></div></div>
+
+<div class="grid g4">
+  {% for k in ['new','duplicate_crm','duplicate_file','invalid'] %}<a class="stat" href="{{ url_for('imports.preview', batch_id=batch.id, show=k) }}"><div class="n">{{ summary.get(k, 0) }}</div><div class="l">{{ labels[k][1] }}</div></a>{% endfor %}
+</div><p></p>
+
+{% if batch.status == 'preview' %}
+<form method="post" action="{{ url_for('imports.mapping', batch_id=batch.id) }}" class="card">{{ csrf() }}
+  <div class="card-h"><h2>Column mapping</h2><span class="small muted">Unmapped columns are kept in the raw record but not imported.</span></div>
+  <div class="form-grid">
+  {% for h in headers %}<div class="field"><label>“{{ h }}”</label><select name="map_{{ loop.index0 }}"><option value="">— don't import —</option>{% for k, (label, syn) in TARGETS.items() %}<option value="{{ k }}" {{ 'selected' if mapping.get(h) == k }}>{{ label }}{{ ' *' if k in REQUIRED }}</option>{% endfor %}</select></div>{% endfor %}
+  <div class="field"><label>Owner for created leads</label><select name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == batch.owner_id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  </div><button class="btn">Apply mapping &amp; re-check rows</button>
+</form>
+{% endif %}
+
+<form method="post" action="{{ url_for('imports.commit', batch_id=batch.id) }}">{{ csrf() }}
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Rows {% if show != 'all' %}({{ labels[show][1] }}) · <a class="small" href="{{ url_for('imports.preview', batch_id=batch.id) }}">show all</a>{% endif %}</h2></div><div class="table-wrap"><table>
+  <tr><th>Row</th><th>Status</th><th>Contact</th><th>Mobile</th><th>Salon</th><th>Locality</th><th>Problems / match</th><th>{{ 'Decision' if batch.status == 'preview' else 'Outcome' }}</th></tr>
+  {% for r in rows %}<tr>
+    <td>{{ r.row_no }}</td><td><span class="badge {{ labels[r.status][0] }}">{{ labels[r.status][1] }}</span></td>
+    <td>{{ r.mapped.full_name or '' }}</td><td class="mono">{{ r.mapped.phone or '' }}</td><td>{{ r.mapped.salon_name or '' }}</td><td>{{ r.mapped.locality or '' }}</td>
+    <td class="small">{% for k, v in r.errors_d.items() %}<div class="unknown">{{ TARGETS[k][0] if k in TARGETS else k }}: {{ v }}</div>{% endfor %}
+      {% if r.status == 'duplicate_crm' %}Matches existing contact <strong>{{ r.dup_name }}</strong>{% endif %}
+      {% if r.status == 'duplicate_file' %}Same mobile as row {{ r.duplicate_of_row }}{% endif %}</td>
+    <td>{% if batch.status == 'preview' %}<select name="decision_{{ r.id }}">{% for d in ['create','link','flag','skip'] if d in ALLOWED[r.status] %}<option value="{{ d }}" {{ 'selected' if r.decision == d }}>{{ dec_labels[d] }}</option>{% endfor %}</select>
+      {% else %}{{ (r.outcome or '')|replace('_',' ') }}{% if r.ref_code %} · <a href="{{ url_for('sellers.detail', opp_id=r.opportunity_id) }}">{{ r.ref_code }}</a>{% endif %}{% endif %}</td></tr>
+  {% else %}<tr><td colspan="8" class="empty">No rows.</td></tr>{% endfor %}
+</table></div></div>
+{% if batch.status == 'preview' %}
+<div class="card inline"><label>First-contact tasks due (IST)</label><input type="datetime-local" name="first_task_due">
+  <span class="small muted">Leave blank for the standard 15-minute SLA. For large imports, pick a working time so My Day isn't flooded.</span></div>
+<div class="inline"><button class="btn primary">Commit import</button></div>
+{% endif %}
+</form>
+{% if batch.status == 'preview' %}<form method="post" action="{{ url_for('imports.discard', batch_id=batch.id) }}" data-confirm="Discard this import? Nothing will be saved.">{{ csrf() }}<p></p><button class="btn danger">Discard</button></form>{% endif %}
+{% endblock %}

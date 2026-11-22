@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% from "macros.html" import task_item, csrf %}
+{% block title %}My Day{% endblock %}
+{% block content %}
+<div class="ph">
+  <div><h1>Good to see you, {{ current_user.full_name.split()[0] }}</h1>
+  <div class="sub">{{ now_iso()|ist('%A, %d %B %Y') }} · ordered by what needs you first</div></div>
+  <div class="actions">
+    {% if can('crm.create') %}<a class="btn primary" href="{{ url_for('sellers.new') }}">+ New seller lead</a>{% endif %}
+    <a class="btn" href="{{ url_for('tasks.index') }}">All my tasks</a>
+  </div>
+</div>
+
+<div class="grid g4">
+  <div class="stat {{ 'bad' if overdue }}"><div class="n">{{ overdue|length }}</div><div class="l">Overdue</div></div>
+  <div class="stat"><div class="n">{{ today|length }}</div><div class="l">Due today</div></div>
+  <div class="stat ok"><div class="n">{{ done_today|length }}</div><div class="l">Completed today</div></div>
+  <div class="stat"><div class="n">{{ conversations }}<span class="muted small"> / {{ calls_today }}</span></div><div class="l">Real conversations / call attempts today</div></div>
+</div>
+<p></p>
+
+<div class="split">
+  <div>
+    {% if no_next %}
+    <div class="card">
+      <div class="card-h"><h2>Your records with no next action</h2><span class="badge bad">{{ no_next|length }}</span></div>
+      <p class="small muted">Every active opportunity needs an owner and a next step. Add one so nothing slips.</p>
+      <ul class="tasks">{% for o in no_next %}<li class="task"><div><div class="t"><a href="{{ url_for('sellers.detail', opp_id=o.id) }}">{{ o.ref_code }} · {{ o.salon_name }}</a></div><div class="meta">{{ o.contact_name }} · {{ STAGE_LABELS.get(o.stage) }}</div></div><div><a class="btn sm" href="{{ url_for('sellers.detail', opp_id=o.id) }}">Add next action</a></div></li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    <div class="card">
+      <div class="card-h"><h2>Overdue</h2><span class="badge {{ 'bad' if overdue else 'grey' }}">{{ overdue|length }}</span></div>
+      <ul class="tasks">{% for t in overdue %}{{ task_item(t) }}{% else %}<li class="empty">Nothing overdue.</li>{% endfor %}</ul>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Today</h2><span class="badge">{{ today|length }}</span></div>
+      <ul class="tasks">{% for t in today %}{{ task_item(t) }}{% else %}<li class="empty">Nothing else due today.</li>{% endfor %}</ul>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Coming up</h2></div>
+      <ul class="tasks">{% for t in upcoming %}{{ task_item(t) }}{% else %}<li class="empty">No upcoming tasks.</li>{% endfor %}</ul>
+    </div>
+  </div>
+  <div>
+    <div class="card" id="notifications">
+      <div class="card-h"><h2>Alerts &amp; mentions</h2>
+        {% if notifications %}<form method="post" action="{{ url_for('main.notifications_read') }}">{{ csrf() }}<button class="btn link small">Mark all read</button></form>{% endif %}</div>
+      <ul class="tasks">{% for n in notifications %}<li class="task"><div><div class="t small">{% if n.link %}<a href="{{ n.link }}">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}</div><div class="meta">{{ n.created_at|rel }}</div></div></li>{% else %}<li class="empty">You're all caught up.</li>{% endfor %}</ul>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Completed today</h2></div>
+      <ul class="tasks">{% for t in done_today %}<li class="task"><div><div class="t small">{{ t.title }}</div><div class="meta">{{ t.outcome }}</div></div></li>{% else %}<li class="empty">Nothing completed yet today.</li>{% endfor %}</ul>
+    </div>
+    <div class="card">
+      <h3>Coming in later milestones</h3>
+      <p class="small muted">Customer WhatsApp replies (M7), forms received for review (M4), match candidates to review (M5) and visits (M6) will appear here as those modules ship. They are not simulated.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

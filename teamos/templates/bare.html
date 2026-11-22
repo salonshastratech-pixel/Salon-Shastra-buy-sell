@@ -1,0 +1,5 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %} · Salon Shastra TeamOS</title>{% if brand_fonts %}<link rel="stylesheet" href="{{ brand_fonts }}">{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<body><div class="login-wrap"><div class="login">{% block content %}{% endblock %}</div></div></body></html>

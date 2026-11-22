@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}{{ name }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ name }}</h1><div class="sub">Planned for {{ milestone }} — not built yet.</div></div></div>
+<div class="card"><p>This module is part of the approved roadmap but has not been implemented. Nothing here is mocked or simulated.</p>
+<p class="muted">See <span class="mono">docs/ROADMAP.md</span> and <span class="mono">docs/STATUS.md</span> in the repository for scope and sequencing.</p></div>
+{% endblock %}
