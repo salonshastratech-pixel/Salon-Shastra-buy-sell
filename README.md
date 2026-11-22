@@ -1,7 +1,7 @@
 # Salon Shastra TeamOS — Business Exchange, Match Desk & Team Command Center
 
 Internal operating platform for Salon Shastra's salon buy–sell team. Milestone 1: foundation, access control and
-seller management; Milestone 2: production hardening; **Milestone 3: buyer / investor management**. See `docs/` for
+seller management; Milestone 2: production hardening; Milestone 3: buyer / investor management; **Milestone 4: forms & data requests**. See `docs/` for
 architecture, roadmap, decisions and feature status.
 
 ## Run locally (5 minutes)
@@ -25,6 +25,10 @@ In development you can switch off two-step sign-in for the demo admin with `expo
 (empty). Production always enforces it for Super Admin and Finance.
 
 Try **Spreadsheet import** as `lead@` with `docs/samples/sample_seller_leads.csv`.
+
+Forms (M4): open **Forms & Requests** for the review inbox and the public quick-form links (`/f/seller`,
+`/f/buyer`). From any seller or buyer page, *Forms & documents* sends a detailed form or a targeted request
+(copy link or the clearly-labelled mock WhatsApp). Uploads need `FILES_KEY` in `.env` (see `.env.example`).
 
 Buyers (M3): open **Buyers / Investors**. Sign in as `harika@` (buyer team) to work mandates, and as `lead@` to
 review funding and confirm criteria (*Qualification* tab). `BY-…` demo records cover a fully qualified acquirer, an

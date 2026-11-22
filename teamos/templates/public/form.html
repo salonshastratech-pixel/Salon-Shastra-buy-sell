@@ -1,0 +1,89 @@
+{% extends "public/layout.html" %}
+{% macro q(key) %}{% set f = FT.field_def(kind, key) %}{% set a = answers.get(key) or {} %}
+<div class="field qf {{ 'has-err' if errors.get(key) }}" {% if f.show_if %}data-show-if="{{ f.show_if[0] }}={{ f.show_if[1] }}"{% endif %}>
+  <label for="q-{{ key }}">{{ FT.label(kind, key) }}{% if f.unit %} <span class="muted">({{ f.unit }})</span>{% endif %}
+    {% if f.privacy == 'restricted' %}<span class="badge warn">Confidential — seen only by Salon Shastra</span>{% endif %}</label>
+  {% if FT.RESPONDENT_HELP.get(key) %}<div class="help">{{ FT.RESPONDENT_HELP[key] }}</div>{% endif %}
+  {% if purposes.get(key) %}<div class="help why">Why we ask: {{ purposes[key] }}</div>{% endif %}
+  <div class="qrow">
+    {% set v = a.value if a.state == 'value' else '' %}
+    {% if f.ftype == 'enum' %}<select id="q-{{ key }}" name="{{ key }}" data-value-for="{{ key }}"><option value="">Choose…</option>{% for ov, ol in f.options %}<option value="{{ ov }}" {{ 'selected' if v == ov }}>{{ ol }}</option>{% endfor %}</select>
+    {% elif f.ftype == 'textarea' %}<textarea id="q-{{ key }}" name="{{ key }}" data-value-for="{{ key }}" maxlength="2000">{{ v or '' }}</textarea>
+    {% elif f.ftype == 'date' %}<input id="q-{{ key }}" type="date" name="{{ key }}" value="{{ v or '' }}" data-value-for="{{ key }}">
+    {% else %}<input id="q-{{ key }}" name="{{ key }}" value="{{ v or '' }}" data-value-for="{{ key }}" maxlength="200" {% if f.ftype == 'inr' %}placeholder="₹ e.g. 25L or 2500000" inputmode="decimal"{% elif f.ftype in ('int','pct') %}inputmode="numeric"{% endif %}>{% endif %}
+    <select name="{{ key }}__state" class="qstate" aria-label="Or">{% for sv, sl in [('', 'or…')] + FT.RESPONDENT_STATES %}<option value="{{ sv }}" {{ 'selected' if a.state == sv and sv }}>{{ sl }}</option>{% endfor %}</select>
+  </div>
+  {% if f.importance %}{% set imp = (answers.get('importance:' ~ key) or {}).value %}
+  <div class="qrow small"><label class="muted" for="imp-{{ key }}">How much does this matter to you?</label>
+    <select id="imp-{{ key }}" name="{{ key }}__importance"><option value="">Choose…</option>{% for iv, il in BF.IMPORTANCE %}<option value="{{ iv }}" {{ 'selected' if imp == iv }}>{{ il }}</option>{% endfor %}</select></div>{% endif %}
+  {% if errors.get(key) %}<div class="err">{{ errors[key] }}</div>{% endif %}
+</div>
+{% endmacro %}
+{% block title %}{{ t.title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{% if personal %}Hello {{ first_name }} — {% endif %}{{ t.title }}</h1>
+  <p>{{ t.intro }}</p>
+  {% if personal and inv.purpose %}<p class="flash ok">{{ inv.purpose }}</p>{% endif %}
+  {% if personal %}<p class="small muted">This is your personal link. It expires on {{ inv.expires_at|ist('%d %b %Y') }}. Please don't forward it.</p>{% endif %}
+  {% if saved %}<p class="flash ok">Saved. You can close this page and come back to the same link later.</p>{% endif %}
+  {% if errors %}<p class="flash error">{{ errors.get('_') or 'Please check the highlighted answers.' }}</p>{% endif %}
+</div>
+
+<form method="post" {% if personal %}enctype="multipart/form-data"{% endif %} novalidate>
+  {% if not personal %}<input type="hidden" name="form_token" value="{{ form_token }}">
+  <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>{% endif %}
+
+  {% if t.contact %}
+  <div class="card"><h2>Your details</h2><div class="form-grid">
+    {% for k in t.contact %}<div class="field {{ 'has-err' if errors.get(k) }}"><label for="c-{{ k }}">{{ FT.CONTACT_LABELS[k] }}{{ ' *' if k in FT.CONTACT_REQUIRED }}</label>
+      <input id="c-{{ k }}" name="{{ k }}" value="{{ contact.get(k, '') }}" maxlength="200" {% if k == 'phone' %}inputmode="tel"{% elif k == 'email' %}type="email"{% endif %} {% if k == 'city' and not contact.get(k) %}placeholder="Hyderabad"{% endif %}>
+      {% if errors.get(k) %}<div class="err">{{ errors[k] }}</div>{% endif %}</div>{% endfor %}
+  </div></div>
+  {% endif %}
+
+  {% for sk, slabel, keys in t.sections if keys %}
+  <div class="card"><h2>{{ slabel }}</h2>
+    {% for key in keys %}{{ q(key) }}{% endfor %}
+  </div>
+  {% endfor %}
+
+  {% if 'localities' in t.extras %}{% set loc = answers.get('localities') or {} %}
+  <div class="card"><h2>Where</h2>
+    <div class="field"><label for="lp">Preferred areas — most preferred first, one per line</label>
+      <textarea id="lp" name="localities_preferred" placeholder="Kondapur&#10;Gachibowli">{{ (loc.preferred or [])|join('\n') }}</textarea></div>
+    <div class="field"><label for="le">Areas you would NOT consider</label>
+      <textarea id="le" name="localities_excluded">{{ (loc.excluded or [])|join('\n') }}</textarea></div>
+  </div>
+  {% endif %}
+
+  {% if 'choice_prefs' in t.extras %}
+  <div class="card"><h2>Type of salon and deal</h2>
+    <p class="small muted">For each option: Must have, Prefer, Flexible, Avoid or Not important. Skip any you haven't thought about.</p>
+    {% for dim, dlabel, opts in BF.CHOICE_DIMENSIONS %}<h3>{{ dlabel }}</h3>
+    <div class="pref-grid">{% for ov, ol in opts %}{% set cur = (answers.get('pref:' ~ dim ~ ':' ~ ov) or {}).value %}<label class="small" for="p-{{ dim }}-{{ ov }}">{{ ol }}</label>
+      <select id="p-{{ dim }}-{{ ov }}" name="pref__{{ dim }}__{{ ov }}"><option value="">—</option>{% for iv, il in BF.IMPORTANCE %}<option value="{{ iv }}" {{ 'selected' if cur == iv }}>{{ il }}</option>{% endfor %}</select>{% endfor %}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if t.docs %}
+  <div class="card"><h2>Documents</h2>
+    <p class="small muted">PDF, PNG or JPG, up to 5 MB each. Files are stored encrypted and seen only by authorised Salon Shastra staff. Upload only what you are comfortable sharing.</p>
+    {% for dt in t.docs %}<div class="field {{ 'has-err' if errors.get('doc__' ~ dt) }}"><label for="d-{{ dt }}">{{ dict(FT.DOC_TYPES[kind])[dt] }}</label>
+      <input id="d-{{ dt }}" type="file" name="doc__{{ dt }}" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
+      {% for d in docs if d.doc_type == dt %}<div class="help">Received: {{ d.original_name }}</div>{% endfor %}
+      {% if errors.get('doc__' ~ dt) %}<div class="err">{{ errors['doc__' ~ dt] }}</div>{% endif %}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    {% if not personal %}
+    <label class="check {{ 'has-err' if errors.get('consent_contact') }}"><input type="checkbox" name="consent_contact" value="1" {{ 'checked' if request.form.get('consent_contact') }}> {{ FT.CONSENT_TEXT.service_contact[1] }}</label>
+    {% if errors.get('consent_contact') %}<div class="err">{{ errors.consent_contact }}</div>{% endif %}{% endif %}
+    {% if 'share_consent' in t.extras %}<label class="check"><input type="checkbox" name="consent_share_criteria" value="1" {{ 'checked' if request.form.get('consent_share_criteria') }}> {{ FT.CONSENT_TEXT.share_teaser[1] }} (optional)</label>{% endif %}
+    <p class="small muted">Please don't guess. "I don't know" is a perfectly good answer.</p>
+    {% if personal %}<button class="btn" name="action" value="save">Save and finish later</button> {% endif %}
+    <button class="btn primary" name="action" value="submit">Submit</button>
+  </div>
+</form>
+{% endblock %}

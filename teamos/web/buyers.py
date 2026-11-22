@@ -151,6 +151,8 @@ def detail(opp_id):
         can_review=user_can(db, g.user, "evidence.review"),
         can_funding_detail=B.can_view_funding_evidence(db, g.user, opp),
     )
+    from .forms import record_context
+    ctx.update(record_context(db, g.user, opp))
     return render_template("buyers/detail.html", **ctx)
 
 

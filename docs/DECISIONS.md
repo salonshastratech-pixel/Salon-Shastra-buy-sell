@@ -48,3 +48,15 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 * UAT-05 ("buyer and consulting lead") is exercised as **one contact with a seller opportunity and two independent buyer mandates**: consulting is a parked vertical (D-01) with no opportunity type yet. The model already keeps any number of opportunities per contact.
 * UAT-02 ("new buyer from public form") is implemented as the server-side submission path (`buyers.submit_respondent_form`) with routing, review task, buyer-declared provenance and privileged-field stripping. The public link/page itself is Milestone 4 (forms).
 * Opportunity reference numbers share one sequence: sellers `SL-xxxxx`, buyers `BY-xxxxx`.
+
+## Added in Milestone 4 (proposals — configurable, pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-27 | Link expiry | Detailed form links 14 days, targeted requests 7 days; one live detailed link per record (a new one revokes the old). | Founder / team lead | Proposed |
+| D-28 | Chasing | One internal chase task 48 h after sending if not submitted. No automatic customer reminders until the real WhatsApp provider (M7). | Team lead | Proposed |
+| D-29 | Who reviews form answers | Any team member with edit rights (PRD §3.2 "Review form submissions: Team member Yes"). Funding/qualification stay reviewer-only. | Founder | Proposed |
+| D-30 | Public form consent | Submitting a quick form requires ticking contact consent (`public-form-consent-v0.1`). Criteria-sharing consent is optional and separate. Wording needs legal review (D-16). | Founder / legal | **Needs decision** |
+| D-31 | Public form abuse limits | Signed 2-hour form token, honeypot, max 5 submissions per IP per hour. | PM | Proposed |
+| D-32 | Documents | PDF/PNG/JPG up to 5 MB, encrypted at rest. Seller documents: owner, approvers, grants. Buyer documents: reviewers, grants. Retention period not set (D-16). | Founder / legal | Proposed |
+| D-33 | Prefilling personal forms | Detailed forms show the record's current answers so the customer corrects rather than retypes — except confidential seller fields (address, lowest price, private reason). | Founder | Proposed |

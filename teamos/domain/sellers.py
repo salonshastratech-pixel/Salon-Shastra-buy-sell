@@ -804,3 +804,76 @@ def days_since(value: str | None) -> int | None:
     from ..timeutil import parse_iso
     dt = parse_iso(value)
     return (now_utc() - dt).days if dt else None
+
+
+# -- Respondent submission (public quick form, Milestone 4) ---------------------------
+def _seller_team_owner(db) -> int | None:
+    """Default routing suggestion (§5.4): seller team first, else an active super admin."""
+    row = db.one("SELECT id FROM users WHERE is_active = 1 AND team = 'seller' AND role IN ('team_member','team_lead') "
+                 "ORDER BY id LIMIT 1") or db.one("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin' "
+                                                 "ORDER BY id LIMIT 1")
+    return row["id"] if row else None
+
+
+def submit_respondent_form(db, payload: dict, source: str = "landing_page", is_synthetic: int = 0) -> int:
+    """A seller's own quick-form submission. Captured as seller-declared with a review task; never linked to,
+    merged with or overwriting an existing contact (possible duplicates go to the review queue)."""
+    errors = {}
+    name = (payload.get("full_name") or "").strip()
+    salon = (payload.get("salon_name") or "").strip()
+    city = (payload.get("city") or "").strip()
+    locality = (payload.get("locality") or "").strip() or city
+    if not name:
+        errors["full_name"] = "Please enter your name."
+    if not salon:
+        errors["salon_name"] = "Please enter the salon name."
+    if not city:
+        errors["city"] = "Please enter the city."
+    if source not in SOURCE_LABELS:
+        errors["source"] = "Unknown source."
+    phone, perr = normalize_indian_mobile(payload.get("phone"))
+    if perr:
+        errors["phone"] = perr
+    values, qerrors = _parse_fields(payload, [f.key for f in FIELDS if f.quick])
+    errors.update(qerrors)
+    if errors:
+        raise ValidationError(errors)
+    owner_id = _seller_team_owner(db)
+    dups = find_duplicates(db, phone, salon, locality)
+    now = now_iso()
+    with db:
+        contact_id = db.insert("contacts", {
+            "full_name": name, "phone_normalized": phone, "phone_raw": payload.get("phone"),
+            "email": (payload.get("email") or "").strip().lower() or None, "city": city, "locality": locality,
+            "is_synthetic": is_synthetic, "created_at": now, "updated_at": now})
+        for d in dups:
+            db.insert("duplicate_reviews", {"contact_id": contact_id, "candidate_contact_id": d["id"],
+                                            "reason": d["reason"], "created_at": now})
+        business_id = db.insert("salon_businesses", {
+            "name": salon, "city": city, "locality": locality, "owner_contact_id": contact_id,
+            "is_synthetic": is_synthetic, "created_at": now, "updated_at": now})
+        opp_id = db.insert("opportunities", {
+            "kind": "seller", "contact_id": contact_id, "business_id": business_id, "stage": "new",
+            "status": "active", "primary_owner_id": owner_id, "priority": "normal", "source": source,
+            "source_detail": "Respondent submission", "is_synthetic": is_synthetic, "created_at": now,
+            "updated_at": now})
+        db.update("opportunities", opp_id, {"ref_code": f"SL-{opp_id:05d}"})
+        listing_id = db.insert("seller_listings", {"opportunity_id": opp_id, "business_id": business_id,
+                                                   "created_at": now, "updated_at": now})
+        _apply_values(db, {"id": None}, listing_id, values, source="public_form", bump_version=False)
+        for key, _ in LISTING_CHECKLIST:
+            db.execute("INSERT INTO listing_checklist (listing_id, item_key, status, updated_at) VALUES (?, ?, ?, ?)",
+                       (listing_id, key, "not_requested", now))
+        db.insert("contact_consents", {
+            "contact_id": contact_id, "purpose": "service_contact", "channel": "any",
+            "granted": 1 if payload.get("consent_contact") else 0, "source": "public_form",
+            "text_version": payload.get("consent_version") or "public-form-consent-v0.1", "captured_at": now})
+        db.insert("stage_history", {"opportunity_id": opp_id, "from_stage": None, "to_stage": "new",
+                                    "reason": "Seller submitted the quick form", "actor_id": None, "at": now})
+        T.add_activity(db, None, "opportunity", opp_id, "system",
+                       "Seller submitted the quick form" + (" — flagged for duplicate review" if dups else ""))
+        T.create_task(db, None, title=f"Review seller submission: {name} ({salon})", assignee_id=owner_id,
+                      due_at=T.first_contact_due(FIRST_CONTACT_SLA_MIN), task_type="review", priority="high",
+                      entity_type="opportunity", entity_id=opp_id, is_synthetic=is_synthetic)
+        audit.record(db, None, "seller.submitted", "opportunity", opp_id, {"source": source, "duplicates": len(dups)})
+    return opp_id

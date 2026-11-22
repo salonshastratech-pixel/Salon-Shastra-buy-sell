@@ -32,13 +32,16 @@ def _in(**kw):
 
 def seed(db):
     if db.scalar("SELECT COUNT(*) FROM users WHERE is_synthetic = 1"):
+        added = []
         if not db.scalar("SELECT COUNT(*) FROM opportunities WHERE kind = 'buyer' AND is_synthetic = 1"):
             seed_buyers(db)  # demo database created before Milestone 3
-            db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
-                       "(SELECT id FROM opportunities WHERE kind = 'buyer' AND is_synthetic = 1)")
-            print("Synthetic demo buyers added (Milestone 3).")
-            return
-        print("Demo data already present — skipping.")
+            added.append("buyers (M3)")
+        if not db.scalar("SELECT COUNT(*) FROM form_invitations"):
+            seed_forms(db)  # demo database created before Milestone 4
+            added.append("forms & requests (M4)")
+        db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
+                   "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
+        print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
         return
     ids = {}
     for email, name, role, team in USERS:
@@ -173,6 +176,7 @@ def seed(db):
                       assignee_id=harika["id"], due_at=_ago(hours=20), task_type="collect_info", priority="normal",
                       entity_type="opportunity", entity_id=o2, is_synthetic=1)
     seed_buyers(db)
+    seed_forms(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -286,3 +290,69 @@ def seed_buyers(db):
                 "Check in", _in(days=1))
     BY.change_stage(db, harika, BY.load(db, b6), "exploring_only", "Researching only; revisit in 90 days",
                     _in(days=90))
+
+
+SYNTHETIC_PDF = (b"%PDF-1.4\n% SYNTHETIC DEMO DOCUMENT - not a real record\n1 0 obj<< /Type /Catalog >>endobj\n"
+                 b"trailer<< /Root 1 0 R >>\n%%EOF\n")
+
+
+def seed_forms(db):
+    """Milestone 4: form links, customer answers waiting for review, documents, public submissions."""
+    from teamos import files
+    from teamos.domain import forms as F
+    u = {r["email"].split("@")[0]: r for r in db.all("SELECT * FROM users WHERE is_synthetic = 1")}
+    shaheen, harika = u["shaheen"], u["harika"]
+
+    def opp_by_phone(kind, phone):
+        return db.scalar("SELECT o.id FROM opportunities o JOIN contacts c ON c.id = o.contact_id WHERE o.kind = ? "
+                         "AND c.phone_normalized = ? AND o.is_synthetic = 1 ORDER BY o.id LIMIT 1", (kind, phone))
+
+    def respond(token, data, docs=None, final=True):
+        inv = F.resolve(db, token)
+        F.mark_opened(db, inv)
+        F.save_response(db, inv, data, docs or {}, None, "seed", final)
+
+    can_upload = files.uploads_enabled()
+
+    # 1. Seller with unknown deposit — targeted request via MOCK WhatsApp, answered with a lease copy
+    imran_sl = opp_by_phone("seller", "+919000000102")
+    if imran_sl:
+        r = F.create_invitation(db, shaheen, imran_sl, "targeted", "whatsapp_mock",
+                                ["rent_deposit", "deposit_treatment", "lease_expiry"],
+                                ["lease_agreement"] if can_upload else [],
+                                "Buyers are asking about the deposit and the lease - three quick questions.")
+        respond(r["token"], {"rent_deposit": "2.5L", "deposit_treatment": "buyer_pays_separately",
+                             "lease_expiry": "2028-09-30"},
+                {"lease_agreement": (SYNTHETIC_PDF, "lease-synthetic.pdf")} if can_upload else None)
+
+    # 2. Qualified buyer sends a new budget + funding proof, and tries to mark himself verified (UAT-42)
+    arjun = opp_by_phone("buyer", "+919000000201")
+    if arjun:
+        r = F.create_invitation(db, harika, arjun, "targeted", "whatsapp_mock", ["all_in_max", "cash_ready_amount"],
+                                ["funding_proof"] if can_upload else [], "Please confirm your updated budget.")
+        respond(r["token"], {"all_in_max": "40L", "cash_ready_amount": "34L", "funding_status": "verified"},
+                {"funding_proof": (SYNTHETIC_PDF, "bank-statement-synthetic.pdf")} if can_upload else None)
+
+    # 3. Investor group half-way through the detailed buyer form (draft saved, link still open)
+    deepa = opp_by_phone("buyer", "+919000000202")
+    if deepa:
+        r = F.create_invitation(db, harika, deepa, "buyer_deep", "copy_link")
+        respond(r["token"], {"chairs_min": "8", "pref__gender_format__women": "must",
+                             "localities_preferred": "Banjara Hills\nJubilee Hills"}, final=False)
+
+    # 4. Detailed seller form sent, not opened yet
+    kavya2 = db.scalar("SELECT o.id FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id "
+                       "WHERE b.name = 'Glow Studio Express' AND o.is_synthetic = 1")
+    if kavya2:
+        F.create_invitation(db, shaheen, kavya2, "seller_deep", "copy_link")
+
+    # 5. Public quick-form submissions (new leads for review)
+    F.submit_public(db, "seller_quick", {
+        "full_name": "Ramesh Goud (demo)", "phone": "9000000301", "email": "", "salon_name": "Classic Cuts (demo)",
+        "city": "Hyderabad", "locality": "Dilsukhnagar", "operating_status": "operating", "ownership_role": "owner",
+        "sale_purpose": "sell_entire", "asking_price": "7L", "sale_timeline": "3_6m", "consent_contact": "1"},
+        F.hash_ip("seed", "seed"), "seed", is_synthetic=1)
+    F.submit_public(db, "buyer_quick", {
+        "full_name": "Nisha Verma (demo)", "phone": "9000000302", "city": "Hyderabad", "locality": "Madhapur",
+        "need_type": "franchise", "decision_maker": "shared", "all_in_max": "45L", "purchase_window": "90d",
+        "consent_contact": "1"}, F.hash_ip("seed", "seed"), "seed", is_synthetic=1)

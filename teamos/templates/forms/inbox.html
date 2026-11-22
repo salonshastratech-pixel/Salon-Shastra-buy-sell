@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Forms & Requests{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Forms &amp; Requests</h1><div class="sub">Customer answers wait here until a team member reviews them. Nothing a customer submits changes a record by itself.</div></div></div>
+
+<div class="split"><div>
+  <div class="card"><div class="card-h"><h2>Needs review</h2><span class="badge {{ 'warn' if pending else 'grey' }}">{{ pending|length }}</span></div>
+    <ul class="tasks">{% for s in pending %}<li class="task"><div>
+      <div class="t"><a href="{{ url_for('forms.review', sub_id=s.id) }}">{{ s.contact_name }} — {{ s.template_version }}</a></div>
+      <div class="meta"><a href="{{ opp_url(s.opp_kind, s.opportunity_id) }}">{{ s.ref_code }}</a> · submitted {{ s.submitted_at|rel }} ·
+        {% if s.invitation_id %}personal link{% else %}<span class="badge info">public form — new record created</span>{% endif %}
+        {% if s.ignored_fields %} · <span class="badge bad">tried to set reviewer-only fields</span>{% endif %}</div></div>
+      <div><a class="btn sm primary" href="{{ url_for('forms.review', sub_id=s.id) }}">Review</a></div></li>
+    {% else %}<li class="empty">Nothing waiting for review.</li>{% endfor %}</ul></div>
+
+  <div class="card"><div class="card-h"><h2>Open personal links</h2><span class="badge grey">{{ open_links|length }}</span></div>
+    <ul class="tasks">{% for i in open_links %}<li class="task"><div>
+      <div class="t small"><a href="{{ opp_url(i.kind, i.opportunity_id) }}">{{ i.ref_code }} · {{ i.contact_name }}</a> — {{ i.template_version }}</div>
+      <div class="meta"><span class="badge {{ 'info' if i.status == 'started' else 'grey' }}">{{ STATUS[i.status] }}</span> · sent {{ i.created_at|rel }} by {{ i.sender_name }} · expires {{ i.expires_at|rel }}{% if i.chased_at %} · chase task created{% endif %}</div></div></li>
+    {% else %}<li class="empty">No open links.</li>{% endfor %}</ul>
+    <p class="small muted">Links not completed after 48 hours create one chase task for the record owner. Expired links stop working.</p></div>
+
+  <div class="card"><h2>Recently reviewed</h2>
+    <ul class="tasks">{% for s in reviewed %}<li class="task"><div>
+      <div class="t small"><a href="{{ url_for('forms.review', sub_id=s.id) }}">{{ s.contact_name }} — {{ s.template_version }}</a></div>
+      <div class="meta">{{ (s.review_outcome or '')|replace('_',' ') }} by {{ s.reviewer_name }} {{ s.reviewed_at|rel }}</div></div></li>
+    {% else %}<li class="empty">None yet.</li>{% endfor %}</ul></div>
+</div><div>
+  <div class="card"><h2>Public quick forms</h2>
+    <p class="small">Anyone can fill these in. Each submission creates a new lead with a review task. Nothing is linked to an existing contact automatically.</p>
+    <p class="small"><strong>Seller:</strong> <a href="{{ public_links.seller }}" target="_blank" rel="noopener">{{ public_links.seller }}</a><br>
+    <strong>Buyer:</strong> <a href="{{ public_links.buyer }}" target="_blank" rel="noopener">{{ public_links.buyer }}</a></p>
+    <p class="small muted">These run on this computer only. They are not public on the internet until the app is deployed.</p></div>
+
+  <div class="card"><h2>Messages log</h2>
+    <p class="small"><span class="badge warn">{{ MOCK_LABEL }}</span></p>
+    <ul class="timeline">{% for m in comms %}<li><div class="small"><strong>{{ m.template_key|replace('_',' ') }}</strong> to {{ m.contact_name }} (<a href="{{ opp_url(m.opp_kind, m.opportunity_id) }}">{{ m.ref_code }}</a>) — {{ m.status|replace('_',' ') }}</div>
+      <div class="who mono">{{ m.provider }} · {{ m.provider_message_id or '—' }} · {{ m.sender_name }} · {{ m.created_at|ist }}</div></li>
+    {% else %}<li class="empty">No messages.</li>{% endfor %}</ul>
+    <p class="small muted">"Provider accepted" is not delivery. Real delivery and read receipts arrive with the WhatsApp integration in Milestone 7.</p></div>
+</div></div>
+{% endblock %}

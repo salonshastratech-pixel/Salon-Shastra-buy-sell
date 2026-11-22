@@ -112,6 +112,8 @@
       <p class="small muted">Each need stays its own opportunity with its own stage and history.</p>{% endif %}
     </div>
 
+    {% include "forms/_record_card.html" %}
+
     <div class="card">
       <div class="card-h"><h2>Qualification</h2><a class="small" href="{{ url_for('buyers.detail', opp_id=opp.id, tab='qualification') }}">Details →</a></div>
       <div class="stat"><div class="n">{{ score.score }}/100</div><div class="l">{{ score.band }} · advisory</div></div>
@@ -253,7 +255,7 @@
   <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Requirement changes</h2></div><div class="table-wrap"><table class="small">
     <tr><th>v</th><th>Field</th><th>From</th><th>To</th><th>By</th></tr>
     {% for c in changes %}<tr><td>{{ c.data_version }}</td><td>{{ BF.BY_KEY[c.field_key].label if c.field_key in BF.BY_KEY else c.field_key|replace('_',' ') }}</td>
-      <td>{{ c.old_value if c.old_value is not none else (c.old_state or '—') }}</td><td>{{ c.new_value if c.new_value is not none else (c.new_state or '—') }}</td>
+      <td>{{ (BF.option_label(c.field_key, c.old_value) if c.field_key in BF.BY_KEY else c.old_value) if c.old_value is not none else (c.old_state or '—') }}</td><td>{{ (BF.option_label(c.field_key, c.new_value) if c.field_key in BF.BY_KEY else c.new_value) if c.new_value is not none else (c.new_state or '—') }}</td>
       <td>{{ c.actor_name or 'Buyer (form)' }}<div class="muted">{{ c.at|ist }}</div></td></tr>
     {% else %}<tr><td colspan="5" class="empty">No changes yet.</td></tr>{% endfor %}</table></div></div>
 </div></div>

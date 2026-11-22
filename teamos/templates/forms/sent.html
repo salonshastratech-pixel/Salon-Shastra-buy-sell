@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Link created{% endblock %}
+{% block content %}
+<div class="ph"><div><div class="small muted"><a href="{{ back }}">{{ opp.ref_code }}</a> / form link</div>
+  <h1>Personal link created for {{ opp.contact_name }}</h1>
+  <div class="sub">{{ inv.template_version }} · expires {{ inv.expires_at|ist('%d %b %Y') }}</div></div></div>
+
+<div class="card">
+  <h2>The link</h2>
+  <p class="small">This is the only time the full link is shown — it is stored only as a fingerprint. If it gets lost, revoke it and create a new one.</p>
+  <div class="link-box">{{ link }}</div>
+  <p class="small muted">Anyone with this link can fill in the form for this record. Share it only with {{ opp.contact_name }}.</p>
+</div>
+
+{% if comm %}
+<div class="card">
+  <h2>WhatsApp message</h2>
+  <p><span class="badge warn">{{ MOCK_LABEL }}</span></p>
+  <p class="small">Status: <strong>{{ comm.status|replace('_',' ') }}</strong> · provider: <span class="mono">{{ comm.provider }}</span> · message ID: <span class="mono">{{ comm.provider_message_id or '—' }}</span></p>
+  <div class="link-box">{{ comm.body }}</div>
+  <p class="small muted">Recorded as it would be sent (the secret link is not stored in the log). A provider acknowledgement is not proof of delivery.</p>
+</div>
+{% else %}
+<div class="card small">Share this link yourself (e.g. read it out on a call or paste it into your approved channel). Delivery is not tracked for copied links.</div>
+{% endif %}
+<p><a class="btn primary" href="{{ back }}">Back to {{ opp.ref_code }}</a></p>
+{% endblock %}

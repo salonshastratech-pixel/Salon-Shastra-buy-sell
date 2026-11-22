@@ -92,8 +92,10 @@
       <h3>Consent</h3>
       {% for purpose in ['service_contact','share_teaser','share_identity','marketing'] %}{% set c = consents.get(purpose) %}
       <div class="small">{{ purpose|replace('_',' ')|capitalize }}: {% if c and c.granted %}<span class="badge ok">Granted</span> <span class="muted">{{ c.captured_at|ist('%d %b %Y') }} · {{ c.source }}</span>{% elif c %}<span class="badge bad">Refused / withdrawn</span>{% else %}<span class="badge grey">Not recorded</span>{% endif %}</div>{% endfor %}
-      {% if other_opps %}<h3>Other opportunities for this contact</h3>{% for o in other_opps %}<div class="small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> · {{ o.kind }} · {{ o.salon_name or '' }} · {{ STAGE_LABELS.get(o.stage, o.stage) }}</div>{% endfor %}{% endif %}
+      {% if other_opps %}<h3>Other opportunities for this contact</h3>{% for o in other_opps %}<div class="small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> · {{ o.kind }}{% if o.salon_name %} · {{ o.salon_name }}{% endif %} · {{ STAGE_LABELS.get(o.stage, o.stage) }}</div>{% endfor %}{% endif %}
     </div>
+
+    {% include "forms/_record_card.html" %}
 
     <div class="card">
       <h2>All-in buyer cash requirement</h2>

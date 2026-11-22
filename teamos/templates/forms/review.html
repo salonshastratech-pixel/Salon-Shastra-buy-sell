@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Review form · {{ sub.contact_name }}{% endblock %}
+{% block content %}
+<div class="ph"><div>
+  <div class="small muted"><a href="{{ url_for('forms.inbox') }}">Forms &amp; Requests</a> / submission #{{ sub.id }}</div>
+  <h1>{{ sub.contact_name }} — {{ sub.template_version }}</h1>
+  <div class="inline sub"><a href="{{ opp_url(opp.kind, opp.id) }}">{{ opp.ref_code }}</a> · {{ opp.kind }} ·
+    {% if sub.invitation_id %}personal link{% if sub.channel == 'whatsapp_mock' %} (sent via mock WhatsApp){% endif %}{% else %}public quick form{% endif %}
+    · submitted {{ sub.submitted_at|ist }}
+    {% if sub.status == 'reviewed' %}<span class="badge ok">Reviewed: {{ sub.review_outcome|replace('_',' ') }} by {{ sub.reviewer_name }}</span>{% else %}<span class="badge warn">Needs review</span>{% endif %}</div>
+</div></div>
+
+{% if ignored %}<div class="flash error">The form also contained reviewer-only fields ({{ ignored|join(', ') }}). They were ignored and the attempt is in the audit log. Funding, qualification and approvals are only ever set by a reviewer.</div>{% endif %}
+
+<div class="split"><div>
+{% if not sub.invitation_id %}
+  <div class="card"><h2>Public quick form</h2>
+    <p>This submission created a <strong>new lead</strong> ({{ opp.ref_code }}) with the answers below recorded as customer-declared. It was not linked to or merged with any existing contact; possible duplicates are in <a href="{{ url_for('admin.duplicates') }}">duplicate review</a>{% if not can('duplicates.resolve') %} (admins){% endif %}.</p>
+    {% if contact %}<table class="small">{% for k, v in contact.items() if v %}<tr><td class="muted">{{ FT.CONTACT_LABELS.get(k, k) }}</td><td>{{ v }}</td></tr>{% endfor %}</table>{% endif %}
+  </div>
+{% endif %}
+
+<form method="post" class="card flush">{{ csrf() }}
+  <div class="card-h"><h2>&nbsp;&nbsp;Answers vs. current record</h2></div>
+  <div class="table-wrap"><table>
+    <tr>{% if sub.status == 'submitted' and sub.invitation_id %}<th>Apply</th>{% endif %}<th>Question</th><th>Customer says</th><th>On record now</th>{% if sub.status == 'reviewed' and sub.invitation_id %}<th></th>{% endif %}</tr>
+    {% for r in rows %}<tr class="diff-row {{ 'same' if not r.changed }}">
+      {% if sub.status == 'submitted' and sub.invitation_id %}<td><input type="checkbox" name="accept" value="{{ r.key }}" {{ 'checked' if r.changed }} {{ 'disabled' if not r.changed }} aria-label="Apply {{ r.label }}"></td>{% endif %}
+      <td>{{ r.label }}{% if r.material %} <span class="badge warn">material</span>{% endif %}</td>
+      <td><strong>{{ r.submitted or '—' }}</strong></td>
+      <td>{% if r.current %}{{ r.current }}{% else %}<span class="missing">Not provided</span>{% endif %}{% if not r.changed %} <span class="small muted">(same)</span>{% endif %}</td>
+      {% if sub.status == 'reviewed' and sub.invitation_id %}<td>{% if r.key in applied %}<span class="badge ok">applied</span>{% endif %}</td>{% endif %}
+    </tr>{% else %}<tr><td colspan="4" class="empty">No answers — see documents.</td></tr>{% endfor %}
+  </table></div>
+  {% if sub.status == 'submitted' and can_edit %}
+  <div class="pad">
+    <p class="small muted">Applied answers are recorded as customer-declared with this submission as their source. Changing a material fact on an approved listing sends it back for re-review; changing a buyer's requirements marks confirmed criteria as changed.</p>
+    <div class="field"><label>Note (required to reject or ask for more)</label><input name="note" value="{{ request.form.get('note', '') }}"></div>
+    {% if sub.invitation_id %}
+    <button class="btn primary" name="action" value="apply">Apply ticked answers</button>
+    <button class="btn" name="action" value="more_info">Ask for more information</button>
+    <button class="btn" name="action" value="reject">Reject all</button>
+    {% else %}
+    <button class="btn primary" name="action" value="recorded">Mark reviewed</button>
+    <button class="btn" name="action" value="reject">Flag as spam / not genuine</button>
+    {% endif %}
+  </div>
+  {% elif sub.status == 'reviewed' %}<div class="pad small">{% if sub.review_note %}Note: {{ sub.review_note }}{% endif %}</div>{% endif %}
+</form>
+</div><div>
+  <div class="card"><h2>Documents</h2>
+    {% for d in docs %}<div class="small">{{ d.doc_type|replace('_',' ')|capitalize }} — {{ d.original_name }} ({{ '%.1f'|format(d.size_bytes / 1024) }} KB)
+      {% if can_docs %}<a class="btn sm" href="{{ url_for('forms.document', doc_id=d.id) }}">Download</a>{% else %}<span class="badge warn">Restricted</span>{% endif %}
+      <span class="badge {{ 'ok' if d.review_status == 'reviewed' else 'bad' if d.review_status == 'rejected' else 'grey' }}">{{ d.review_status }}</span></div>
+    {% else %}<p class="small muted">No documents uploaded.</p>{% endfor %}
+    {% if docs and not can_docs %}<p class="small muted">{% if opp.kind == 'buyer' %}Buyer documents (e.g. funding proof) are visible to reviewers or someone with an explicit grant.{% else %}Seller documents are visible to the record's primary owner, approvers or someone with an explicit grant.{% endif %}</p>{% endif %}
+  </div>
+  <div class="card"><h2>Consent given in this form</h2>
+    {% for k, v in consent.items() %}<div class="small">{{ k|replace('_',' ')|capitalize }}: {% if v %}<span class="badge ok">Granted</span>{% else %}<span class="badge grey">Not given</span>{% endif %}</div>
+    {% else %}<p class="small muted">None asked.</p>{% endfor %}
+  </div>
+</div></div>
+{% endblock %}

@@ -22,7 +22,8 @@ def mfa_roles():
 def app(tmp_path, mfa_roles):
     url = f"sqlite:///{tmp_path}/test.db"
     app = create_app({"DATABASE_URL": url, "COOKIE_SECURE": False, "TESTING": True, "SECRET_KEY": "test",
-                      "MFA_REQUIRED_ROLES": mfa_roles})
+                      "MFA_REQUIRED_ROLES": mfa_roles, "UPLOAD_DIR": str(tmp_path / "uploads"),
+                      "FILES_KEY": "Wz3Qt1tVYv0d6m1M4mQe5Gk0b8Yq3c2y7r9s1u4x6zA="})
     db = open_standalone(url)
     for email, name, role, team in [("admin@t.test", "Asha Admin", "super_admin", "admin"),
                                     ("seller@t.test", "Shaheen Seller", "team_member", "seller"),

@@ -12,13 +12,14 @@ import logging
 from . import logging_setup, timeutil
 from .db import close_db, get_db, migrate, open_standalone
 from .domain import buyer_fields as BF
+from .domain import form_templates as FT
 from .domain import seller_fields as SF
 from .domain.common import format_inr
 from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.3.0-m3"
+__version__ = "0.4.0-m4"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -30,7 +31,11 @@ def create_app(overrides: dict | None = None) -> Flask:
         SESSION_ABSOLUTE_HOURS=int(os.environ.get("SESSION_ABSOLUTE_HOURS", "12")),
         COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "1") == "1",
         APP_ENV=os.environ.get("APP_ENV", "development"),
-        MAX_CONTENT_LENGTH=5 * 1024 * 1024,
+        # Whole request (a form may carry several documents); each file is still capped at 5 MB in files.py.
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,
+        # Fernet key for encrypting uploaded documents at rest. Without it, uploads are refused.
+        FILES_KEY=os.environ.get("FILES_KEY"),
+        PUBLIC_BASE_URL=os.environ.get("PUBLIC_BASE_URL", ""),
         # Roles that must use an authenticator app. Anyone may opt in; disabling for a role needs an env change.
         MFA_REQUIRED_ROLES=os.environ.get("MFA_REQUIRED_ROLES", "super_admin,finance"),
         # Brand: logo self-hosted at static/brand/logo.png when present, else the official website file.
@@ -96,7 +101,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["ist"] = timeutil.fmt_ist
     app.jinja_env.filters["rel"] = timeutil.relative
     app.jinja_env.globals.update(
-        can=can, SF=SF, BF=BF, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__,
+        can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__,
         now_iso=timeutil.now_iso,
         # A global (not context variable) so imported macros can read it.
         csrf_value=lambda: g.session["csrf_token"] if g.get("session") else "",
@@ -114,8 +119,8 @@ def create_app(overrides: dict | None = None) -> Flask:
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL", (g.user["id"],))
         return ctx
 
-    from .web import admin, auth, buyers, imports, main, sellers, tasks
-    for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp):
+    from .web import admin, auth, buyers, forms, imports, main, public, sellers, tasks
+    for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp):
         app.register_blueprint(bp)
     return app
 

@@ -1,0 +1,45 @@
+{# "Forms & documents" card shown on seller and buyer pages. Expects record_context() keys. #}
+{% from "macros.html" import csrf %}
+<div class="card" id="forms">
+  <div class="card-h"><h2>Forms &amp; documents</h2>{% if form_pending_review %}<a class="badge warn" href="{{ url_for('forms.inbox') }}">{{ form_pending_review }} to review</a>{% endif %}</div>
+  {% if form_blockers %}<p class="small unknown">Links cannot be sent: {{ form_blockers|join('; ') }}.</p>
+  {% else %}
+  <details class="disclose"><summary>Send the detailed form</summary>
+    <form method="post" action="{{ url_for('forms.send', opp_id=opp.id) }}">{{ csrf() }}
+      <input type="hidden" name="template_key" value="{{ form_deep_key }}">
+      <div class="field"><label>How</label><select name="channel"><option value="copy_link">Create a link to share myself</option><option value="whatsapp_mock">WhatsApp (mock — nothing is sent)</option></select></div>
+      <button class="btn primary">Create personal link</button>
+      <p class="small muted">Expires in 14 days. Answers come back to the review inbox — they never change this record on their own.</p>
+    </form></details>
+  <details class="disclose"><summary>Request specific missing information</summary>
+    <form method="post" action="{{ url_for('forms.send', opp_id=opp.id) }}">{{ csrf() }}
+      <input type="hidden" name="template_key" value="targeted">
+      <div class="field"><label>Questions to ask (most valuable missing ones are ticked)</label>
+        <select name="fields" multiple size="8">{% for f in form_requestable %}<option value="{{ f.key }}" {{ 'selected' if f.key in form_missing[:5] }}>{{ f.label }}</option>{% endfor %}</select>
+        <div class="help">Hold Ctrl (Cmd on Mac) to pick several.</div></div>
+      <div class="field"><label>Documents to request</label>{% for dv, dl in form_doc_types %}<label class="check small"><input type="checkbox" name="docs" value="{{ dv }}"> {{ dl }}</label>{% endfor %}</div>
+      <div class="field"><label>Message shown at the top of the form</label><input name="purpose" maxlength="500" placeholder="e.g. Buyers are asking about the deposit and lease — two quick questions."></div>
+      <div class="field"><label>How</label><select name="channel"><option value="copy_link">Create a link to share myself</option><option value="whatsapp_mock">WhatsApp (mock — nothing is sent)</option></select></div>
+      <button class="btn">Create request link</button>
+    </form></details>
+  {% endif %}
+
+  {% if form_invitations %}<h3>Links</h3>
+  <ul class="tasks">{% for i in form_invitations %}<li class="task"><div>
+    <div class="t small">{{ i.template_version }}{% if i.fields %} · {{ i.fields|length }} question(s){% endif %}{% if i.docs %} · {{ i.docs|length }} document(s){% endif %}</div>
+    <div class="meta"><span class="badge {{ 'warn' if i.status == 'submitted' else 'ok' if i.status == 'accepted' else 'grey' if i.status in ('revoked','expired') else 'info' }}">{{ FORM_STATUS[i.status] }}</span>
+      · {{ 'mock WhatsApp' if i.channel == 'whatsapp_mock' else 'copied link' }}{% if i.provider_message_id %} <span class="mono">{{ i.provider_message_id }}</span>{% endif %} · {{ i.sender_name }} {{ i.created_at|rel }}
+      {% if i.opened_at %} · opened {{ i.opened_at|rel }}{% endif %}{% if i.status in ('sent','opened','started') %} · expires {{ i.expires_at|rel }}{% endif %}</div></div>
+    {% if i.status in ('sent','opened','started') %}<form method="post" action="{{ url_for('forms.revoke', inv_id=i.id) }}" data-confirm="Revoke this link? It will stop working immediately.">{{ csrf() }}<button class="btn sm">Revoke</button></form>{% endif %}
+  </li>{% endfor %}</ul>{% endif %}
+
+  <h3>Documents</h3>
+  {% for d in form_documents %}<div class="small task">
+    <div>{{ d.doc_type|replace('_',' ')|capitalize }} — {{ d.original_name }}
+      <span class="badge {{ 'ok' if d.review_status == 'reviewed' else 'bad' if d.review_status == 'rejected' else 'grey' }}">{{ d.review_status }}</span>
+      <div class="meta">{{ d.created_at|rel }} via {{ d.uploaded_via }}{% if d.reviewer_name %} · reviewed by {{ d.reviewer_name }}{% endif %}</div></div>
+    {% if form_can_docs %}<div class="inline"><a class="btn sm" href="{{ url_for('forms.document', doc_id=d.id) }}">Download</a>
+      {% if can('evidence.review') and d.review_status == 'pending' %}<form method="post" action="{{ url_for('forms.document_review', doc_id=d.id) }}">{{ csrf() }}<input type="hidden" name="status" value="reviewed"><button class="btn sm">Mark reviewed</button></form>{% endif %}</div>
+    {% else %}<span class="badge warn">Restricted</span>{% endif %}
+  </div>{% else %}<p class="small muted">No documents yet.</p>{% endfor %}
+</div>

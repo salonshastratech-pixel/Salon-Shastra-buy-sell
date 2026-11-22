@@ -44,6 +44,7 @@ def schedule_periodic(db) -> None:
     n = now_utc()
     bucket = n.replace(minute=(n.minute // 15) * 15, second=0)
     enqueue(db, "sla_sweep", dedupe_key="sla_sweep:" + bucket.strftime("%Y%m%d%H%M"))
+    enqueue(db, "form_chase", dedupe_key="form_chase:" + n.strftime("%Y%m%d%H"))  # hourly
 
 
 def run_once(db, limit: int = 20) -> int:
@@ -114,6 +115,13 @@ def sla_sweep(db, payload) -> str:
             db.insert("task_events", {"task_id": t["id"], "event": "escalated", "at": now})
             escalated += 1
     return f"{alerted} overdue alerts, {escalated} escalations"
+
+
+@handler("form_chase")
+def form_chase(db, payload) -> str:
+    """Chase personal form links not completed after 48 h (one task each) and expire old links (PRD §10.4)."""
+    from .domain import forms
+    return forms.chase_and_expire(db)
 
 
 @handler("noop")

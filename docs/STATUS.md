@@ -1,4 +1,32 @@
-# Feature status — Milestone 3 (23 Nov 2026, v0.3.0)
+# Feature status — Milestone 4 (23 Nov 2026, v0.4.0)
+
+Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
+
+## Milestone 4 — forms & data requests (awaiting founder review)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Versioned form templates | **Built** | `seller-quick v1`, `buyer-quick v1`, `seller-deep v1`, `buyer-deep v1`, `targeted v1`. Every question is a canonical field; the version is stored on each link and submission. Customer-facing wording and help are separate from staff wording (internal guidance never shown — tested). |
+| Public quick forms `/f/seller`, `/f/buyer` (FR-009/010) | **Built** | New lead + review task, routed to the seller / buyer team; consent required and versioned; possible duplicates flagged, never linked. Signed form token, honeypot and 5-per-hour rate limit per IP. Reviewer-only fields dropped and audited. |
+| Personal expiring links (FR-043) | **Built** | Token shown once to staff, stored only as a SHA-256 hash; 14-day expiry (7 for targeted); one live detailed link per record; revoke. Lifecycle: sent → opened → in progress → submitted → reviewed / more info, or expired / revoked. Delivery and read are never claimed. |
+| Drafts & resume | **Built** | "Save and finish later" keeps a draft on the same link; the detailed form is prefilled with the record's current non-confidential answers. |
+| Conditional questions | **Built** | Franchise-only questions appear only when "Franchise" is chosen (reuses the dictionary's `show_if`). |
+| Review inbox + field-by-field apply (FR-011/047, UAT-42) | **Built** | Answers never change a record on their own. Reviewer sees "customer says" vs "on record now", ticks what to apply; applied facts are customer-declared with the submission as their source. Material change → approved listing back to re-review; buyer criteria marked "changed since review". Funding status never changes from a form. |
+| Targeted missing-field requests | **Built** | Staff pick specific questions/documents (most valuable missing ones pre-selected) and a message; each question shows why it is asked. |
+| Secure uploads (FR-013) | **Built** | PDF/PNG/JPG checked by content (not extension), ≤5 MB, encrypted at rest (Fernet, `FILES_KEY`), random names outside the web root. Download only for the seller's owner / approvers, buyer funding proof only for reviewers or a grant; every open (and denial) audited. |
+| WhatsApp send — mock (UAT-41 mock) | **Built (mock only)** | Records source record, invitation ID, template, sender and a `mock-…` provider message ID; status "provider accepted", never "delivered". Clearly labelled TEST-ONLY; nothing leaves the server. Live Meta adapter is Milestone 7. |
+| Chasing & expiry job | **Built** | Hourly: one chase task per link not completed after 48 h; expired links closed. |
+| Automatic outbound reminders, quiet hours, frequency caps | **Planned (M7)** | Need the real messaging provider. |
+| Telugu forms (FR-052, P1) | **Planned** | Templates are ready for translation (labels separated from canonical keys). |
+| Staff-side document upload on a record | **Planned** | Customers can upload now; staff upload is a small follow-up. |
+| UAT-47 (finance user edits deal fee) | **Moved to M6** | It depends on deal fees, which arrive with Deals & admin finance. |
+| PostgreSQL replay for the new SQL | **Not run** | No PostgreSQL on this machine. New SQL is plain/portable; run `scripts/pg_replay.py` before deployment. |
+
+Tests: 102 automated tests pass (88 from M1–M3, 14 new for M4). Verified by hand in a real browser (send → customer answers → review → apply).
+
+---
+
+# Milestone 3 status (23 Nov 2026, v0.3.0)
 
 Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
 

@@ -125,6 +125,8 @@ def detail(opp_id):
         can_restricted=not hidden, can_approve=user_can(db, g.user, "listing.approve"),
         can_review=user_can(db, g.user, "evidence.review"),
     )
+    from .forms import record_context
+    ctx.update(record_context(db, g.user, opp))
     return render_template("sellers/detail.html", **ctx)
 
 

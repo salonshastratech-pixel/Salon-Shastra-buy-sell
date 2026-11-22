@@ -4,6 +4,7 @@ URL: http://localhost:8000  — dev server, bound to 127.0.0.1 only, SQLite file
 No WhatsApp or other live integrations exist in this build; nothing is deployed.
 
 ## Start it again
+From this folder (`app\salon-shastra-teamos`):
 ```powershell
 C:\Users\user\.venvs\teamos-m2\Scripts\python.exe run_local.py
 ```
@@ -20,6 +21,14 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 | accounts@demo.salonshastra.test | Finance specialist |
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
+
+## Milestone 4 — forms & requests
+* **Forms & Requests** (left menu): review inbox, open links, mock message log, public form links.
+* Public quick forms (no login): http://localhost:8000/f/seller and http://localhost:8000/f/buyer
+* On any seller or buyer page, use *Forms & documents* to send the detailed form or request specific missing info.
+  The personal link is shown once; open it in the browser to fill it in as the customer would.
+* WhatsApp sending is a labelled **mock** — nothing leaves this computer.
+* Uploaded files are encrypted with `FILES_KEY` from `.env` and stored in `instance\uploads`.
 
 ## Milestone 3 — buyers
 Open **Buyers / Investors** (left menu). Best roles to try:
