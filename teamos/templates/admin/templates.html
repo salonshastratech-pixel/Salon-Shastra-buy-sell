@@ -1,24 +1,48 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}Message templates{% endblock %}
 {% block content %}
-<div class="ph"><div><h1>Message templates</h1><div class="sub">Approved wording for WhatsApp. Placeholders like {name} are filled at send time; a message with an empty placeholder is never sent.</div></div></div>
+<div class="ph"><div><h1>Message templates</h1><div class="sub">Only templates that Meta has approved — with exactly the same wording — can be sent once WhatsApp is live. In test mode every approved-internally template is simulated.</div></div>
+  <div class="actions"><form method="post">{{ csrf() }}<input type="hidden" name="action" value="meta_check"><button class="btn primary" {{ 'disabled' if not can_check }}>Check with Meta</button></form></div></div>
+<div class="card small">
+  <strong>Live-ready: {{ ready }} of {{ rows|length - replies }}</strong>{% if last_check %} · last checked with Meta {{ last_check|rel }}{% endif %}.
+  {% if not can_check %}<span class="muted">To check, fill in the WhatsApp Business account ID and access token in <a href="{{ url_for('admin.integrations') }}#whatsapp">Integrations</a>.</span>{% endif %}
+  <p class="muted">How to get a template approved: open <em>For Meta</em> under a template → copy the name, category, language, text (with {% raw %}{{1}}, {{2}}{% endraw %}) and sample values into WhatsApp Manager → Message templates → Create. When Meta approves it, press <em>Check with Meta</em>.</p>
+</div>
 <div class="card flush"><div class="table-wrap"><table class="small">
-  <tr><th>Template</th><th>Type</th><th>Text</th><th>Values needed</th><th>Status</th><th></th></tr>
-  {% for t in rows %}<tr><td><strong>{{ t.name }}</strong><div class="mono muted">{{ t.key }} · v{{ t.version }}</div></td><td>{{ t.category }}</td><td>{{ t.body }}</td>
-    <td>{{ t.fields|join(', ') }}</td><td><span class="badge {{ 'ok' if t.status in ('approved_local','provider_approved') else 'grey' }}">{{ t.status|replace('_',' ') }}</span></td>
+  <tr><th>Template</th><th>Text</th><th>Meta category</th><th>Meta status</th><th></th></tr>
+  {% for t in rows %}<tr>
+    <td><strong>{{ t.name }}</strong><div class="mono muted">{{ t.provider_name or t.key }} · v{{ t.version }}</div>
+      <span class="badge {{ 'ok' if t.status in ('approved_local','provider_approved') else 'grey' }}">{{ 'approved internally' if t.status == 'approved_local' else t.status|replace('_',' ') }}</span></td>
+    <td>{{ t.body }}
+      {% if t.lint %}<div class="unknown">{% for i in t.lint %}⚠ {{ i }}<br>{% endfor %}</div>{% endif %}
+      <details class="small"><summary>For Meta</summary>
+        {% if t.meta_category == 'REPLY' %}<p>Not a template: sent only as a reply right after the customer writes STOP (allowed inside the 24-hour window).</p>
+        {% else %}<table class="small"><tr><td>Name</td><td class="mono">{{ t.provider_name or t.key }}</td></tr>
+          <tr><td>Category</td><td>{{ t.meta_category or 'UTILITY' }}</td></tr><tr><td>Language</td><td>English ({{ t.language }})</td></tr>
+          <tr><td>Body</td><td class="mono">{{ t.meta_text }}</td></tr>
+          <tr><td>Samples</td><td>{% for v in t.meta_vars %}{% raw %}{{{% endraw %}{{ loop.index }}{% raw %}}}{% endraw %} = {{ SAMPLES.get(v, 'example') }}{{ ', ' if not loop.last }}{% endfor %}</td></tr></table>{% endif %}
+        {% if t.meta_body and t.meta_issue %}<p class="unknown">Meta's approved text: <span class="mono">{{ t.meta_body }}</span></p>{% endif %}
+      </details></td>
+    <td>{{ t.meta_category or '—' }}{% if t.meta_category == 'MARKETING' %}<div class="muted">needs marketing consent</div>{% endif %}</td>
+    <td>{% if t.meta_category == 'REPLY' %}<span class="badge grey">reply only</span>
+      {% elif t.live_ready %}<span class="badge ok">approved · live-ready</span>
+      {% elif t.meta_status %}<span class="badge {{ 'bad' if t.meta_status in ('REJECTED','DISABLED','PAUSED') else 'warn' }}">{{ t.meta_status|lower|replace('_',' ') }}</span>
+      {% else %}<span class="badge grey">not checked</span>{% endif %}
+      {% if t.meta_issue %}<div class="unknown">{{ t.meta_issue }}</div>{% endif %}</td>
     <td><a class="btn sm" href="{{ url_for('admin.templates', edit=t.key) }}#edit">Edit</a></td></tr>{% endfor %}
 </table></div></div>
 {% set e = (rows|selectattr('key', 'equalto', edit)|first) if edit else None %}
 <form method="post" class="card" id="edit">{{ csrf() }}<h2>{{ 'Edit ' ~ e.name if e else 'New template' }}</h2>
+  {% if e and e.meta_status %}<p class="flash warn small">Changing the wording means Meta must approve it again before it can be used live.</p>{% endif %}
   <div class="form-grid">
     <div class="field"><label>Key</label><input name="key" value="{{ e.key if e else '' }}" {{ 'readonly' if e }} required placeholder="e.g. price_update"></div>
     <div class="field"><label>Name</label><input name="name" value="{{ e.name if e else '' }}" required></div>
-    <div class="field"><label>Type</label><select name="category"><option value="service" {{ 'selected' if e and e.category == 'service' }}>Service (follow-up the customer asked for)</option><option value="marketing" {{ 'selected' if e and e.category == 'marketing' }}>Marketing (needs marketing consent)</option></select></div>
-    <div class="field"><label>Status</label><select name="status"><option value="draft">Draft</option><option value="approved_local" {{ 'selected' if e and e.status == 'approved_local' }}>Approved internally (test use)</option><option value="provider_approved" {{ 'selected' if e and e.status == 'provider_approved' }}>Approved by Meta</option><option value="paused" {{ 'selected' if e and e.status == 'paused' }}>Paused</option></select></div>
-    <div class="field"><label>Meta template name</label><input name="provider_name" value="{{ e.provider_name or '' if e else '' }}" placeholder="e.g. call_thanks_seller_v1">
-      <div class="help">Exactly as approved in WhatsApp Manager. The {placeholders} are sent to Meta as {{ '{{1}}, {{2}}' }} … in the order they appear.</div></div>
+    <div class="field"><label>Type</label><select name="category"><option value="service" {{ 'selected' if e and e.category == 'service' }}>Service / utility (follow-up the customer asked for)</option><option value="marketing" {{ 'selected' if e and e.category == 'marketing' }}>Marketing (needs marketing consent)</option></select></div>
+    <div class="field"><label>Status in TeamOS</label><select name="status"><option value="draft">Draft</option><option value="approved_local" {{ 'selected' if e and e.status in ('approved_local', 'provider_approved') }}>Approved internally</option><option value="paused" {{ 'selected' if e and e.status == 'paused' }}>Paused</option></select>
+      <div class="help">"Approved by Meta" is set only by <em>Check with Meta</em>.</div></div>
+    <div class="field"><label>Meta template name</label><input name="provider_name" value="{{ (e.provider_name or e.key) if e else '' }}" placeholder="lowercase_with_underscores">
+      <div class="help">Must be exactly the name used in WhatsApp Manager.</div></div>
     <div class="field full"><label>Text</label><textarea name="body" required>{{ e.body if e else '' }}</textarea>
-      <div class="help">Must include how to opt out ("Reply STOP to opt out"). Never promise a deal, a return or that buyers are available.</div></div>
+      <div class="help">Use {name}-style placeholders (they become {% raw %}{{1}}, {{2}}{% endraw %} for Meta). Don't start or end with a placeholder, keep words between placeholders, include "Reply STOP to opt out", and never promise a deal, a return or that buyers are available.</div></div>
   </div><button class="btn primary">Save</button></form>
-<p class="small muted">Going live: each template also needs Meta's approval ("provider approved"), recorded when the live account is connected.</p>
 {% endblock %}

@@ -74,7 +74,7 @@ def thread(conv_id):
     else:
         other = []
     I.ensure_templates(db)
-    templates = db.all("SELECT * FROM message_templates WHERE status IN ('approved_local','provider_approved') ORDER BY name")
+    templates = I.usable_templates(db, messaging.whatsapp_status(current_app.config)["live"])
     for t in templates:
         t["fields"] = [p for p in messaging.placeholders(t["body"]) if p not in ("name", "sender")]
     blocks, warns = I.check_send(db, g.user, conv["contact_id"], "service") if conv["contact_id"] else (["unknown number — link it to a record first"], [])
@@ -234,8 +234,8 @@ def batches():
                   "u.id = b.created_by LEFT JOIN users a ON a.id = b.approved_by ORDER BY b.id DESC")
     for r in rows:
         r["counts_d"] = json.loads(r["counts"]) if r["counts"] else None
-    templates = [t for t in db.all("SELECT * FROM message_templates WHERE status IN ('approved_local','provider_approved') "
-                                   "ORDER BY name") if I.batch_allowed(t)]
+    templates = [t for t in I.usable_templates(db, messaging.whatsapp_status(current_app.config)["live"])
+                 if I.batch_allowed(t)]
     for t in templates:
         t["fields"] = [p for p in messaging.placeholders(t["body"]) if p not in ("name", "sender")]
     return render_template("inbox/batches.html", rows=rows, templates=templates, AUDIENCES=I.AUDIENCES,

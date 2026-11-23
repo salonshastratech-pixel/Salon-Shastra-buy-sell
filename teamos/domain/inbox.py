@@ -44,18 +44,39 @@ def _config():
 
 # -- Templates --------------------------------------------------------------------------------
 def ensure_templates(db) -> None:
-    """Add any built-in template that is not in the database yet (edits made by an admin are kept)."""
-    have = {r["key"] for r in db.all("SELECT key FROM message_templates")}
-    missing = {k: v for k, v in messaging.TEMPLATES.items() if k not in have}
-    if not missing:
+    """Add any built-in template that is not in the database yet (edits made by an admin are kept), and give
+    untouched built-ins their Meta category and Meta name."""
+    from .. import meta_templates as MT
+    rows = {r["key"]: r for r in db.all("SELECT * FROM message_templates")}
+    missing = {k: v for k, v in messaging.TEMPLATES.items() if k not in rows}
+    stale = [r for k, r in rows.items() if k in MT.META_CATEGORY and not r.get("meta_category")]
+    if not missing and not stale:
         return
     now = now_iso()
     with db:
         for key, (name, cat, body) in missing.items():
             db.insert("message_templates", {"key": key, "name": name, "category": cat, "body": body,
                                             "status": "approved_local", "created_at": now, "updated_at": now,
+                                            "meta_category": MT.META_CATEGORY.get(key), "provider_name": MT.meta_name(key),
                                             "notes": "Internal wording approved for testing; needs Meta approval "
                                                      "before live use."})
+        for r in stale:
+            upd = {"meta_category": MT.META_CATEGORY[r["key"]], "provider_name": r["provider_name"] or MT.meta_name(r["key"])}
+            builtin = messaging.TEMPLATES.get(r["key"])
+            if builtin and not r["created_by"] and r["body"] == builtin[2]:
+                upd["category"] = builtin[1]  # e.g. the re-engagement follow-up is MARKETING under Meta's rules
+            db.update("message_templates", r["id"], upd)
+
+
+def usable_templates(db, live: bool) -> list[dict]:
+    """Templates staff may pick: approved internally in test mode; once live, only Meta-approved with matching text."""
+    ensure_templates(db)
+    rows = db.all("SELECT * FROM message_templates WHERE status IN ('approved_local','provider_approved') ORDER BY name")
+    rows = [r for r in rows if r["key"] != "optout_confirm"]  # system reply, never chosen by hand
+    if live:
+        rows = [r for r in rows if r["status"] == "provider_approved" and r["meta_status"] == "APPROVED"
+                and not r["meta_issue"]]
+    return rows
 
 
 def template(db, key: str) -> dict | None:
@@ -70,8 +91,10 @@ def template_problems(t: dict | None, variables: dict, live: bool) -> list[str]:
     out = []
     if t["status"] in ("draft", "paused", "rejected"):
         out.append(f"Template '{t['name']}' is {t['status']} — it must be approved before use")
-    if live and t["status"] != "provider_approved":
-        out.append(f"Template '{t['name']}' is not approved by Meta yet")
+    if live and (t["status"] != "provider_approved" or (t.get("meta_status") or "") != "APPROVED"):
+        out.append(f"Template '{t['name']}' is not confirmed as approved by Meta (use 'Check with Meta')")
+    elif live and t.get("meta_issue"):
+        out.append(f"Template '{t['name']}': {t['meta_issue']}")
     elif live and not (t.get("provider_name") or "").strip():
         out.append(f"Template '{t['name']}' has no Meta template name recorded")
     missing = [p for p in messaging.placeholders(t["body"]) if not str(variables.get(p) or "").strip()]
@@ -87,23 +110,29 @@ def save_template(db, actor, key: str, name: str, category: str, body: str, stat
     key = (key or "").strip().lower()
     if not key.replace("_", "").isalnum() or not (name or "").strip() or not (body or "").strip():
         raise ValidationError({"template": "Key (letters, digits, _), name and text are required."})
-    if category not in ("service", "marketing") or status not in ("draft", "approved_local", "provider_approved", "paused"):
+    if category not in ("service", "marketing") or status not in ("draft", "approved_local", "paused"):
         raise ValidationError({"template": "Choose a valid category and status."})
     if "stop" not in body.lower():
         raise ValidationError({"body": "Every customer template must tell people how to opt out (e.g. 'Reply STOP')."})
-    provider_name = (provider_name or "").strip() or None
-    if status == "provider_approved" and not provider_name:
-        raise ValidationError({"provider_name": "Enter the template's name exactly as approved in Meta."})
+    from .. import meta_templates as MT
+    provider_name = MT.meta_name((provider_name or "").strip() or key)
     now = now_iso()
     with db:
         ex = db.one("SELECT * FROM message_templates WHERE key = ?", (key,))
         if ex:
-            db.update("message_templates", ex["id"], {"name": name.strip(), "category": category, "body": body.strip(),
-                                                      "status": status, "version": ex["version"] + (ex["body"] != body.strip()),
-                                                      "provider_name": provider_name, "updated_at": now})
+            changed = ex["body"] != body.strip() or (ex["provider_name"] or "") != provider_name
+            db.update("message_templates", ex["id"], {
+                "name": name.strip(), "category": category, "body": body.strip(), "status": status,
+                "version": ex["version"] + (ex["body"] != body.strip()), "provider_name": provider_name,
+                "meta_category": "MARKETING" if category == "marketing" else (ex["meta_category"] or "UTILITY"),
+                "updated_at": now,
+                # any wording change needs Meta's approval again before live use
+                **({"meta_status": None, "meta_issue": "Changed after the last check with Meta — check again."}
+                   if changed and ex["meta_status"] else {})})
         else:
             db.insert("message_templates", {"key": key, "name": name.strip(), "category": category, "body": body.strip(),
                                             "status": status, "provider_name": provider_name,
+                                            "meta_category": "MARKETING" if category == "marketing" else "UTILITY",
                                             "created_by": actor["id"], "created_at": now,
                                             "updated_at": now})
         audit.record(db, actor["id"], "template.saved", None, None, {"key": key, "status": status})
@@ -144,11 +173,11 @@ def set_team_number(db, actor, user_id: int, wa_number: str | None, number_id: s
         norm, err = normalize_indian_mobile(wa_number)
         if err or not norm:
             raise ValidationError({"wa_number": "Enter the WhatsApp number as a 10-digit Indian mobile."})
-        if not number_id.isdigit() or len(number_id) < 6:
+        if number_id and (not number_id.isdigit() or len(number_id) < 6):
             raise ValidationError({"number_id": "Enter Meta's phone number ID (digits only, from WhatsApp Manager / API setup)."})
-        nid = number_id
-        clash = db.scalar("SELECT full_name FROM users WHERE id <> ? AND (wa_phone_number_id = ? OR wa_number = ?)",
-                          (user_id, nid, norm))
+        nid = number_id or None  # number saved now; the Meta ID is added once the number is in Meta's account
+        clash = db.scalar("SELECT full_name FROM users WHERE id <> ? AND ((? IS NOT NULL AND wa_phone_number_id = ?) "
+                          "OR wa_number = ?)", (user_id, nid, nid, norm))
         if clash:
             raise ValidationError({"number_id": f"That number is already connected to {clash}."})
     with db:
@@ -270,9 +299,12 @@ def send(db, actor, *, contact_id: int, opportunity_id: int | None = None, templ
     now = now_iso()
     nid = sender_number(db, actor, conv, free_text=text is not None)
     try:
+        from .. import meta_templates as MT
         res = prov.send(contact["phone_normalized"], body, template_key, from_number_id=nid,
-                        template_name=t["provider_name"] if t else None, language=t["language"] if t else "en",
-                        params=[str(variables.get(p, "")) for p in messaging.ordered_placeholders(t["body"])] if t else None)
+                        template_name=(t["provider_name"] or MT.meta_name(t["key"])) if t else None,
+                        language=t["language"] if t else "en",
+                        params=[MT.clean_param(variables.get(p, "")) for p in messaging.ordered_placeholders(t["body"])]
+                        if t else None)
     except messaging.ProviderTimeout as e:
         res = {"status": "uncertain", "detail": f"No answer from the provider ({e}). It may or may not have been sent — "
                                                 "check before sending again."}

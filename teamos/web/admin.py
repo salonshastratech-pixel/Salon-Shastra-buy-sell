@@ -1,5 +1,5 @@
 """Administration: users, grants, audit log, duplicate review, finance boundary."""
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from .. import audit
 from ..db import get_db
@@ -202,6 +202,30 @@ def finance_post(kind):
     return redirect(url_for("admin.finance"))
 
 
+@bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
+@require("users.manage")
+def reset_password(user_id):
+    """Forgotten password: a one-time temporary password, shown once to the admin; it must be changed at sign-in."""
+    import secrets
+    db = get_db()
+    u = db.one("SELECT * FROM users WHERE id = ?", (user_id,))
+    if not u:
+        abort(404)
+    if u["id"] == g.user["id"]:
+        flash("Use 'Change password' (click your name at the top) for your own account.", "error")
+        return redirect(url_for("admin.users"))
+    words = ["Salon", "Mirror", "Comb", "Studio", "Style", "Shine", "Trim", "Glow"]
+    temp = secrets.choice(words) + secrets.choice(words).lower() + str(secrets.randbelow(9000) + 1000) + \
+        secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ")
+    with db:
+        db.update("users", user_id, {"password_hash": hash_password(temp), "must_change_password": 1})
+        revoke_user_sessions(db, user_id)
+        audit.record(db, g.user["id"], "user.password_reset", "user", user_id)  # never the password itself
+    flash(f"Temporary password for {u['full_name']}: {temp} — share it privately (e.g. by phone). "
+          "They must choose their own when they sign in. It is not shown again.", "ok")
+    return redirect(url_for("admin.users"))
+
+
 @bp.route("/users/<int:user_id>/reset-mfa", methods=["POST"])
 @require("users.manage")
 def reset_mfa(user_id):
@@ -315,6 +339,17 @@ def templates():
     from ..domain import inbox as I
     db = get_db()
     I.ensure_templates(db)
+    from .. import meta_templates as MT
+    if request.method == "POST" and request.form.get("action") == "meta_check":
+        try:
+            c = MT.cross_check(db, g.user["id"], MT.fetch_meta_templates(current_app.config))
+            flash(f"Checked with Meta: {c['approved']} approved and matching, {c['mismatch']} with different wording, "
+                  f"{c['pending']} pending, {c['rejected']} rejected/paused, {c['missing']} not in Meta.", "ok")
+        except ValueError as e:
+            flash(str(e), "error")
+        except Exception as e:  # network / Meta error: nothing changes
+            flash(f"Could not reach Meta: {type(e).__name__}. Nothing was changed.", "error")
+        return redirect(url_for("admin.templates"))
     if request.method == "POST":
         f = request.form
         try:
@@ -327,7 +362,15 @@ def templates():
     rows = db.all("SELECT * FROM message_templates ORDER BY category, name")
     for r in rows:
         r["fields"] = messaging.placeholders(r["body"])
-    return render_template("admin/templates.html", rows=rows, edit=request.args.get("edit"))
+        r["meta_text"], r["meta_vars"] = MT.to_meta(r["body"])
+        r["lint"] = MT.lint(r["key"], r["body"], r["meta_category"])
+        r["live_ready"] = r["status"] == "provider_approved" and r["meta_status"] == "APPROVED" and not r["meta_issue"]
+    replies = sum(1 for r in rows if r["meta_category"] == "REPLY")
+    return render_template("admin/templates.html", rows=rows, edit=request.args.get("edit"), SAMPLES=MT.SAMPLES,
+                           ready=sum(1 for r in rows if r["live_ready"]), replies=replies,
+                           last_check=db.scalar("SELECT MAX(meta_checked_at) FROM message_templates"),
+                           can_check=bool(messaging._cfg("WHATSAPP_BUSINESS_ACCOUNT_ID", current_app.config)
+                                          and messaging._cfg("WHATSAPP_ACCESS_TOKEN", current_app.config)))
 
 
 @bp.route("/outbox")

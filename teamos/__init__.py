@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.7.2-m7"
+__version__ = "0.7.3-m7"
 
 
 def create_app(overrides: dict | None = None) -> Flask:

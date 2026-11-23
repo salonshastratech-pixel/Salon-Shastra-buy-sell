@@ -170,14 +170,14 @@ def test_uat44_second_employee_is_warned_before_messaging_the_same_lead(app, db,
     b = buyer(db)
     send_tmpl(app, db, "buyer@t.test", b)
     with pytest.raises(I.CollisionWarning) as w:
-        send_tmpl(app, db, "seller@t.test", b, "inactive_followup")
+        send_tmpl(app, db, "seller@t.test", b, "next_steps")
     assert "Harika Buyer messaged this person" in w.value.message
     assert db.scalar("SELECT COUNT(*) FROM messages WHERE direction = 'out'") == 1  # nothing sent without confirmation
     conv = conv_of(db, b)
-    r = login("seller@t.test").post(f"/inbox/{conv['id']}/send", {"mode": "template", "template_key": "inactive_followup"},
+    r = login("seller@t.test").post(f"/inbox/{conv['id']}/send", {"mode": "template", "template_key": "next_steps"},
                                     follow_redirects=True)
     assert b"Send anyway" in r.data or b"Tick" in r.data
-    send_tmpl(app, db, "seller@t.test", b, "inactive_followup", ack=True)
+    send_tmpl(app, db, "seller@t.test", b, "next_steps", ack=True)
     assert db.scalar("SELECT COUNT(*) FROM messages WHERE direction = 'out'") == 2
 
 

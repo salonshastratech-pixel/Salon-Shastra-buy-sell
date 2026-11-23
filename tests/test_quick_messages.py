@@ -166,10 +166,13 @@ def test_live_template_send_uses_meta_template_name_params_and_sender_number(mon
 
 
 def test_live_mode_refuses_templates_without_a_meta_name():
-    t = {"name": "Call-back", "status": "provider_approved", "provider_name": None, "body": "Hi {name} STOP"}
+    t = {"name": "Call-back", "status": "provider_approved", "meta_status": "APPROVED", "meta_issue": None,
+         "provider_name": None, "body": "Hi {name} STOP"}
     assert any("no Meta template name" in p for p in I.template_problems(t, {"name": "A"}, live=True))
     t["provider_name"] = "callback_v1"
     assert I.template_problems(t, {"name": "A"}, live=True) == []
+    t["meta_status"] = None  # never confirmed with Meta: refused
+    assert any("not confirmed as approved by Meta" in p for p in I.template_problems(t, {"name": "A"}, live=True))
 
 
 def test_new_built_in_templates_are_added_to_existing_databases(app, db):

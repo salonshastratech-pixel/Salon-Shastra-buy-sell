@@ -48,6 +48,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM conversations WHERE phone = '+919000000999'"):
             seed_inbox(db)  # demo database created before Milestone 7
             added.append("WhatsApp inbox conversations & a draft batch (M7)")
+        if not db.scalar("SELECT COUNT(*) FROM seller_listings WHERE floor_level IS NOT NULL"):
+            seed_premises(db)  # demo database created before Milestone 7.2
+            added.append("premises, running costs & buyer floor/area/parking preferences (M7.2)")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -189,6 +192,7 @@ def seed(db):
     seed_matches(db)
     seed_deals(db)
     seed_inbox(db)
+    seed_premises(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -470,3 +474,40 @@ def seed_inbox(db):
                 variables={"name": "Nisha", "sender": "Harika"}, system=True)
     # 4. A draft batch waiting for a reviewer
     IB.create_batch(db, u["harika"], "Buyers — gentle follow-up (demo)", "inactive_followup", "buyers_active", {})
+
+
+def seed_premises(db):
+    """Milestone 7.2: premises, running costs and licences on the demo salons; floor / area / parking on demo buyers.
+    Some answers are left blank on purpose so 'Still to collect' has something to show."""
+    from teamos.domain import buyers as B
+    from teamos.domain import sellers as S
+    admin = db.one("SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    floors = ["ground", "first", "ground", "mall", "ground", "first"]
+    areas = ["main_road", "market", "residential", "mall", "commercial", "main_road"]
+    parks = ["car_and_bike", "bike_only", "bike_only", "car_and_bike", "none", "car_and_bike"]
+    rows = db.all("SELECT o.id, l.id AS listing_id, l.monthly_rent, l.operating_years FROM opportunities o "
+                  "JOIN seller_listings l ON l.opportunity_id = o.id WHERE o.kind = 'seller' AND o.is_synthetic = 1 "
+                  "ORDER BY o.id")
+    for i, r in enumerate(rows):
+        v = {"floor_level": floors[i % 6], "area_type": areas[i % 6], "trade_licence": "yes",
+             "gst_registered": "yes" if i % 3 else "applied", "signage_visible": "yes" if i % 4 else "no",
+             "washrooms": 1, "ac_type": "split"}
+        if i % 5 != 4:  # leave parking unknown on a few, so the team is asked to collect it
+            v["parking"] = parks[i % 6]
+        if r["monthly_rent"]:
+            v["maintenance_monthly"] = int(round(r["monthly_rent"] * 0.12, -3)) or 5000
+            v["electricity_monthly"] = int(round(r["monthly_rent"] * 0.25, -3)) or 8000
+        if r["operating_years"]:
+            v["started_year"] = 2026 - int(r["operating_years"])
+        S._apply_values(db, admin, r["listing_id"], {k: (x, "value") for k, x in v.items()},
+                        source="demo seed (M7.2)", bump_version=False)
+    for i, r in enumerate(db.all("SELECT o.id FROM opportunities o WHERE o.kind = 'buyer' AND o.is_synthetic = 1 "
+                                 "ORDER BY o.id")):
+        o = B.load(db, r["id"])
+        if not o or not o.get("mandate_id"):
+            continue
+        B.update_fields(db, admin, o, {"parking_need": ["car", "bike", "not_needed"][i % 3],
+                                       "parking_need__importance": "prefer"}, "salon")
+        B.set_choice_preferences(db, admin, B.load(db, r["id"]),
+                                 {"pref__floor_level__ground": "prefer", "pref__floor_level__basement": "avoid",
+                                  "pref__area_type__main_road": "prefer" if i % 2 else "flexible"})

@@ -1,3 +1,19 @@
+# Milestone 7.3 — Meta-approved templates only, real staff logins, whole-journey check (23 Nov 2026, v0.7.3)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Only Meta-approved templates go live | **Built** | Live sending requires the template to be APPROVED in Salon Shastra's WhatsApp account **and** its wording to match ours exactly. "Check with Meta" reads the account's templates and marks each one approved / different wording / pending / rejected / not in Meta. An admin can no longer mark a template "approved by Meta" by hand; any wording change needs Meta's approval again. In live mode staff can only pick live-ready templates. |
+| Meta rules checked | **Built** | Each template shows Meta's category (Utility / Marketing), problems Meta would reject (placeholder at start/end, placeholders side by side, too long, too many placeholders, missing opt-out, promotional words in a Utility template) and a ready-to-copy "For Meta" block ({{1}}, {{2}} … and sample values). All 18 built-in texts pass. Values sent to Meta are cleaned (no line breaks). |
+| Category correction | **Changed** | The "Polite follow-up — are you still exploring?" message is re-engagement, which Meta treats as MARKETING, so it now needs marketing consent like any marketing message. |
+| Staff accounts | **Built** | Change my password (click your name at the top); temporary passwords must be changed at first sign-in, with a reminder banner; other devices are signed out after a change. Admin → Users → Reset password gives a one-time temporary password for anyone who forgot theirs. A staff WhatsApp number can be saved before its Meta ID exists ("Meta ID pending"). |
+| Whole journey | **Tested** | One automated journey through the real screens: seller lead → call → one-click WhatsApp → customer form with photo → review → checklist → listing approval → buyer form (floor/area/parking) → criteria + funding → match (uses rent + maintenance, floor, parking) → approach → teaser → introduction → deal → close → fee → reports. |
+| Demo data | **Updated** | Demo salons have floor, area, parking, maintenance, electricity, licences (a few left blank on purpose); demo buyers have parking and floor/area preferences; matches re-scored. |
+
+QA: all automated tests pass; page crawl 1,360 pages across 5 roles with 0 errors; security probe 90 forged attempts
+(now including password reset, integration settings, GO LIVE and Check with Meta) all refused.
+
+---
+
 # Milestone 7.2 — easier, richer forms; buyer↔seller sync; admin-configurable integrations (23 Nov 2026, v0.7.2)
 
 | Area | Status | Evidence |

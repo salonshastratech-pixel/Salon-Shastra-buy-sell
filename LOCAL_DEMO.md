@@ -22,6 +22,13 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 7.3 — templates and staff accounts
+* Real staff logins (Super Admin, seller team, buyer team) were created on the local demo database only — their
+  details are not stored in this repository. Each is asked to choose their own password at first sign-in.
+* **Admin → Message templates**: Meta category, problems found, "For Meta" copy block and **Check with Meta**
+  (needs the WhatsApp account ID and token in Integrations).
+* **Admin → Users → Reset password** for anyone who forgot theirs; click your own name at the top to change yours.
+
 ## Milestone 7.2 — easy forms, sync and integrations
 * Open any seller (e.g. **SL-00004**): the **Still to collect** card lists what is missing; choose *Create a link to
   share myself* and **Send these as a short form**, then open the link on a phone-sized window: one step at a time,

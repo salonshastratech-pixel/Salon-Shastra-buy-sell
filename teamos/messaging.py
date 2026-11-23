@@ -50,7 +50,7 @@ TEMPLATES = {
     "visit_confirm": ("Visit confirmation", "service",
                       "Hello {name}, this is {sender} from Salon Shastra confirming your visit on {when}. Reply here if "
                       "you need to change it. Reply STOP to opt out."),
-    "inactive_followup": ("Polite follow-up", "service",
+    "inactive_followup": ("Polite follow-up", "marketing",
                           "Hello {name}, this is {sender} from Salon Shastra checking in. Are you still exploring your "
                           "salon plans? Reply STOP to opt out."),
     "call_thanks_seller": ("After call — seller thank-you", "service",

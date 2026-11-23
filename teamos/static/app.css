@@ -346,3 +346,7 @@ pre.digest { white-space: pre-wrap; font-family: inherit; background: #faf6f2; p
 .connector { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
 
 [hidden] { display: none !important; }
+
+.card.narrow { max-width: 460px; }
+.me-link { color: inherit; }
+.me-link:hover strong { text-decoration: underline; }

@@ -18,6 +18,8 @@ def login():
             token = start_session(db, user["id"])
             nxt = request.args.get("next") or ""
             dest = nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("main.my_day")
+            if user.get("must_change_password"):
+                dest = url_for("auth.change_password", first=1)
             resp = redirect(dest)
             resp.set_cookie(COOKIE, token, httponly=True, samesite="Strict",
                             secure=current_app.config["COOKIE_SECURE"],
@@ -121,3 +123,42 @@ def mfa_setup():
         error = "That code didn't match — check the time on your phone is automatic and try the newest code."
     return render_template("mfa.html", mode="setup", secret=mfa.grouped(secret),
                            uri=mfa.provisioning_uri(secret, g.user["email"]), error=error)
+
+
+
+# -- Change my password ------------------------------------------------------------------
+@bp.route("/me/password", methods=["GET", "POST"])
+def change_password():
+    from werkzeug.security import check_password_hash
+
+    from ..security import hash_password, login_required, revoke_user_sessions, validate_password_strength
+
+    @login_required
+    def view():
+        db = get_db()
+        error = None
+        if request.method == "POST":
+            f = request.form
+            current, new, again = f.get("current") or "", f.get("new") or "", f.get("again") or ""
+            if not check_password_hash(g.user["password_hash"], current):
+                error = "Your current password is not correct."
+            elif new != again:
+                error = "The two new passwords are different."
+            elif new == current:
+                error = "Choose a password different from the current one."
+            else:
+                error = validate_password_strength(new)
+            if error:
+                audit.record(db, g.user["id"], "auth.password_change", outcome="denied")
+            else:
+                with db:
+                    db.update("users", g.user["id"], {"password_hash": hash_password(new), "must_change_password": 0,
+                                                      "password_changed_at": _now()})
+                    # sign out every other device; keep this one
+                    db.execute("DELETE FROM sessions WHERE user_id = ? AND id <> ?", (g.user["id"], g.session["id"]))
+                    audit.record(db, g.user["id"], "auth.password_change")
+                flash("Password changed. Other devices have been signed out.", "ok")
+                return redirect(url_for("main.my_day"))
+        return render_template("change_password.html", error=error, first=bool(request.args.get("first"))), \
+            (400 if error else 200)
+    return view()

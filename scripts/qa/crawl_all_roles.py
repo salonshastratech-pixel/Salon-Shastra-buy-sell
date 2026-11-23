@@ -41,8 +41,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def crawl(user):
     cj = http.cookiejar.CookieJar()
     op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-    op.open(BASE + "/login", urllib.parse.urlencode({"email": f"{user}@demo.salonshastra.test",
-                                                     "password": "Demo-Shastra-2026"}).encode())
+    # QA_LOGIN_<NAME>="email:password" overrides a demo login (e.g. staff who now have real accounts)
+    email, pw = (os.environ.get(f"QA_LOGIN_{user.upper()}") or f"{user}@demo.salonshastra.test:Demo-Shastra-2026")         .split(":", 1)
+    op.open(BASE + "/login", urllib.parse.urlencode({"email": email, "password": pw}).encode())
     nr = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), NoRedirect)
     seen, queue, res = set(), list(SEEDS), {}
     while queue and len(seen) < 600:

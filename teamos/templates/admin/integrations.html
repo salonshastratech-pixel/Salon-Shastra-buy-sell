@@ -69,7 +69,7 @@
       <td><form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="team_number"><input type="hidden" name="user_id" value="{{ u.id }}">
         <input name="wa_number" value="{{ (u.wa_number or '')[-10:] }}" placeholder="98xxxxxxxx" inputmode="tel" aria-label="WhatsApp number for {{ u.full_name }}">
         <input name="number_id" value="{{ u.wa_phone_number_id or '' }}" placeholder="e.g. 1098765432101" inputmode="numeric" aria-label="Meta phone number ID for {{ u.full_name }}">
-        <button class="btn sm">Save</button>{% if u.wa_phone_number_id %} <span class="badge ok">connected</span>{% endif %}</form></td></tr>{% endfor %}
+        <button class="btn sm">Save</button>{% if u.wa_phone_number_id %} <span class="badge ok">connected</span>{% elif u.wa_number %} <span class="badge warn">number saved · Meta ID pending</span>{% endif %}</form></td></tr>{% endfor %}
   </table></div>
   <p class="small muted">To disconnect someone, clear both boxes and save. Templates are approved once for the whole business account and then work from every number. A number in use in the WhatsApp Business <em>app</em> on a phone may first need moving to the API (or Meta's coexistence onboarding, where offered) — check with Meta or your WhatsApp partner.</p>
 </div>

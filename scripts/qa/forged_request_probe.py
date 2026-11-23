@@ -59,6 +59,16 @@ PROBES = [  # (label, method, url, data, privileged roles that MAY do it, state 
      {"key": "inactive_followup", "name": "x", "category": "marketing", "status": "approved_local",
       "body": "Buy now! Reply STOP to opt out."}, {"founder"},
      "SELECT body || category FROM message_templates WHERE key = 'inactive_followup'"),
+    # Milestone 7.2 / 7.3
+    ("reset someone's password", "POST", "/admin/users/1/reset-password", {}, {"founder"},
+     "SELECT password_hash FROM users WHERE id = 1"),
+    ("save integration settings", "POST", "/admin/integrations",
+     {"action": "settings", "WHATSAPP_ACCESS_TOKEN": "forged", "PUBLIC_BASE_URL": "https://evil.example"}, {"founder"},
+     "SELECT COUNT(*) FROM integration_settings"),
+    ("switch WhatsApp live", "POST", "/admin/integrations", {"action": "go_live", "confirm": "GO LIVE"}, {"founder"},
+     "SELECT COUNT(*) FROM integration_settings"),
+    ("check templates with Meta", "POST", "/admin/templates", {"action": "meta_check"}, {"founder"},
+     "SELECT COUNT(*) FROM audit_events WHERE action = 'templates.meta_cross_check'"),
 ]
 if intro:
     PROBES.append(("approve introduction", "POST", f"/deals/introductions/{intro[0]}", {"decision": "approved"},
@@ -75,10 +85,23 @@ if buyer_doc:
     GETS.append(("download buyer funding proof", f"/forms/documents/{buyer_doc[0]}",
                  {"founder", "lead", "shaheen", "harika"}))
 
+# Which real account plays each role in this copy (staff may have real logins); give them a QA-only password here.
+QA_PW = "Qa-Probe-Password-1"
+EMAILS = {
+    "shaheen": q("SELECT email FROM users WHERE role = 'team_member' AND team = 'seller' AND is_active = 1 ORDER BY id")[0],
+    "harika": q("SELECT email FROM users WHERE role = 'team_member' AND team = 'buyer' AND is_active = 1 ORDER BY id")[0],
+    "lead": q("SELECT email FROM users WHERE role = 'team_lead' AND is_active = 1 ORDER BY id")[0],
+    "accounts": q("SELECT email FROM users WHERE role = 'finance' AND is_active = 1 ORDER BY id")[0],
+}
+from teamos.security import hash_password  # noqa: E402
+db.executemany("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE email = ?",
+               [(hash_password(QA_PW), e) for e in EMAILS.values()])
+db.commit()
+
 problems = 0
 for role in ("shaheen", "harika", "lead", "accounts"):
     c = app.test_client()
-    c.post("/login", data={"email": f"{role}@demo.salonshastra.test", "password": "Demo-Shastra-2026"})
+    c.post("/login", data={"email": EMAILS[role], "password": QA_PW})
     page = c.get("/").data.decode()
     tok = re.search(r'name="csrf_token" value="([^"]+)"', page).group(1)
     for label, method, url, data, allowed, check in PROBES:
