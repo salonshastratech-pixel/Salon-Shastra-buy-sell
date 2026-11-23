@@ -12,35 +12,26 @@
 <div class="shell">
   <aside class="side">
     <div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Business Exchange · TeamOS</small></div>
-    <nav class="nav">
-      <div class="group">Work</div>
-      <a href="{{ url_for('main.my_day') }}" class="{{ 'on' if ep == 'main.my_day' }}">My Day</a>
-      {% if can('crm.view') %}
-      <a href="{{ url_for('main.team_board') }}" class="{{ 'on' if ep == 'main.team_board' }}">Team Command Center</a>
+    {% set nc = nav_counts or {} %}
+    {% macro item(endpoint, label, on, count=0, hot=false) %}<a href="{{ url_for(endpoint) }}" class="{{ 'on' if on }}"><span>{{ label }}</span>{% if count %}<b class="count {{ 'hot' if hot }}">{{ count }}</b>{% endif %}</a>{% endmacro %}
+    <nav class="nav" aria-label="Main">
+      <div class="group">Today</div>
+      {{ item('main.my_day', 'My Day', ep == 'main.my_day') }}
+      {{ item('tasks.index', 'Tasks', ep.startswith('tasks.'), nc.tasks, true) }}
+      {% if can('crm.view') %}{{ item('main.team_board', 'Team', ep in ('main.team_board', 'improve.hand_over')) }}
+      <div class="group">People</div>
+      {{ item('sellers.index', 'Sellers', ep.startswith('sellers.')) }}
+      {{ item('buyers.index', 'Buyers & investors', ep.startswith('buyers.')) }}
+      <div class="group">Matching &amp; deals</div>
+      {{ item('matches.desk', 'Match Desk', ep.startswith('matches.')) }}
+      {{ item('deals.index', 'Deals', ep.startswith('deals.')) }}
+      <div class="group">Conversations</div>
+      {{ item('inbox.index', 'WhatsApp', ep.startswith('inbox.'), nc.whatsapp, true) }}
+      {{ item('forms.inbox', 'Forms', ep.startswith('forms.'), nc.forms) }}
+      <div class="group">Results</div>
+      {{ item('reports.index', 'Reports', ep.startswith('reports.') or ep == 'improve.learning') }}
       {% endif %}
-      <a href="{{ url_for('tasks.index') }}" class="{{ 'on' if ep.startswith('tasks.') }}">Tasks</a>
-      {% if can('crm.view') %}
-      <div class="group">Opportunities</div>
-      <a href="{{ url_for('sellers.index') }}" class="{{ 'on' if ep.startswith('sellers.') }}">Sellers</a>
-      <a href="{{ url_for('buyers.index') }}" class="{{ 'on' if ep.startswith('buyers.') }}">Buyers / Investors</a>
-      <a href="{{ url_for('forms.inbox') }}" class="{{ 'on' if ep.startswith('forms.') }}">Forms &amp; Requests</a>
-      <a href="{{ url_for('matches.desk') }}" class="{{ 'on' if ep.startswith('matches.') }}">Match Desk</a>
-      <a href="{{ url_for('deals.index') }}" class="{{ 'on' if ep.startswith('deals.') }}">Deals</a>
-      <a href="{{ url_for('inbox.index') }}" class="{{ 'on' if ep.startswith('inbox.') and ep != 'inbox.batches' and ep != 'inbox.batch' }}">WhatsApp Inbox</a>
-      <a href="{{ url_for('inbox.batches') }}" class="{{ 'on' if ep in ('inbox.batches', 'inbox.batch') }}">Message batches</a>
-      <a href="{{ url_for('reports.index') }}" class="{{ 'on' if ep.startswith('reports.') }}">Reports</a>
-      {% if can('crm.import') %}<a href="{{ url_for('imports.index') }}" class="{{ 'on' if ep.startswith('imports.') }}">Spreadsheet import</a>{% endif %}
-      <a href="{{ url_for('main.dictionary') }}" class="{{ 'on' if ep == 'main.dictionary' }}">Field dictionary</a>
-      {% endif %}
-      {% if can('users.manage') or can('audit.view') or can('finance.view') or can('duplicates.resolve') or can('settings.manage') %}
-      <div class="group">Admin</div>
-      {% if can('settings.manage') %}<a href="{{ url_for('admin.integrations') }}" class="{{ 'on' if ep == 'admin.integrations' }}">Integrations</a><a href="{{ url_for('admin.templates') }}" class="{{ 'on' if ep == 'admin.templates' }}">Message templates</a><a href="{{ url_for('admin.outbox') }}" class="{{ 'on' if ep == 'admin.outbox' }}">E-mail outbox</a>{% endif %}
-      {% if can('users.manage') %}<a href="{{ url_for('admin.users') }}" class="{{ 'on' if ep == 'admin.users' }}">Users &amp; access</a>{% endif %}
-      {% if can('duplicates.resolve') %}<a href="{{ url_for('admin.duplicates') }}" class="{{ 'on' if ep == 'admin.duplicates' }}">Duplicate review</a>{% endif %}
-      {% if can('settings.manage') %}<a href="{{ url_for('admin.jobs') }}" class="{{ 'on' if ep == 'admin.jobs' }}">Background jobs</a>{% endif %}
-      {% if can('audit.view') %}<a href="{{ url_for('admin.audit_log') }}" class="{{ 'on' if ep == 'admin.audit_log' }}">Audit log</a>{% endif %}
-      {% if can('finance.view') %}<a href="{{ url_for('admin.finance') }}" class="{{ 'on' if ep == 'admin.finance' }}">Admin Finance</a>{% endif %}
-      {% endif %}
+      <div class="nav-foot">{{ item('improve.tools', 'Tools & admin', ep.startswith('admin.') or ep.startswith('imports.') or ep in ('main.dictionary', 'improve.tools')) }}</div>
     </nav>
   </aside>
   <div class="main">

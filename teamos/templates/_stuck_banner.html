@@ -1,0 +1,1 @@
+{% if stuck_info %}<div class="flash warn stuck-banner"><strong>Not moving:</strong> {{ stuck_info.days }} days at “{{ stuck_info.stage_label }}” (usually about {{ stuck_info.usual }}). <strong>Suggested next step:</strong> {{ stuck_info.push }}</div>{% endif %}

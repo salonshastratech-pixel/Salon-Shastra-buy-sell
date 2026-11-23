@@ -22,6 +22,13 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 8 — what to try
+* **Menu**: shorter, grouped, with counts. Admin pages are under **Tools & admin**.
+* **Team** (sign in as the team lead): Workload table → **More** → *Mark away* or *Preview hand-over*; **Not moving** list.
+* **A seller or buyer → Overview → Summary → Draft for me**, edit, **Save summary**.
+* **Reports → Match learning**: decline reasons, current weights, suggestions to approve (founder).
+* **Customer forms in Telugu**: open `/f/seller?lang=te` or `/f/buyer?lang=te`, or tap తెలుగు at the top of any form.
+
 ## Load test (any time)
 `python -I scripts/qa/load_and_sweep.py . instance/qa-load.db` — copies the demo database, creates 100 synthetic
 sellers and buyers through the screens, exercises every module and prints crashes, refused actions and slow pages.

@@ -57,6 +57,10 @@
     });
   });
 
+  // Customer-form wording in the chosen language (set by the server on <body data-form-text>; CSP forbids inline JS)
+  function formText() {
+    try { return JSON.parse(document.body.dataset.formText || '{}'); } catch (e) { return {}; }
+  }
   // Rupee amounts: show what was typed in words (45k -> ₹45,000; 25L -> ₹25 lakh)
   function inrWords(raw) {
     var v = (raw || '').toLowerCase().replace(/[,₹\s]|rs\.?/g, '');
@@ -64,7 +68,8 @@
     if (!m) return v ? 'Write a number like 45000, 45k or 25L' : '';
     var mult = {l: 1e5, lac: 1e5, lakh: 1e5, lakhs: 1e5, cr: 1e7, crore: 1e7, crores: 1e7, k: 1e3, thousand: 1e3, thousands: 1e3}[m[2]] || 1;
     var n = Math.round(parseFloat(m[1]) * mult);
-    var words = n >= 1e7 ? (n / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' crore' : n >= 1e5 ? (n / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' lakh' : '';
+    var T = formText();
+    var words = n >= 1e7 ? (n / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' ' + (T.crore || 'crore') : n >= 1e5 ? (n / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' ' + (T.lakh || 'lakh') : '';
     return '= ₹' + n.toLocaleString('en-IN') + (words ? ' (' + words + ')' : '');
   }
   document.querySelectorAll('input[data-inr]').forEach(function (i) {
@@ -109,7 +114,9 @@
       steps.forEach(function (s, k) { s.hidden = k !== cur; });
       bar.hidden = false; nav.hidden = false;
       bar.querySelector('.stepbar-fill').style.width = Math.round(100 * (cur + 1) / steps.length) + '%';
-      bar.querySelector('.stepbar-text').textContent = 'Step ' + (cur + 1) + ' of ' + steps.length + ' · ' + (steps[cur].dataset.title || '');
+      var T = formText();
+      var pos = T.te ? (steps.length + ' ' + T.of + ' ' + T.step + ' ' + (cur + 1)) : ('Step ' + (cur + 1) + ' of ' + steps.length);
+      bar.querySelector('.stepbar-text').textContent = pos + ' · ' + (steps[cur].dataset.title || '');
       nav.querySelector('[data-step="-1"]').hidden = cur === 0;
       nav.querySelector('[data-step="1"]').hidden = cur === steps.length - 1;
       window.scrollTo(0, stepper.offsetTop - 10);
@@ -151,4 +158,21 @@
     };
     tpl.addEventListener('change', showVars); showVars();
   }
+  // Record summary: "Draft for me" asks the server for a draft; the person edits it and presses Save.
+  document.querySelectorAll('form[data-summary] [data-draft-url]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var form = btn.closest('form'), box = form.querySelector('textarea[name=summary]'), note = form.querySelector('.summary-note');
+      if (box.value.trim() && !window.confirm('Replace the current text with a new draft?')) return;
+      btn.disabled = true; note.textContent = 'Drafting…';
+      fetch(btn.dataset.draftUrl, {method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRF-Token': form.querySelector('[name=csrf_token]').value}})
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (d) {
+          box.value = d.text; box.rows = 5; form.querySelector('[name=source]').value = d.source;
+          note.textContent = d.note; box.focus();
+        })
+        .catch(function () { note.textContent = 'Could not draft right now — please write it yourself.'; })
+        .finally(function () { btn.disabled = false; });
+    });
+  });
 })();

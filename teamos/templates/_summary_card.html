@@ -1,0 +1,14 @@
+{# Record summary: drafted on request, always edited/confirmed by a person. Needs `opp`. #}
+<div class="card summary-card" id="summary">
+  <div class="card-h"><h2>Summary</h2>
+    {% if opp.summary_at %}<span class="small muted">confirmed {{ opp.summary_at|rel }}{% if opp.summary_source == 'claude' %} · drafted with AI{% endif %}</span>{% endif %}</div>
+  {% if can('crm.edit') %}
+  <form method="post" action="{{ url_for('improve.summary_save', opp_id=opp.id) }}" data-summary>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="source" value="manual">
+    <textarea name="summary" rows="{{ 4 if opp.summary else 2 }}" maxlength="2000" placeholder="One short paragraph a colleague can read in 20 seconds. Press “Draft for me” to start from the facts on this record.">{{ opp.summary or '' }}</textarea>
+    <div class="help summary-note" aria-live="polite"></div>
+    <div class="inline"><button type="button" class="btn sm" data-draft-url="{{ url_for('improve.summary_draft', opp_id=opp.id) }}">Draft for me</button>
+      <button class="btn sm primary">Save summary</button></div>
+  </form>
+  {% elif opp.summary %}<p>{{ opp.summary }}</p>{% else %}<p class="muted small">No summary yet.</p>{% endif %}
+</div>

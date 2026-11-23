@@ -4,7 +4,7 @@ Every question is a canonical field from seller_fields.py or buyer_fields.py, so
 lands on exactly one known field. Templates are versioned: the version is stored on every invitation
 and submission, so a reviewer can always see which wording the respondent answered.
 
-Changing a template's questions = bump its version. English only for now (Telugu is P1, FR-052).
+Changing a template's questions = bump its version. Customer forms can be shown in Telugu (teamos/i18n.py, M8); answers are stored the same way.
 """
 from __future__ import annotations
 

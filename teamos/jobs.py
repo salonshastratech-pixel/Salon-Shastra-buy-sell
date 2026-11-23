@@ -48,6 +48,8 @@ def schedule_periodic(db) -> None:
     enqueue(db, "match_refresh", dedupe_key="match_refresh:" + bucket.strftime("%Y%m%d%H%M"))  # every 15 min
     enqueue(db, "webhook_retry", dedupe_key="webhook_retry:" + bucket.strftime("%Y%m%d%H%M"))  # every 15 min
     enqueue(db, "daily_digest", dedupe_key="daily_digest:" + n.strftime("%Y%m%d%H"))  # hourly; sends once/user/day
+    enqueue(db, "stuck_sweep", dedupe_key="stuck_sweep:" + n.strftime("%Y%m%d"))  # daily; one alert per person
+    enqueue(db, "learning_propose", dedupe_key="learning_propose:" + n.strftime("%G%V"))  # weekly
 
 
 def run_once(db, limit: int = 20) -> int:
@@ -147,6 +149,26 @@ def daily_digest(db, payload) -> str:
     if not digests.due_now():
         return "not yet 08:00 IST"
     return digests.send_all(db)
+
+
+@handler("stuck_sweep")
+def stuck_sweep(db, payload) -> str:
+    """Records that have not moved for longer than their stage usually takes (M8)."""
+    from .domain import progress
+    return progress.stuck_sweep(db)
+
+
+@handler("learning_propose")
+def learning_propose(db, payload) -> str:
+    """Weekly: propose matching-weight changes from declined matches (the founder approves; M8)."""
+    from .domain import learning
+    made = learning.propose(db)
+    if made:
+        from .domain import tasks as T
+        for a in db.all("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin'"):
+            T.notify(db, a["id"], "learning", f"{len(made)} suggestion(s) to improve match scoring — please review",
+                     "/reports/learning")
+    return f"{len(made)} proposals"
 
 
 @handler("noop")

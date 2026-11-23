@@ -2,6 +2,7 @@
 from flask import Blueprint, g, redirect, render_template, request, url_for
 
 from ..db import get_db
+from ..domain import progress as P
 from ..domain import tasks as T
 from ..domain.buyers import STAGE_LABELS as BUYER_STAGE_LABELS
 from ..domain.sellers import STAGE_LABELS as SELLER_STAGE_LABELS
@@ -60,6 +61,7 @@ def my_day():
                            notifications=notes, STAGE_LABELS=STAGE_LABELS,
                            match_tiles=MM.my_tiles(db, g.user["id"]) if g.user["role"] != "finance" else [],
                            forms_waiting=forms_waiting,
+                           stuck=P.stuck(db, owner_id=g.user["id"], limit=10) if g.user["role"] != "finance" else [],
                            unread_convs=db.scalar("SELECT COUNT(*) FROM conversations WHERE unread > 0 AND status = 'open' "
                                                   "AND (assigned_to = ? OR (assigned_to IS NULL AND ? = 1))",
                                                   (g.user["id"], 1 if g.user["role"] in ("super_admin", "team_lead") else 0)))
@@ -71,17 +73,7 @@ def team_board():
     db = get_db()
     now = now_iso()
     day_start, day_end = ist_day_bounds()
-    users = db.all("SELECT id, full_name, role, team FROM users WHERE is_active = 1 AND role <> 'finance' ORDER BY full_name")
     open_tasks = db.all(TASK_SELECT + "WHERE t.status = 'open'")
-    for u in users:
-        ts = [t for t in open_tasks if t["assignee_id"] == u["id"]]
-        u["open"] = len(ts)
-        u["overdue"] = sum(1 for t in ts if t["due_at"] and t["due_at"] < now)
-        u["today"] = sum(1 for t in ts if t["due_at"] and now <= t["due_at"] < day_end)
-        u["done_today"] = db.scalar("SELECT COUNT(*) FROM tasks WHERE completed_by = ? AND completed_at >= ?",
-                                    (u["id"], day_start))
-        u["active_opps"] = db.scalar("SELECT COUNT(*) FROM opportunities WHERE primary_owner_id = ? AND status = 'active'",
-                                     (u["id"],))
     who = request.args.get("who")
     shown = open_tasks if not who else [t for t in open_tasks if str(t["assignee_id"]) == who]
     for t in shown:
@@ -112,9 +104,10 @@ def team_board():
     match_counts = {k: allq[k] for k in ("new", "info", "near", "consent", "ready", "stale")}
     top_matches = MM.attach_open_tasks(db, db.all(MM.CAND_SELECT_LIGHT + "WHERE " + MM.ACTIVE_WHERE + " AND mc.suppressed = 0 "
                                                   "AND mc.outcome IN ('ready','near') ORDER BY mc.rank_score DESC LIMIT 5"))
-    return render_template("team.html", users=users, overdue=overdue, due_today=due_today, later=later,
+    return render_template("team.html", overdue=overdue, due_today=due_today, later=later,
                            exceptions=exceptions, unowned=unowned, review_queue=review_queue, buyer_queue=buyer_queue, dup_open=dup_open,
                            match_counts=match_counts, top_matches=top_matches, MQ=MM.QUEUES,
+                           workload=P.workload(db), stuck=P.stuck(db, limit=40),
                            who=who, STAGE_LABELS=STAGE_LABELS)
 
 

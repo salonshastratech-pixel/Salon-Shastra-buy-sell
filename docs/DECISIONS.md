@@ -104,3 +104,7 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-58 | Match Desk noise | A buyer–salon pair is listed only once ≥ 30% of the facts are known on both sides (or it is a ready/near match). | Founder | Proposed |
 | D-59 | Consent for imported leads | People who submitted a form or lead-ad (timestamped responses) get service-contact consent recorded with the sheet as source; call-log rows get none until consent is captured on a call. | Founder | Proposed |
 | D-60 | Pilot owners vs sellers | Salon owners from growth-program / "struggling salons" campaigns are imported as owners seeking help (not confirmed sellers) and are not matched to buyers. | Founder | Proposed |
+| D-61 | When is a record "not moving"? | Usual days per stage (e.g. new 2, form sent 7, active matching 30, due diligence 21) and no customer contact for that long; tune from pilot data. | Team lead | Proposed |
+| D-62 | Changing match weights | System proposes from declined good-fit matches (≥5 and ≥25%), +25% per step, never above 2× the start; founder approves; reset any time. | Founder | Proposed |
+| D-63 | Telugu wording | First-draft translation of all customer form text; a Telugu-speaking team member reviews `teamos/i18n.py` before customers see it. | Founder | Proposed |
+| D-64 | AI-drafted summaries | Off by default. When on: Claude receives only non-identifying facts (no names, phones, e-mails, addresses, map links, private notes); a person always edits and saves. | Founder | Proposed |

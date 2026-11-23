@@ -39,6 +39,15 @@ CONNECTORS = [
     {"key": "links", "name": "Customer links (forms & summaries)", "status": "built",
      "what": "The public address used in personal form links and confidential salon summaries.",
      "settings": [("PUBLIC_BASE_URL", "Public address of TeamOS", False, "e.g. https://team.salonshastra.in")]},
+    {"key": "ai", "name": "AI writing assistant (Claude)", "status": "built",
+     "what": "Better-worded record summaries when someone presses \"Draft summary\". Off by default — the built-in "
+             "drafter works without it. Only non-identifying facts are sent (never names, phones, e-mails, addresses "
+             "or private notes) and a person always checks the draft before it is saved.",
+     "settings": [
+         ("AI_ASSISTANT_ENABLED", "Switched on? (yes / no)", False, "Type yes to use Claude for drafts."),
+         ("ANTHROPIC_API_KEY", "Anthropic API key", True, "From console.anthropic.com → API keys."),
+         ("AI_MODEL", "Model (optional)", False, "Leave empty for claude-opus-5-5."),
+     ]},
     {"key": "meta_leads", "name": "Facebook / Instagram lead forms", "status": "planned",
      "what": "New leads from Meta ad forms appear automatically as seller or buyer leads, with the first-call task.",
      "settings": []},

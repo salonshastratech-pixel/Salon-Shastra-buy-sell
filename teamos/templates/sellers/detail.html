@@ -19,10 +19,12 @@
   {% for k, l in [('overview','Overview'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('matches','Matches'),('teaser','Teaser'),('history','History')] %}
   <a href="{{ url_for('sellers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
 </nav>
+{% include "_stuck_banner.html" %}
 
 {% if tab == 'overview' %}
 <div class="split">
   <div>
+    {% include "_summary_card.html" %}
     {% include "matches/_unblock_card.html" %}
     <div class="card">
       <div class="card-h"><h2>Next action</h2></div>

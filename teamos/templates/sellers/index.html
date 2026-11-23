@@ -16,7 +16,7 @@
 <tr><th>Ref</th><th>Salon</th><th>Contact</th><th>Stage</th><th>Listing</th><th class="right">Asking</th><th>Owner</th><th>Next action</th></tr>
 {% for r in rows %}
 <tr class="row-link">
-  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
+  <td class="nowrap"><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
   <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a><div class="small muted">{{ r.locality }}, {{ r.city }}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}</div></td>
   <td>{{ r.contact_name }}<div class="small muted mono">{{ r.phone_normalized }}</div></td>
   <td>{{ stage_badge(r.stage, STAGE_LABELS) }}</td>

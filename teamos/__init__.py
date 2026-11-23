@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.7.5-m7"
+__version__ = "0.8.0-m8"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -109,6 +109,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.globals.update(
         can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
         now_iso=timeutil.now_iso,
+        _=lambda s: s,  # customer forms pass a translating `_`; everywhere else text is shown as written
         # A global (not context variable) so imported macros can read it.
         csrf_value=lambda: g.session["csrf_token"] if g.get("session") else "",
     )
@@ -123,13 +124,27 @@ def create_app(overrides: dict | None = None) -> Flask:
         if g.get("user"):
             ctx["unread_count"] = get_db().scalar(
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL", (g.user["id"],))
+            ctx["nav_counts"] = _nav_counts(get_db(), g.user)
         return ctx
 
-    from .web import admin, auth, buyers, deals, forms, imports, inbox, main, matches, public, sellers, tasks
+    from .web import admin, auth, buyers, deals, forms, improve, imports, inbox, main, matches, public, sellers, tasks
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
-               matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp):
+               matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp):
         app.register_blueprint(bp)
     return app
+
+
+def _nav_counts(db, user) -> dict:
+    """Small numbers next to menu items: what is waiting for this person right now."""
+    lead = 1 if user["role"] in ("super_admin", "team_lead") else 0
+    return {
+        "tasks": db.scalar("SELECT COUNT(*) FROM tasks WHERE status = 'open' AND assignee_id = ? AND due_at IS NOT NULL "
+                           "AND due_at < ?", (user["id"], timeutil.now_iso())) or 0,
+        "whatsapp": db.scalar("SELECT COUNT(*) FROM conversations WHERE unread > 0 AND status = 'open' AND "
+                              "(assigned_to = ? OR (assigned_to IS NULL AND ? = 1))", (user["id"], lead)) or 0,
+        "forms": db.scalar("SELECT COUNT(*) FROM form_submissions s JOIN opportunities o ON o.id = s.opportunity_id "
+                           "WHERE s.status = 'submitted' AND (o.primary_owner_id = ? OR ? = 1)", (user["id"], lead)) or 0,
+    }
 
 
 def _make_error_handler(code, title):

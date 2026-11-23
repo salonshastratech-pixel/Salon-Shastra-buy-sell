@@ -1,3 +1,16 @@
+# Milestone 8 — measured improvements + simpler screens (24 Nov 2026, v0.8.0)
+
+| Area | Status | How it works |
+|---|---|---|
+| Simpler menu | **Built** | Five short groups (Today, People, Matching & deals, Conversations, Results) with counts of what is waiting (overdue tasks, unread WhatsApp, forms to review). Admin pages, imports and the field dictionary moved to one **Tools & admin** page; WhatsApp group messages and Match learning are tabs on their pages. My Day shows the most urgent first and hides empty sections. |
+| Stuck records | **Built** | A seller, buyer or deal that has sat in one stage longer than usual **and** nobody has spoken to the customer is "Not moving": shown on My Day (own), Team (everyone) and as a banner on the record with one suggested next step. Daily: one alert per person and one per team lead, never one per record. Leads whose first call is simply not due yet are not flagged. Usual durations per stage are in `teamos/domain/progress.py` (D-61). |
+| Workload | **Built** | Team page → Workload: records, open/overdue tasks, first calls waiting, "heavy" flag. **Mark away** (no new leads while away — imports and auto-assignment skip them) and **Hand over** (preview first; records move with their open tasks, spread least-busy first). Team leads only for other people. |
+| Learning from declines | **Built** | Reports → Match learning: why matches were declined, split by whether the engine had scored them high. When ≥5 good-fit pairs (60+) are declined for one area and that is ≥25% of such declines, the system proposes +25% weight for that area (max 2×). Nothing changes until the founder approves; every change is versioned ("tuned #n") and can be reset (D-62). Checked weekly. |
+| Telugu customer forms | **Built** | Every customer form (quick and personal links) has an English / తెలుగు switch; `?lang=te` on a link opens it in Telugu. Answers are stored identically; staff screens stay English. Wording is a first draft for a native speaker to check (D-63). |
+| Drafted summaries | **Built** | "Draft for me" on a seller/buyer writes a short paragraph from the record's facts and latest notes; a person edits and saves it. Built-in drafter by default (nothing leaves the server). Optional **AI writing assistant (Claude)** in Integrations — off until an admin adds a key and types yes; only non-identifying facts are sent (D-64). Needs `pip install -r requirements-ai.txt` on the server. |
+
+---
+
 # v0.7.5 — load-tested with 100 sellers + 100 buyers (23 Nov 2026)
 
 Every module was exercised with 200 synthetic people created through the screens: 3,206 actions, 0 crashes, no slow

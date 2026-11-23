@@ -9,6 +9,7 @@ import json
 from flask import Blueprint, abort, current_app, make_response, redirect, render_template, request, url_for
 from itsdangerous import BadData, URLSafeTimedSerializer
 
+from .. import i18n
 from ..db import get_db
 from ..domain import buyer_fields as BFD
 from ..domain import form_templates as FT
@@ -29,7 +30,13 @@ def _ip_hash():
 
 
 def _page(template, status=200, **ctx):
-    resp = make_response(render_template(template, **ctx), status)
+    lang = i18n.pick(request)
+    _ = lambda s: i18n.tr(s, lang)  # noqa: E731
+    if "title" in ctx:
+        ctx["title"], ctx["message"] = _(ctx["title"]), _(ctx.get("message"))
+    resp = make_response(render_template(template, lang=lang, LANGS=i18n.LANGS, _=_, **ctx), status)
+    if request.args.get("lang") in i18n.LANGS:
+        resp.set_cookie("form_lang", lang, max_age=180 * 86400, samesite="Lax", httponly=True)
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     return resp
@@ -41,6 +48,12 @@ def _uploads():
         if key.startswith("doc__") and fs and fs.filename:
             out[key[5:]] = (fs.read(), fs.filename)
     return out
+
+
+def _remember_lang(db, sid):
+    """Record which language the customer answered in (answers themselves are stored the same either way)."""
+    if isinstance(sid, int):
+        db.execute("UPDATE form_submissions SET lang = ? WHERE id = ?", (i18n.pick(request), sid))
 
 
 @bp.route("/<kind>", methods=["GET", "POST"])
@@ -69,7 +82,9 @@ def quick(kind):
                          message="We have already received several forms from this connection. Please try again "
                                  "later or call us.")
         try:
-            F.submit_public(db, form_key, request.form, ip, request.headers.get("User-Agent"))
+            opp_id = F.submit_public(db, form_key, request.form, ip, request.headers.get("User-Agent"))
+            _remember_lang(db, db.scalar("SELECT MAX(id) FROM form_submissions WHERE opportunity_id = ? AND "
+                                         "invitation_id IS NULL", (opp_id,)))
             return redirect(url_for("public.thanks", kind=kind))
         except ValidationError as e:
             errors = e.errors
@@ -110,7 +125,9 @@ def personal(token):
     if request.method == "POST":
         final = request.form.get("action") == "submit"
         try:
-            F.save_response(db, inv, request.form, _uploads(), _ip_hash(), request.headers.get("User-Agent"), final)
+            res = F.save_response(db, inv, request.form, _uploads(), _ip_hash(), request.headers.get("User-Agent"),
+                                  final)
+            _remember_lang(db, (res or {}).get("submission_id"))
             if final:
                 return _page("public/message.html", title="Thank you",
                              message="We have received your answers. Our team will review them and get back to you. "

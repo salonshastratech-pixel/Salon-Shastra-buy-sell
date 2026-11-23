@@ -18,7 +18,7 @@ def test_records_without_next_action_surface_as_exceptions(login, db):
     c = login("seller@t.test")
     c.post("/sellers/new", SELLER_FORM)
     db.execute("UPDATE tasks SET status = 'cancelled'")
-    assert b"no next action" in c.get("/").data
+    assert b"No next step yet" in c.get("/").data
     assert b"Exceptions: no next action" in c.get("/team").data
 
 

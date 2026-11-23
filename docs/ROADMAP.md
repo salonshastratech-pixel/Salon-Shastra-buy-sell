@@ -11,7 +11,7 @@ Each milestone ends with: what was built, what was tested (UAT IDs), what remain
 | M5 | **Matching engine + Match Desk** | Rules catalogue v0.1, gates/fit/coverage/readiness, bidirectional ranking, near-match queue, next questions, match subtasks with separate owners, suppression on rejection, incremental re-score jobs | UAT-10–14,35–39,49 + PRD §8.7 examples 1–10 | **Done** |
 | M6 | **Deals, teasers & admin finance** | Teaser versions + content consent, introduction approval gate, visits/offers/diligence/handover, closed-lost reasons, fee agreements/invoices/receipts (admin-only) | UAT-15,17,18,19,47,50 (UAT-47 from M4) | **Done** |
 | M7 | **WhatsApp + notifications + reporting** | Mock provider → Meta Cloud API adapter, team inbox, templates, webhooks, opt-out, batch eligibility, email digests, leadership dashboards & exports | UAT-22,23,24,25,29,30,43,44,45,48 | **Done, test-only provider** (awaiting founder review; going live needs Meta assets) |
-| M8 | **Measured improvements** ← next | Workload balancing, stalled-deal detection, outcome-tuned weights, Telugu forms, AI-drafted summaries with human confirmation | Pilot metrics | Later |
+| M8 | **Measured improvements** | Workload balancing (away + hand-over), stuck-record detection, outcome-tuned match weights (founder-approved), Telugu customer forms, drafted summaries with human confirmation, simpler menu | Pilot metrics | **Done** (awaiting founder review) |
 
 ## Ten improvements proposed beyond the PRD (ranked by value ÷ effort)
 

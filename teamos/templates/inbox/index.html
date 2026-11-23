@@ -2,6 +2,7 @@
 {% block title %}WhatsApp Inbox{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>WhatsApp Inbox</h1><div class="sub">One shared inbox. Every conversation is linked to the right buyer or seller, with an owner.</div></div></div>
+<nav class="tabs"><a href="{{ url_for('inbox.index') }}" class="{{ 'on' if request.endpoint == 'inbox.index' }}">Conversations</a><a href="{{ url_for('inbox.batches') }}" class="{{ 'on' if request.endpoint != 'inbox.index' }}">Group messages</a></nav>
 <div class="flash {{ 'ok' if wa.live else 'warn' }}"><strong>{{ wa.label }}.</strong> {{ wa.note }}</div>
 
 <div class="inline small queue-tabs">{% for k, (label, _c) in QUEUES.items() %}

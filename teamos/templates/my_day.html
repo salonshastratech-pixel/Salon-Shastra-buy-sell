@@ -3,67 +3,63 @@
 {% block content %}
 <div class="ph">
   <div><h1>Good to see you, {{ current_user.full_name.split()[0] }}</h1>
-  <div class="sub">{{ now_iso()|ist('%A, %d %B %Y') }} · ordered by what needs you first</div></div>
-  <div class="actions">
-    {% if can('crm.create') %}<a class="btn primary" href="{{ url_for('sellers.new') }}">+ Seller lead</a>
-    <a class="btn primary" href="{{ url_for('buyers.new') }}">+ Buyer lead</a>{% endif %}
-    <a class="btn" href="{{ url_for('tasks.index') }}">All my tasks</a>
-  </div>
+  <div class="sub">{{ now_iso()|ist('%A, %d %B %Y') }} · most urgent first</div></div>
+  {% if can('crm.create') %}<div class="actions">
+    <a class="btn primary" href="{{ url_for('sellers.new') }}">+ Seller lead</a>
+    <a class="btn primary" href="{{ url_for('buyers.new') }}">+ Buyer lead</a></div>{% endif %}
 </div>
 
-<div class="grid g4">
-  <div class="stat {{ 'bad' if overdue }}"><div class="n">{{ overdue|length }}</div><div class="l">Overdue</div></div>
-  <div class="stat"><div class="n">{{ today|length }}</div><div class="l">Due today</div></div>
-  <div class="stat ok"><div class="n">{{ done_today|length }}</div><div class="l">Completed today</div></div>
-  <div class="stat"><div class="n">{{ conversations }}<span class="muted small"> / {{ calls_today }}</span></div><div class="l">Real conversations / call attempts today</div></div>
+<div class="statbar">
+  <a class="stat-chip {{ 'bad' if overdue }}" href="#overdue"><b>{{ overdue|length }}</b> overdue</a>
+  <a class="stat-chip" href="#today"><b>{{ today|length }}</b> due today</a>
+  <span class="stat-chip ok"><b>{{ done_today|length }}</b> done today</span>
+  <span class="stat-chip"><b>{{ conversations }}</b> conversations · {{ calls_today }} calls</span>
+  {% if stuck %}<a class="stat-chip warn" href="#stuck"><b>{{ stuck|length }}</b> not moving</a>{% endif %}
 </div>
-<p></p>
 
 <div class="split">
   <div>
-    {% if no_next %}
-    <div class="card">
-      <div class="card-h"><h2>Your records with no next action</h2><span class="badge bad">{{ no_next|length }}</span></div>
-      <p class="small muted">Every active opportunity needs an owner and a next step. Add one so nothing slips.</p>
-      <ul class="tasks">{% for o in no_next %}<li class="task"><div><div class="t"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }} · {{ o.salon_name or o.contact_name }}</a></div><div class="meta">{{ o.contact_name }} · {{ STAGE_LABELS.get(o.stage) }}</div></div><div><a class="btn sm" href="{{ opp_url(o.kind, o.id) }}">Add next action</a></div></li>{% endfor %}</ul>
-    </div>
+    {% if overdue %}
+    <div class="card" id="overdue"><div class="card-h"><h2>Overdue</h2><span class="badge bad">{{ overdue|length }}</span></div>
+      <ul class="tasks">{% for t in overdue %}{{ task_item(t) }}{% endfor %}</ul></div>
     {% endif %}
-    <div class="card">
-      <div class="card-h"><h2>Overdue</h2><span class="badge {{ 'bad' if overdue else 'grey' }}">{{ overdue|length }}</span></div>
-      <ul class="tasks">{% for t in overdue %}{{ task_item(t) }}{% else %}<li class="empty">Nothing overdue.</li>{% endfor %}</ul>
-    </div>
-    <div class="card">
-      <div class="card-h"><h2>Today</h2><span class="badge">{{ today|length }}</span></div>
-      <ul class="tasks">{% for t in today %}{{ task_item(t) }}{% else %}<li class="empty">Nothing else due today.</li>{% endfor %}</ul>
-    </div>
-    <div class="card">
-      <div class="card-h"><h2>Coming up</h2></div>
-      <ul class="tasks">{% for t in upcoming %}{{ task_item(t) }}{% else %}<li class="empty">No upcoming tasks.</li>{% endfor %}</ul>
-    </div>
+    <div class="card" id="today"><div class="card-h"><h2>Today</h2><span class="badge">{{ today|length }}</span></div>
+      <ul class="tasks">{% for t in today %}{{ task_item(t) }}{% else %}<li class="empty">{{ 'Nothing else due today.' if overdue else 'All clear for today. Pick something from “Coming up” or the Match Desk.' }}</li>{% endfor %}</ul></div>
+    {% if no_next %}
+    <div class="card"><div class="card-h"><h2>No next step yet</h2><span class="badge bad">{{ no_next|length }}</span></div>
+      <p class="small muted">Every live record needs a next step so nothing slips.</p>
+      <ul class="tasks">{% for o in no_next %}<li class="task"><div><div class="t"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }} · {{ o.salon_name or o.contact_name }}</a></div><div class="meta">{{ o.contact_name }} · {{ STAGE_LABELS.get(o.stage) }}</div></div><div><a class="btn sm" href="{{ opp_url(o.kind, o.id) }}">Add next step</a></div></li>{% endfor %}</ul></div>
+    {% endif %}
+    {% if stuck %}
+    <div class="card" id="stuck"><div class="card-h"><h2>Not moving</h2><span class="badge warn">{{ stuck|length }}</span></div>
+      <p class="small muted">Your records that have sat in one stage longer than usual. One suggested push each.</p>
+      <ul class="tasks">{% for x in stuck %}<li class="task"><div><div class="t small"><a href="{{ url_for('deals.detail', deal_id=x.id) if x.kind == 'deal' else opp_url(x.kind, x.id) }}">{{ x.ref_code }} · {{ x.name }}</a> <span class="badge grey">{{ x.stage_label }} · {{ x.days }} days</span></div><div class="meta">{{ x.push }}</div></div></li>{% endfor %}</ul></div>
+    {% endif %}
+    <details class="card disclose" {{ 'open' if not overdue and not today }}><summary>Coming up ({{ upcoming|length }})</summary>
+      <ul class="tasks">{% for t in upcoming %}{{ task_item(t) }}{% else %}<li class="empty">No upcoming tasks.</li>{% endfor %}</ul></details>
   </div>
   <div>
-<div class="card">
-      <div class="card-h"><h2>Matching</h2><a class="small" href="{{ url_for('matches.desk', mine='1') }}">My matches →</a></div>
-      <div class="tiles">{% for t in match_tiles %}<a class="tile {{ 'hot' if t.count and t.key in ('new','ready') }}" href="{{ url_for('matches.desk', queue=t.key, mine='1') }}"><span class="n">{{ t.count }}</span><span class="l">{{ t.label }}</span></a>{% endfor %}</div>
-      {% if unread_convs %}<p><a class="btn sm primary" href="{{ url_for('inbox.index') }}">{{ unread_convs }} unread WhatsApp conversation{{ 's' if unread_convs > 1 }} →</a></p>{% endif %}
-      {% if forms_waiting %}<p><a class="btn sm" href="{{ url_for('forms.inbox') }}">{{ forms_waiting }} customer form{{ 's' if forms_waiting > 1 }} waiting for your review →</a></p>{% endif %}
-      <p class="small muted">Customer WhatsApp replies (M7) and visits/offers (M6) will appear here when those modules ship.</p>
+    {% set live_tiles = match_tiles|selectattr('count')|list %}
+    {% if unread_convs or forms_waiting or live_tiles %}
+    <div class="card"><div class="card-h"><h2>Waiting for you</h2></div>
+      {% if unread_convs %}<a class="wait-row" href="{{ url_for('inbox.index') }}"><b>{{ unread_convs }}</b> unread WhatsApp conversation{{ 's' if unread_convs > 1 }}</a>{% endif %}
+      {% if forms_waiting %}<a class="wait-row" href="{{ url_for('forms.inbox') }}"><b>{{ forms_waiting }}</b> customer form{{ 's' if forms_waiting > 1 }} to review</a>{% endif %}
+      {% if live_tiles %}<div class="tiles">{% for t in live_tiles %}<a class="tile {{ 'hot' if t.key in ('new','ready') }}" href="{{ url_for('matches.desk', queue=t.key, mine='1') }}"><span class="n">{{ t.count }}</span><span class="l">{{ t.label }}</span></a>{% endfor %}</div>
+      <a class="small" href="{{ url_for('matches.desk', mine='1') }}">All my matches →</a>{% endif %}
     </div>
+    {% endif %}
     <div class="card" id="notifications">
-      <div class="card-h"><h2>Alerts &amp; mentions</h2>
+      <div class="card-h"><h2>Alerts</h2>
         {% if notifications %}<form method="post" action="{{ url_for('main.notifications_read') }}">{{ csrf() }}<button class="btn link small">Mark all read</button></form>{% endif %}</div>
       <ul class="tasks">{% for n in notifications %}<li class="task"><div><div class="t small">{% if n.link %}<a href="{{ n.link }}">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}</div><div class="meta">{{ n.created_at|rel }}</div></div></li>{% else %}<li class="empty">You're all caught up.</li>{% endfor %}</ul>
     </div>
-    <div class="card">
-      <div class="card-h"><h2>Completed today</h2></div>
-      <ul class="tasks">{% for t in done_today %}<li class="task"><div><div class="t small">{{ t.title }}</div><div class="meta">{{ t.outcome }}</div></div></li>{% else %}<li class="empty">Nothing completed yet today.</li>{% endfor %}</ul>
-    </div>
-    
+    <details class="card disclose"><summary>Completed today ({{ done_today|length }})</summary>
+      <ul class="tasks">{% for t in done_today %}<li class="task"><div><div class="t small">{{ t.title }}</div><div class="meta">{{ t.outcome }}</div></div></li>{% else %}<li class="empty">Nothing completed yet today.</li>{% endfor %}</ul></details>
+    <form method="post" action="{{ url_for('main.digest_toggle') }}" class="card small inline">{{ csrf() }}
+      <span>Morning e-mail summary:</span>
+      {% if current_user.digest_opt_in %}<input type="hidden" name="on" value="0"><button class="btn sm">Turn off</button>{% else %}<input type="hidden" name="on" value="1"><button class="btn sm">Turn on</button>{% endif %}
+      <a class="small" href="{{ url_for('main.digest_preview') }}">Preview</a>
+    </form>
   </div>
 </div>
-<form method="post" action="{{ url_for('main.digest_toggle') }}" class="card small inline">{{ csrf() }}
-  <span>Morning e-mail summary of your day:</span>
-  {% if current_user.digest_opt_in %}<input type="hidden" name="on" value="0"><button class="btn sm">Turn off</button>{% else %}<input type="hidden" name="on" value="1"><button class="btn sm">Turn on</button>{% endif %}
-  <a class="small" href="{{ url_for('main.digest_preview') }}">Preview</a>
-</form>
 {% endblock %}

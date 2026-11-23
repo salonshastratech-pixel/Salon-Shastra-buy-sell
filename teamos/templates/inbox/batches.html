@@ -2,6 +2,7 @@
 {% block title %}Message batches{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Message batches</h1><div class="sub">Reviewed outreach to a group. Anyone can draft; a team lead or admin approves; consent is re-checked for every person at the moment of sending.</div></div></div>
+<nav class="tabs"><a href="{{ url_for('inbox.index') }}" class="{{ 'on' if request.endpoint == 'inbox.index' }}">Conversations</a><a href="{{ url_for('inbox.batches') }}" class="{{ 'on' if request.endpoint != 'inbox.index' }}">Group messages</a></nav>
 <div class="flash {{ 'ok' if wa.live else 'warn' }} small"><strong>{{ wa.label }}.</strong> {{ wa.note }}</div>
 
 <form method="post" class="card">{{ csrf() }}<h2>Draft a batch</h2>

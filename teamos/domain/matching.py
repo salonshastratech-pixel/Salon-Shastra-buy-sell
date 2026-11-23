@@ -36,6 +36,27 @@ FAMILIES = {  # family: (label, weight)
     "G": ("Staff & handover", 8), "H": ("Timing", 8), "I": ("Asset quality & track record", 5),
     "J": ("Terms & flexibility", 4),
 }
+BASE_RULES_VERSION = RULES_VERSION
+WEIGHTS = {k: v[1] for k, v in FAMILIES.items()}   # effective weights = defaults + founder-approved tuning (M8)
+
+
+def load_weights(db) -> dict:
+    """Apply founder-approved weight changes (Reports → Learning). The rules version records the tuning."""
+    global RULES_VERSION
+    weights = {k: v[1] for k, v in FAMILIES.items()}
+    try:
+        rows = db.all("SELECT id, family, new_weight FROM match_weight_changes WHERE status = 'approved' ORDER BY id")
+    except Exception:  # table not migrated yet
+        rows = []
+    for r in rows:
+        if r["family"] in weights:
+            weights[r["family"]] = r["new_weight"]
+    WEIGHTS.clear()
+    WEIGHTS.update(weights)
+    RULES_VERSION = BASE_RULES_VERSION + (f" · tuned #{rows[-1]['id']}" if rows else "")
+    return weights
+
+
 # criterion: (family, share of the family weight, label)
 CRITERIA = {
     "all_in": ("A", 14, "All-in cash requirement vs ceiling"), "price_band": ("A", 4, "Asking price vs price band"),
@@ -148,7 +169,7 @@ class _Eval:
 
     def add(self, key, result, buyer, seller, note="", ratio=None, hard=False):
         fam, share, label = CRITERIA[key]
-        weight = FAMILIES[fam][1] * share / sum(v[1] for v in CRITERIA.values() if v[0] == fam)
+        weight = WEIGHTS[fam] * share / sum(v[1] for v in CRITERIA.values() if v[0] == fam)
         earned = {"match": 1.0, "miss": 0.0, "partial": ratio if ratio is not None else 0.5}.get(result, 0.0) * weight
         self.factors.append({"key": key, "family": fam, "label": label, "result": result, "buyer": buyer,
                              "seller": seller, "note": note, "weight": round(weight, 2), "earned": round(earned, 2),
@@ -679,6 +700,7 @@ def _notify_strong(db, cid, b, s, r) -> None:
 def refresh(db, buyer_id: int | None = None, seller_id: int | None = None, force: bool = False,
             actor_id: int | None = None) -> dict:
     """Incremental re-evaluation. Only pairs whose input fingerprints changed are recomputed (unless force)."""
+    load_weights(db)
     if buyer_id:
         buyers = [x for x in [load_buyer(db, buyer_id)] if x]
     else:

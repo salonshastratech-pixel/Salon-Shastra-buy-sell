@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Match learning{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Match learning</h1><div class="sub">When good-looking matches keep getting declined for the same reason, the scoring should change. The system suggests; the founder decides.</div></div>
+  {% if can_decide %}<div class="actions"><form method="post" action="{{ url_for('improve.learning_check') }}">{{ csrf() }}<button class="btn">Check for suggestions now</button></form></div>{% endif %}</div>
+<nav class="tabs"><a href="{{ url_for('reports.index') }}">Numbers</a><a href="{{ url_for('improve.learning') }}" class="on">Match learning</a></nav>
+
+{% for p in open_ %}
+<div class="card proposal">
+  <div class="card-h"><h2>Suggestion: give “{{ p.family_label }}” more weight</h2><span class="badge warn">waiting for decision</span></div>
+  <p>{{ p.reason }}</p>
+  <p class="small"><strong>Change:</strong> weight {{ p.old_weight }} → {{ p.new_weight }}. All matches are re-scored after approval; it can be reset at any time below.</p>
+  {% if can_decide %}<form method="post" action="{{ url_for('improve.learning_decide', change_id=p.id) }}" class="inline">{{ csrf() }}
+    <input name="note" placeholder="Note (optional)" maxlength="300">
+    <button class="btn primary" name="decision" value="approve">Approve</button>
+    <button class="btn" name="decision" value="reject">Not now</button></form>
+  {% else %}<p class="small muted">The founder / an admin decides on this.</p>{% endif %}
+</div>
+{% endfor %}
+
+<div class="split">
+  <div class="card">
+    <div class="card-h"><h2>Why matches were declined</h2><span class="small muted">last {{ stats.days }} days</span></div>
+    {% if stats.total %}
+    <p class="small muted">{{ stats.total }} declined in total; {{ stats.high }} of them were pairs the system had scored as a good fit (60+), which is where the scoring can learn.</p>
+    <table class="small"><tr><th>Reason</th><th class="right">Declined</th><th class="right">…of good-fit pairs</th><th>Scoring area</th></tr>
+      {% for r in stats.reasons %}<tr><td>{{ r.label }}</td><td class="right">{{ r.all }} <span class="muted">({{ r.share }}%)</span></td><td class="right">{{ r.high }}</td><td class="muted">{{ r.family_label or '—' }}</td></tr>{% endfor %}</table>
+    {% else %}<p class="empty">No declined matches yet. Always pick a reason when declining — that is what this page learns from.</p>{% endif %}
+    <p class="small muted">A suggestion appears when at least {{ L.MIN_DECLINES }} good-fit pairs were declined for one area and that area is at least {{ (L.MIN_SHARE * 100)|int }}% of such declines. Checked automatically every week.</p>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>How matches are scored now</h2></div>
+    <table class="small"><tr><th>Area</th><th class="right">Weight</th><th></th></tr>
+      {% for w in weights %}<tr><td>{{ w.label }}</td><td class="right">{% if w.changed %}<strong>{{ w.weight }}</strong> <span class="muted">(was {{ w.default }})</span>{% else %}{{ w.weight }}{% endif %}</td>
+        <td class="right">{% if w.changed and can_decide %}<form method="post" action="{{ url_for('improve.learning_reset', family=w.family) }}">{{ csrf() }}<button class="btn link small">Reset</button></form>{% endif %}</td></tr>{% endfor %}</table>
+    <p class="small muted">Weights decide how matches are ranked on the Match Desk. Hard limits (budget ceiling, excluded areas, city) always apply whatever the weights.</p>
+  </div>
+</div>
+
+{% if history %}<div class="card"><h2>Decisions so far</h2>
+  <ul class="tasks">{% for h in history %}<li class="task"><div><div class="t small">{{ h.family_label }}: {{ h.old_weight }} → {{ h.new_weight }} · <span class="badge {{ 'ok' if h.status == 'approved' else 'grey' }}">{{ h.status }}</span></div>
+    <div class="meta">{{ h.decided_by_name or 'system' }} · {{ (h.decided_at or h.proposed_at)|rel }}{% if h.decision_note %} · {{ h.decision_note }}{% endif %}</div></div></li>{% endfor %}</ul></div>{% endif %}
+{% endblock %}

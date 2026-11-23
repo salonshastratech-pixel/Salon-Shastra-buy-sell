@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Hand over work{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Hand over {{ names[from_id] }}'s work</h1><div class="sub">Check before anything moves. Records move with their open tasks; nothing is changed for the customer.</div></div></div>
+<div class="card">
+  {% if plan.records %}
+  <p><strong>{{ plan.records }}</strong> live record{{ 's' if plan.records != 1 }} ({{ {'all': 'sellers and buyers', 'seller': 'sellers', 'buyer': 'buyers'}[kind] }}) will be shared out, least-busy first:</p>
+  <ul>{% for uid, n in plan.per_person.items() %}<li>{{ names[uid] }} — {{ n }}</li>{% endfor %}</ul>
+  <form method="post" action="{{ url_for('improve.hand_over') }}" class="inline">{{ csrf() }}
+    <input type="hidden" name="from_id" value="{{ from_id }}"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="limit" value="{{ limit }}">
+    {% for t in to_ids %}<input type="hidden" name="to_ids" value="{{ t }}">{% endfor %}
+    <button class="btn primary" name="go" value="1">Hand over now</button>
+    <a class="btn" href="{{ url_for('main.team_board') }}#workload">Cancel</a></form>
+  {% else %}<p>{{ names[from_id] }} has no live records of this kind. Nothing to hand over.</p>
+  <a class="btn" href="{{ url_for('main.team_board') }}#workload">Back to Team</a>{% endif %}
+</div>
+{% endblock %}

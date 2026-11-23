@@ -1,6 +1,7 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}{{ d.ref_code }} · {{ d.salon_name }}{% endblock %}
 {% block content %}
+{% include "_stuck_banner.html" %}
 <div class="ph"><div>
   <div class="small muted"><a href="{{ url_for('deals.index') }}">Deals</a> / {{ d.ref_code }}</div>
   <h1><a href="{{ url_for('buyers.detail', opp_id=d.buyer_opp_id) }}">{{ d.buyer_name }}</a> <span class="muted">↔</span> <a href="{{ url_for('sellers.detail', opp_id=d.seller_opp_id) }}">{{ d.salon_name }}</a></h1>

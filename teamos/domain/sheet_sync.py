@@ -425,16 +425,8 @@ def summary(db, import_id: int) -> dict:
 
 
 def _owner(db, team: str, load: dict) -> int | None:
-    people = db.all("SELECT id FROM users WHERE is_active = 1 AND team = ? AND role IN ('team_member','team_lead') "
-                    "ORDER BY id", (team,))
-    if not people:
-        return None
-    for p in people:
-        load.setdefault(p["id"], db.scalar("SELECT COUNT(*) FROM opportunities WHERE primary_owner_id = ? AND "
-                                           "status <> 'closed'", (p["id"],)) or 0)
-    pid = min(people, key=lambda p: load[p["id"]])["id"]
-    load[pid] += 1
-    return pid
+    from .progress import pick_owner  # least-busy available person; people marked away are skipped
+    return pick_owner(db, team, load)
 
 
 def _next_morning() -> str:

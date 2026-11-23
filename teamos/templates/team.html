@@ -1,17 +1,40 @@
-{% extends "base.html" %}{% from "macros.html" import task_item, stage_badge %}
-{% block title %}Team Command Center{% endblock %}
+{% extends "base.html" %}{% from "macros.html" import task_item, stage_badge, csrf %}
+{% block title %}Team{% endblock %}
 {% block content %}
-<div class="ph"><div><h1>Team Command Center</h1><div class="sub">Who is working on what, what is due, what is blocked. No company finance is shown here.</div></div>
+<div class="ph"><div><h1>Team</h1><div class="sub">Who has how much, what is stuck, what is due. No company finance is shown here.</div></div>
 {% if who %}<div class="actions"><a class="btn" href="{{ url_for('main.team_board') }}">Show everyone</a></div>{% endif %}</div>
 
-<div class="card flush"><div class="table-wrap"><table>
-  <tr><th>Team member</th><th class="right">Open tasks</th><th class="right">Overdue</th><th class="right">Due today</th><th class="right">Done today</th><th class="right">Active opportunities</th><th></th></tr>
-  {% for u in users %}<tr class="row-link">
-    <td><strong>{{ u.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[u.role] }} · {{ u.team }}</div></td>
-    <td class="right">{{ u.open }}</td><td class="right">{% if u.overdue %}<span class="badge bad">{{ u.overdue }}</span>{% else %}0{% endif %}</td>
-    <td class="right">{{ u.today }}</td><td class="right">{{ u.done_today }}</td><td class="right">{{ u.active_opps }}</td>
-    <td class="right"><a class="btn sm" href="{{ url_for('main.team_board', who=u.id) }}">View work</a></td></tr>{% endfor %}
+<div class="card flush" id="workload"><div class="card-h pad"><h2>Workload</h2><span class="small muted">records = live sellers + buyers they own</span></div><div class="table-wrap"><table>
+  <tr><th>Person</th><th class="right">Records</th><th class="right">Open tasks</th><th class="right">Overdue</th><th class="right">Due today</th><th class="right">First calls waiting</th><th>Status</th><th></th></tr>
+  {% for u in workload %}<tr class="{{ 'row-away' if u.away }}">
+    <td><strong>{{ u.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[u.role] }}{% if u.team %} · {{ u.team }}{% endif %}</div></td>
+    <td class="right">{{ u.records }}{% if u.heavy %} <span class="badge warn" title="Well above the team average">heavy</span>{% endif %}<div class="small muted">{{ u.sellers }} S · {{ u.buyers }} B</div></td>
+    <td class="right">{{ u.open }}</td>
+    <td class="right">{% if u.overdue %}<span class="badge bad">{{ u.overdue }}</span>{% else %}0{% endif %}</td>
+    <td class="right">{{ u.today }}</td><td class="right">{{ u.first_calls }}</td>
+    <td>{% if u.away %}<span class="badge grey">Away till {{ u.away_until }}</span>{% else %}<span class="badge ok">Available</span>{% endif %}</td>
+    <td class="right nowrap"><a class="btn sm" href="{{ url_for('main.team_board', who=u.id) }}">Tasks</a>
+      {% if can('crm.assign') or u.id == current_user.id %}<details class="pop"><summary class="btn sm">More</summary><div class="pop-body">
+        <form method="post" action="{{ url_for('improve.set_away') }}">{{ csrf() }}<input type="hidden" name="user_id" value="{{ u.id }}">
+          {% if u.away %}<button class="btn sm">Mark available</button>{% else %}<label class="small">Away until <input type="date" name="until" required></label> <button class="btn sm">Mark away</button>{% endif %}
+          <p class="small muted">While away, no new leads are given to {{ u.full_name.split()[0] }}.</p></form>
+        {% if can('crm.assign') and u.records %}<form method="post" action="{{ url_for('improve.hand_over') }}">{{ csrf() }}<input type="hidden" name="from_id" value="{{ u.id }}">
+          <div class="small"><strong>Hand over records to</strong></div>
+          {% for o in workload if o.id != u.id and not o.away and o.role != 'super_admin' %}<label class="check small"><input type="checkbox" name="to_ids" value="{{ o.id }}"> {{ o.full_name }} ({{ o.records }})</label>{% endfor %}
+          <div class="inline small"><select name="kind"><option value="all">Sellers and buyers</option><option value="seller">Sellers only</option><option value="buyer">Buyers only</option></select>
+            <input name="limit" inputmode="numeric" placeholder="How many (all)" size="12"></div>
+          <button class="btn sm primary">Preview hand-over</button></form>{% endif %}
+      </div></details>{% endif %}</td></tr>{% endfor %}
 </table></div></div>
+
+<div class="card" id="stuck"><div class="card-h"><h2>Not moving</h2><span class="badge {{ 'warn' if stuck else 'ok' }}">{{ stuck|length }}</span></div>
+  <p class="small muted">Records that have sat in one stage longer than usual with nobody speaking to the customer. Each has one suggested push.</p>
+  <ul class="tasks">{% for x in stuck[:15] %}<li class="task"><div><div class="t small">
+    <a href="{{ url_for('deals.detail', deal_id=x.id) if x.kind == 'deal' else opp_url(x.kind, x.id) }}">{{ x.ref_code }} · {{ x.name }}</a>
+    <span class="badge grey">{{ x.stage_label }}</span> <span class="badge warn">{{ x.days }} days (usually {{ x.usual }})</span></div>
+    <div class="meta">{{ x.owner_name or 'Unowned' }} · {{ x.push }}</div></div></li>{% else %}<li class="empty">Everything is moving.</li>{% endfor %}</ul>
+  {% if stuck|length > 15 %}<details class="disclose"><summary>{{ stuck|length - 15 }} more</summary><ul class="tasks">{% for x in stuck[15:] %}<li class="task"><div><div class="t small"><a href="{{ url_for('deals.detail', deal_id=x.id) if x.kind == 'deal' else opp_url(x.kind, x.id) }}">{{ x.ref_code }} · {{ x.name }}</a> <span class="badge grey">{{ x.stage_label }}</span> <span class="badge warn">{{ x.days }} days</span></div><div class="meta">{{ x.owner_name or 'Unowned' }} · {{ x.push }}</div></div></li>{% endfor %}</ul></details>{% endif %}
+</div>
 
 <div class="split">
   <div>
