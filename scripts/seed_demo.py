@@ -42,6 +42,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM match_candidates"):
             seed_matches(db)  # demo database created before Milestone 5
             added.append("scored matches (M5)")
+        if not db.scalar("SELECT COUNT(*) FROM teasers"):
+            seed_deals(db)  # demo database created before Milestone 6
+            added.append("teaser, introduction, deal & fee ledger (M6)")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -181,6 +184,7 @@ def seed(db):
     seed_buyers(db)
     seed_forms(db)
     seed_matches(db)
+    seed_deals(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -386,3 +390,49 @@ def seed_matches(db):
     if near:
         MT.create_subtasks(db, u["harika"], near, "Ask Lakshmi if she can stretch the all-in budget by 2.8 L",
                            "Ask Kavya whether there is any flexibility on the 22 L asking price", None)
+
+
+def seed_deals(db):
+    """Milestone 6: Arjun <-> Glow Studio Unisex goes from match to an open deal with a visit and offers, and Admin
+    Finance holds an illustrative 5% seller success fee (illustration only — not Salon Shastra's fee policy)."""
+    from teamos.domain import deals as DL
+    from teamos.domain import finance as FN
+    from teamos.domain import matching as MT
+    from teamos.domain import teasers as TZ
+    u = {r["email"].split("@")[0]: r for r in db.all("SELECT * FROM users WHERE is_synthetic = 1")}
+    glow = db.scalar("SELECT o.id FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id "
+                     "WHERE b.name = 'Glow Studio Unisex' AND o.is_synthetic = 1")
+    arjun = db.scalar("SELECT o.id FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
+                      "WHERE c.phone_normalized = '+919000000201' AND o.kind = 'buyer'")
+    if not glow or not arjun:
+        return
+    tid = TZ.save_draft(db, u["shaheen"], glow, ["area", "format", "positioning", "size", "years", "asking", "sales_band",
+                                                 "lease", "structure"],
+                        "Established premium unisex salon in West Hyderabad",
+                        "Loyal repeat clientele; lease confirmed transferable to 2029; owner will support handover.")
+    TZ.record_seller_approval(db, u["shaheen"], tid, "call", "Kavya approved the summary on a call (synthetic)")
+    TZ.approve(db, u["founder"], tid)
+    MT.refresh(db, buyer_id=arjun, seller_id=glow)
+    cid = db.scalar("SELECT id FROM match_candidates WHERE buyer_opp_id = ? AND seller_opp_id = ?", (arjun, glow))
+    MT.change_stage(db, u["lead"], cid, "approved_to_approach", note="Synthetic demo approval")
+    TZ.share_with_buyer(db, u["harika"], cid, "whatsapp_mock")
+    MT.change_stage(db, u["harika"], cid, "interest_confirmed", note="Arjun liked the teaser (synthetic)")
+    for side in ("buyer", "seller"):
+        TZ.record_identity_consent(db, u["harika"] if side == "buyer" else u["shaheen"], cid, side, "call", None)
+    iid = TZ.request_introduction(db, u["harika"], cid, "Both sides keen to meet")
+    deal = TZ.decide_introduction(db, u["founder"], iid, "approved", "Synthetic demo introduction")
+    DL.schedule_visit(db, u["shaheen"], deal, _ago(days=2), "Arjun, Shaheen")
+    vid = db.scalar("SELECT id FROM deal_visits WHERE deal_id = ?", (deal,))
+    DL.record_visit(db, u["shaheen"], vid, "completed", "Walked through the salon; liked footfall and equipment.",
+                    "Wants clarity on the stylist contracts")
+    DL.add_offer(db, u["harika"], deal, {"from_party": "buyer", "amount": "19L", "deposit_treatment": "included",
+                                         "financing": "Own funds", "valid_until": _in(days=7)[:10]})
+    DL.add_offer(db, u["shaheen"], deal, {"from_party": "seller", "amount": "21L", "deposit_treatment": "included",
+                                          "contingencies": "Two senior stylists' contracts to be renewed before handover",
+                                          "valid_until": _in(days=5)[:10]})
+    FN.add_agreement(db, u["founder"], {"deal_id": deal, "payer": "seller", "fee_type": "success", "basis": "percent",
+                                        "rate_pct": "5", "earning_condition": "on_closing",
+                                        "agreement_ref": "SYNTHETIC-ENG-001",
+                                        "note": "Illustration only - not Salon Shastra's fee policy"})
+    FN.add_expense(db, u["founder"], {"category": "Marketing", "amount": "15000", "spent_on": _ago(days=10)[:10],
+                                      "note": "Synthetic: Meta lead campaign (demo)"})

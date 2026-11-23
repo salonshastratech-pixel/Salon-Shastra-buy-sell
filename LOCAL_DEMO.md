@@ -22,6 +22,14 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 6 — deals & finance
+* **Deals → DL-00001** (Arjun ↔ Glow Studio Unisex): visit done, buyer offered ₹19 L, seller countered ₹21 L. Try
+  accepting the counter, ticking the diligence list, adding a handover date and closing (as `founder@`).
+* Glow Studio's *Teaser* tab shows the approved anonymous summary; the match page shows the teaser share, both
+  consents and the approved introduction.
+* **Admin Finance** (`founder@` or `accounts@`): an illustrative 5% seller success fee that becomes earned only when
+  the deal closes. Team members cannot open it and never see amounts.
+
 ## Milestone 5 — Match Desk
 * **Match Desk** (left menu): queues of buyer↔salon matches; open one for the side-by-side comparison.
 * Try BY-00009 Arjun ↔ SL-00001 Glow Studio Unisex: fit 99, fully known — but *awaiting consent* (the seller has not

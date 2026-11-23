@@ -1,4 +1,31 @@
-# Feature status — Milestone 5 (23 Nov 2026, v0.5.0)
+# Feature status — Milestone 6 (23 Nov 2026, v0.6.0)
+
+Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
+
+## Milestone 6 — teasers, introductions, deal room & admin finance (awaiting founder review)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Anonymous teasers (FR-016, UAT-50) | **Built** | Whitelisted items only (area, format, positioning, size, years, indicative price, banded sales/rent, lease remaining, structure, safe reason categories). Name, phone, address, brand, lowest price, private notes and documents can never appear; the headline is checked for the salon/owner name. Versioned; seller approves the content categories (recorded as consent), then a reviewer approves; content frozen at approval. |
+| Teaser sharing | **Built** | Only for matches approved to approach; expiring 14-day link (hashed token), copy link or labelled mock WhatsApp; opening is recorded on the match. Public page shows only the frozen content + disclaimers, no-index. |
+| Introductions (FR-018, UAT-15) | **Built** | Requested after interest; approver-only decision; requires both sides' recorded identity consent, an approved teaser shared, no do-not-contact. Approval stores exactly what was given to whom and the consent rows/versions relied on, then opens the deal room. |
+| Deal room (FR-019, UAT-17) | **Built** | Stages per PRD §9.2 with gates (visit before "visit completed", accepted offer before agreement, diligence + handover date + approver before closed won). Visits create tasks; offers are versioned (counter = new version, history kept) and create response tasks for the other side; completed work closes its own tasks; 9-item due-diligence checklist; closed-lost needs a reason and a lesson. Closing marks both records closed won. |
+| Admin finance (FR-020, FR-050, UAT-18/19) | **Built** | Fee agreements per deal (payer, type, fixed or % of the agreed price, earning condition, versioned), invoices (tax only if entered — D-05 open), receipts, expenses. Earned = only when the condition is met; due = earned − received. Sale consideration is shown separately and never counted as revenue. |
+| Finance permissions (UAT-47) | **Built** | Finance specialist can view and edit the ledger but not the CRM deal room; ordinary staff get 403 and see only "commercial verification pending / terms recorded" on a deal. Every change audited. |
+| Real WhatsApp delivery, inbox, reminders | **Planned (M7)** | All sends are still the labelled mock. |
+| Leadership dashboards & exports | **Planned (M7)** | |
+| PostgreSQL replay for the new SQL | **Not run** | No PostgreSQL here; SQL kept portable. |
+
+Found and fixed during the browser walkthrough: offer "valid until" dates were stored as task deadlines without a time,
+which crashed the deal page and would have broken My Day (now converted to 6 pm IST and validated; pages covered by a
+test); "arrange a visit" and "respond to offer v1" tasks stayed open after the work was done (now auto-closed);
+the teaser preview hid real values for optional items.
+
+Tests: 133 automated tests pass (124 from M1–M5, 9 new for M6 covering UAT-15, 17, 18, 19, 47, 50). Walked through in a real browser.
+
+---
+
+# Milestone 5 status (23 Nov 2026, v0.5.0)
 
 Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
 

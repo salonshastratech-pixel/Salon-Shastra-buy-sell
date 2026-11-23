@@ -269,3 +269,10 @@ table.cmp tr.res-unknown td:first-child { box-shadow: inset 3px 0 #c9c3bb; }
 .tile.hot { border-color: var(--brand); background: var(--brand-soft, #ffe3d5); }
 .card.unblock { border-color: var(--brand); }
 @media (max-width: 900px) { .desk { grid-template-columns: 1fr; } .four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Milestone 6 — deals & teasers */
+.stagebar { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 16px; }
+.stagebar span { font-size: 11.5px; padding: 4px 9px; border-radius: 99px; background: #eeeae4; color: var(--muted); }
+.stagebar span.done { background: var(--ok-soft); color: var(--ok); }
+.stagebar span.on { background: var(--brand); color: #fff; font-weight: 600; }
+.teaser-mini { background: #faf6f2; border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }

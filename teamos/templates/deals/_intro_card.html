@@ -1,0 +1,45 @@
+{% from "macros.html" import csrf %}
+{% if c.stage in ('approved_to_approach', 'interest_confirmed') or intro or deal %}
+<div class="card" id="intro">
+  <h2>Teaser &amp; introduction</h2>
+  {% if deal %}<p class="flash ok small">Introduced — deal <a href="{{ url_for('deals.detail', deal_id=deal.id) }}"><strong>{{ deal.ref_code }}</strong></a> is open ({{ deal.stage|replace('_',' ') }}).</p>{% endif %}
+
+  <h3>1 · Share the anonymous teaser</h3>
+  {% if not teaser %}<p class="small unknown">This salon has no approved teaser yet. Create one on the salon's <a href="{{ url_for('sellers.detail', opp_id=c.seller_opp_id, tab='teaser') }}">Teaser tab</a> (seller approves the content, then a reviewer approves).</p>
+  {% else %}
+    {% for s in shares %}<div class="small">Teaser shared {{ s.created_at|rel }} by {{ s.by_name }} via {{ 'mock WhatsApp' if s.channel == 'whatsapp_mock' else 'link' }}{% if s.opened_at %} · <strong>opened {{ s.opened_at|rel }}</strong>{% endif %}</div>{% endfor %}
+    {% if not deal %}<form method="post" action="{{ url_for('deals.share_teaser', cid=c.id) }}" class="inline">{{ csrf() }}
+      <select name="channel"><option value="copy_link">Link</option><option value="whatsapp_mock">WhatsApp (mock)</option></select>
+      <button class="btn sm">{{ 'Share again' if shares else 'Share teaser with buyer' }}</button></form>{% endif %}
+  {% endif %}
+
+  <h3>2 · Consent to exchange contact details</h3>
+  {% for side in ['buyer', 'seller'] %}{% set cons = identity[side] %}
+  <div class="small">{{ side|title }}: {% if cons and cons.granted %}<span class="badge ok">Agreed</span> <span class="muted">{{ cons.captured_at|rel }} · {{ cons.text_version }}</span>{% else %}<span class="badge grey">Not recorded</span>{% endif %}</div>{% endfor %}
+  {% if not deal %}<details class="disclose"><summary>Record consent</summary>
+    <form method="post" action="{{ url_for('deals.identity_consent', cid=c.id) }}">{{ csrf() }}
+      <div class="field"><select name="side"><option value="buyer">Buyer agreed</option><option value="seller">Seller agreed</option></select></div>
+      <div class="field"><select name="method"><option value="call">On a call</option><option value="whatsapp">On WhatsApp</option><option value="in_person">In person</option><option value="form">In writing</option></select></div>
+      <div class="field"><input name="note" placeholder="Note (optional)"></div><button class="btn sm">Save consent</button>
+      <p class="small muted">Only record consent the person actually gave for THIS introduction.</p></form></details>{% endif %}
+
+  <h3>3 · Introduction</h3>
+  {% if intro and intro.status == 'requested' %}
+    <p class="small">Requested by {{ intro.requested_name }} {{ intro.requested_at|rel }}{% if intro.request_note %} — {{ intro.request_note }}{% endif %}.</p>
+    {% if intro_blockers %}<p class="small unknown">Before it can be approved: {{ intro_blockers|join('; ') }}.</p>{% endif %}
+    {% if can_intro %}<form method="post" action="{{ url_for('deals.decide_intro', intro_id=intro.id) }}">{{ csrf() }}
+      <div class="field"><input name="note" placeholder="Note (required to reject)"></div>
+      <button class="btn primary" name="decision" value="approved" {{ 'disabled' if intro_blockers }}>Approve — exchange contact details</button>
+      <button class="btn" name="decision" value="rejected">Reject</button></form>
+    {% else %}<p class="small muted">Waiting for an approver (Super Admin).</p>{% endif %}
+  {% elif intro and intro.status == 'approved' %}
+    <p class="small">Approved by {{ intro.decided_name }} {{ intro.decided_at|rel }}.</p>
+  {% else %}
+    {% if intro and intro.status == 'rejected' %}<p class="small">Previous request rejected: {{ intro.decision_note }}</p>{% endif %}
+    {% if c.stage == 'interest_confirmed' %}<form method="post" action="{{ url_for('deals.request_intro', cid=c.id) }}">{{ csrf() }}
+      <div class="field"><input name="note" placeholder="Why now? (optional)"></div><button class="btn">Request introduction</button></form>
+      {% if intro_blockers %}<p class="small muted">An approver will need: {{ intro_blockers|join('; ') }}.</p>{% endif %}
+    {% else %}<p class="small muted">Record the buyer's interest (above) first.</p>{% endif %}
+  {% endif %}
+</div>
+{% endif %}

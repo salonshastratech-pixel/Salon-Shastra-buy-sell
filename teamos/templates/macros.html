@@ -23,7 +23,7 @@
     </div>
   </div>
   <div class="inline">
-    {% if t.opp_id %}<a class="btn sm" href="{{ opp_url(t.opp_kind, t.opp_id) }}">Open</a>{% elif t.entity_type == 'match' %}<a class="btn sm" href="{{ url_for('matches.detail', cid=t.entity_id) }}">Open match</a>{% endif %}
+    {% if t.opp_id %}<a class="btn sm" href="{{ opp_url(t.opp_kind, t.opp_id) }}">Open</a>{% elif t.entity_type == 'match' %}<a class="btn sm" href="{{ url_for('matches.detail', cid=t.entity_id) }}">Open match</a>{% elif t.entity_type == 'deal' %}<a class="btn sm" href="{{ url_for('deals.detail', deal_id=t.entity_id) }}">Open deal</a>{% endif %}
     <a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a>
   </div>
 </li>

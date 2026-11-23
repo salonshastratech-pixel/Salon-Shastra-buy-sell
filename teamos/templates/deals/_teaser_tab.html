@@ -1,0 +1,37 @@
+{% from "macros.html" import csrf %}
+<div class="split"><div>
+  {% set draft = teasers|selectattr('status', 'equalto', 'draft')|first %}
+  <form method="post" action="{{ url_for('deals.teaser_save', opp_id=opp.id) }}" class="card">{{ csrf() }}
+    <div class="card-h"><h2>{{ 'Edit draft teaser v' ~ draft.version if draft else 'New teaser' }}</h2></div>
+    <p class="small muted">An anonymous one-page summary buyers can see before they know which salon it is. Only the items below can ever appear; sizes and money are shown as ranges.</p>
+    <div class="field"><label>Headline (no salon or owner name)</label><input name="headline" maxlength="140" value="{{ draft.headline if draft else '' }}" placeholder="e.g. Established premium unisex salon in West Hyderabad"></div>
+    <div class="field"><label>Include</label>
+      {% set chosen = draft.fields if draft else [] %}
+      {% for k, (label, _fn, default) in TZ.TEASER_FIELDS.items() %}{% set prev = (teaser_preview.rows|selectattr('key', 'equalto', k)|first) %}
+      <label class="check small"><input type="checkbox" name="fields" value="{{ k }}" {{ 'checked' if (k in chosen) or (not draft and default) }}> {{ label }}{% if prev %} <span class="muted">— {{ prev.value }}</span>{% else %} <span class="missing">(no data yet)</span>{% endif %}</label>{% endfor %}</div>
+    <div class="field"><label>Highlights (optional, keep it anonymous)</label><textarea name="highlights" maxlength="1200" placeholder="e.g. Loyal repeat clientele; lease confirmed transferable; owner willing to support handover">{{ draft.highlights if draft else '' }}</textarea></div>
+    <button class="btn primary">Save draft</button>
+    <p class="small muted">Never included: {{ TZ.NEVER_IN_TEASER|join(', ') }}.</p>
+  </form>
+</div><div>
+  {% for t in teasers %}
+  <div class="card">
+    <div class="card-h"><h2>Teaser v{{ t.version }}</h2><span class="badge {{ 'ok' if t.status == 'approved' else 'warn' if t.status == 'seller_approved' else 'grey' }}">{{ TZ.STATUS[t.status] }}</span></div>
+    {% if t.content_d %}<div class="teaser-mini"><strong>{{ t.content_d.headline }}</strong>
+      <table class="small">{% for r in t.content_d.rows %}<tr><td class="muted">{{ r.label }}</td><td>{{ r.value }}</td></tr>{% endfor %}</table>
+      {% if t.content_d.highlights %}<p class="small">{{ t.content_d.highlights }}</p>{% endif %}</div>{% endif %}
+    {% if t.status == 'draft' %}
+      <form method="post" action="{{ url_for('deals.teaser_action', teaser_id=t.id, action='seller-approval') }}">{{ csrf() }}
+        <div class="field"><label>The seller approved exactly this content</label><select name="method"><option value="call">On a call</option><option value="whatsapp">On WhatsApp</option><option value="in_person">In person</option><option value="form">In writing / form</option></select></div>
+        <div class="field"><input name="note" placeholder="Note (optional)"></div><button class="btn">Record seller approval</button></form>
+    {% elif t.status == 'seller_approved' %}
+      <p class="small">Seller approved {{ t.seller_consent_at|rel }} ({{ t.seller_consent_method|replace('_',' ') }}) — recorded by {{ t.consent_by_name }}.</p>
+      {% if can('listing.approve') %}<form method="post" action="{{ url_for('deals.teaser_action', teaser_id=t.id, action='approve') }}">{{ csrf() }}<button class="btn primary">Approve teaser</button></form>
+      {% else %}<p class="small muted">Waiting for an approver.</p>{% endif %}
+    {% elif t.status == 'approved' %}
+      <p class="small">Approved by {{ t.approver_name }} {{ t.approved_at|rel }}. Frozen — later edits to the listing do not change it.{% if t.listing_version and listing.data_version != t.listing_version %} <span class="badge warn">Listing changed since — consider a new version</span>{% endif %}</p>
+      <p class="small muted">Share it from a match that is approved to approach.</p>
+    {% endif %}
+  </div>
+  {% else %}<div class="card empty">No teaser yet.</div>{% endfor %}
+</div></div>

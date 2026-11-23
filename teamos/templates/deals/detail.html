@@ -1,0 +1,91 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}{{ d.ref_code }} · {{ d.salon_name }}{% endblock %}
+{% block content %}
+<div class="ph"><div>
+  <div class="small muted"><a href="{{ url_for('deals.index') }}">Deals</a> / {{ d.ref_code }}</div>
+  <h1><a href="{{ url_for('buyers.detail', opp_id=d.buyer_opp_id) }}">{{ d.buyer_name }}</a> <span class="muted">↔</span> <a href="{{ url_for('sellers.detail', opp_id=d.seller_opp_id) }}">{{ d.salon_name }}</a></h1>
+  <div class="inline sub"><span class="badge {{ 'ok' if d.stage == 'closed_won' else 'bad' if d.stage in ('closed_lost','withdrawn') else 'info' }}">{{ D.STAGE_LABELS[d.stage] }}</span>
+    <span>Owner: <strong>{{ d.owner_name or '—' }}</strong></span> · <a href="{{ url_for('matches.detail', cid=d.match_id) }}">Match</a>
+    {% if d.agreed_consideration %} · <span>Agreed price (between the parties): <strong>{{ d.agreed_consideration|inr }}</strong></span>{% endif %}</div>
+</div></div>
+
+{% set keys = D.STAGES|map('first')|list %}{% set idx = keys.index(d.stage) if d.stage in keys else -1 %}
+<div class="stagebar">{% for k, l in D.STAGES %}<span class="{{ 'done' if loop.index0 < idx }} {{ 'on' if k == d.stage }}">{{ l }}</span>{% endfor %}</div>
+
+<div class="split"><div>
+  <div class="card"><div class="card-h"><h2>Next actions</h2></div>
+    <ul class="tasks">{% for t in tasks %}<li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}"><div><div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div><div class="meta">{{ t.assignee_name }} · due {{ t.due_at|ist }} ({{ t.due_at|rel }})</div></div></li>{% else %}<li class="empty">No open tasks.</li>{% endfor %}</ul></div>
+
+  <div class="card"><div class="card-h"><h2>Site visits</h2></div>
+    {% for v in visits %}<div class="task-group"><div><strong>{{ v.scheduled_at|ist }}</strong> <span class="badge {{ 'ok' if v.status == 'completed' else 'grey' if v.status == 'scheduled' else 'bad' }}">{{ v.status|replace('_',' ') }}</span>{% if v.attendees %} <span class="small muted">· {{ v.attendees }}</span>{% endif %}</div>
+      {% if v.outcome_note %}<div class="small">{{ v.outcome_note }}</div>{% endif %}{% if v.buyer_feedback %}<div class="small muted">Buyer feedback: {{ v.buyer_feedback }}</div>{% endif %}
+      {% if v.status == 'scheduled' %}<details class="disclose"><summary>Record what happened</summary>
+        <form method="post" action="{{ url_for('deals.visit_outcome', visit_id=v.id) }}">{{ csrf() }}
+          <div class="field"><select name="status"><option value="completed">Visit completed</option><option value="no_show">No-show</option><option value="cancelled">Cancelled</option></select></div>
+          <div class="field"><input name="outcome" placeholder="What happened?"></div><div class="field"><input name="feedback" placeholder="Buyer's feedback (optional)"></div>
+          <button class="btn sm">Save</button></form></details>{% endif %}</div>{% else %}<p class="small muted">No visits yet.</p>{% endfor %}
+    {% if d.stage not in ('closed_won','closed_lost','withdrawn') %}<form method="post" action="{{ url_for('deals.visit', deal_id=d.id) }}" class="inline">{{ csrf() }}
+      <input type="datetime-local" name="when" required><input name="attendees" placeholder="Who is going?"><button class="btn sm">Schedule visit</button></form>{% endif %}
+  </div>
+
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Offers (every version kept)</h2></div>
+    <div class="table-wrap"><table class="small">
+      <tr><th>v</th><th>From</th><th class="right">Amount</th><th>Terms</th><th>Valid until</th><th>Status</th><th></th></tr>
+      {% for o in offers %}<tr><td>{{ o.version }}</td><td>{{ o.from_party }}</td><td class="right nowrap"><strong>{{ o.amount|inr }}</strong></td>
+        <td>{% if o.deposit_treatment %}Deposit {{ o.deposit_treatment|replace('_',' ') }}. {% endif %}{% if o.stock_included %}Stock {{ o.stock_included }}. {% endif %}{% if o.working_capital %}WC {{ o.working_capital|inr }}. {% endif %}{% if o.financing %}{{ o.financing }}. {% endif %}{% if o.contingencies %}<span class="muted">{{ o.contingencies }}</span>{% endif %}</td>
+        <td>{{ o.valid_until or '—' }}</td><td><span class="badge {{ 'ok' if o.status == 'accepted' else 'info' if o.status == 'open' else 'grey' }}">{{ o.status }}</span></td>
+        <td>{% if o.status == 'open' %}<form method="post" action="{{ url_for('deals.offer_status', offer_id=o.id) }}" class="inline">{{ csrf() }}<button class="btn sm" name="status" value="accepted">Accept</button><button class="btn sm" name="status" value="rejected">Reject</button></form>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="7" class="empty">No offers yet.</td></tr>{% endfor %}</table></div>
+    {% if d.stage not in ('closed_won','closed_lost','withdrawn') %}
+    <details class="disclose pad"><summary>Record an offer / counter-offer</summary>
+      <form method="post" action="{{ url_for('deals.offer', deal_id=d.id) }}" class="form-grid">{{ csrf() }}
+        <div class="field"><label>From</label><select name="from_party"><option value="buyer">Buyer</option><option value="seller">Seller (counter)</option></select></div>
+        <div class="field"><label>Amount</label><input name="amount" placeholder="e.g. 20L" required></div>
+        <div class="field"><label>Rent deposit</label><select name="deposit_treatment"><option value="">—</option><option value="included">Included</option><option value="buyer_pays_separately">Buyer pays separately</option></select></div>
+        <div class="field"><label>Stock</label><select name="stock_included"><option value="">—</option><option value="included">Included</option><option value="extra">Extra</option></select></div>
+        <div class="field"><label>Working capital</label><input name="working_capital" placeholder="optional"></div>
+        <div class="field"><label>Valid until</label><input type="date" name="valid_until"></div>
+        <div class="field full"><label>Financing / conditions</label><input name="financing" placeholder="e.g. Own funds; subject to landlord consent"></div>
+        <div class="field full"><input name="contingencies" placeholder="Other conditions (optional)"></div>
+        <div class="full"><button class="btn primary">Save offer</button> <span class="small muted">A response task is created for the other side's owner.</span></div>
+      </form></details>{% endif %}
+  </div>
+
+  <div class="card" id="diligence"><div class="card-h"><h2>Due diligence</h2><span class="small muted">{{ checklist|selectattr('status', 'in', ['reviewed','not_applicable'])|list|length }}/{{ checklist|length }} done</span></div>
+    <table class="small">{% for ch in checklist %}<tr><td>{{ ch.label }}</td><td>
+      <form method="post" action="{{ url_for('deals.check', deal_id=d.id) }}" class="inline">{{ csrf() }}<input type="hidden" name="item_key" value="{{ ch.key }}">
+        <select name="status">{% for v, l in D.CHECK_STATUSES %}<option value="{{ v }}" {{ 'selected' if ch.status == v }}>{{ l }}</option>{% endfor %}</select>
+        <input name="note" value="{{ ch.note or '' }}" placeholder="note"><button class="btn sm">Save</button></form></td></tr>{% endfor %}</table>
+    <p class="small muted">Tracking only — legal, tax and valuation checks are done by qualified professionals outside the platform.</p></div>
+
+  <div class="card"><h2>Timeline</h2>
+    <form method="post" action="{{ url_for('deals.note', deal_id=d.id) }}">{{ csrf() }}<div class="field"><textarea name="body" placeholder="Note. Use @firstname to bring someone in." required></textarea></div><button class="btn">Add note</button></form>
+    <ul class="timeline">{% for e in events %}<li><div>{% if e.event == 'stage' %}<strong>{{ D.STAGE_LABELS.get(e.from_stage, e.from_stage or '—') }} → {{ D.STAGE_LABELS.get(e.to_stage, e.to_stage) }}</strong>{% if e.body %}: {{ e.body }}{% endif %}{% else %}{{ e.body or e.event }}{% endif %}</div><div class="who">{{ e.actor_name or 'System' }} · {{ e.at|ist }}</div></li>{% endfor %}</ul></div>
+</div><div>
+  <div class="card"><h2>Move the deal</h2>
+    <form method="post" action="{{ url_for('deals.stage', deal_id=d.id) }}">{{ csrf() }}
+      <div class="field"><select name="to">{% for k, l in D.STAGES + D.OTHER if k != d.stage %}<option value="{{ k }}" {{ 'disabled' if blockers[k] and k != 'closed_lost' }}>{{ l }}{% if blockers[k] and k != 'closed_lost' %} — {{ blockers[k] }}{% endif %}</option>{% endfor %}</select></div>
+      <div class="field"><input name="note" placeholder="Note (optional)"></div>
+      <details class="disclose"><summary>If closing as lost</summary>
+        <div class="field"><select name="reason"><option value="">Reason…</option>{% for v, l in D.LOST_REASONS %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><textarea name="lessons" placeholder="What would we do differently?"></textarea></div></details>
+      <button class="btn">Update stage</button></form>
+    {% if not can_close %}<p class="small muted">Closing as won needs an approver.</p>{% endif %}</div>
+
+  <div class="card"><h2>Key dates</h2>
+    <form method="post" action="{{ url_for('deals.dates', deal_id=d.id) }}">{{ csrf() }}
+      <div class="field"><label>Agreement date</label><input type="date" name="agreement_date" value="{{ d.agreement_date or '' }}"></div>
+      <div class="field"><label>Handover date</label><input type="date" name="handover_date" value="{{ d.handover_date or '' }}"></div>
+      <button class="btn sm">Save dates</button></form></div>
+
+  <div class="card"><h2>Commercial</h2>
+    <p class="small"><span class="badge {{ 'ok' if 'recorded' in commercial else 'warn' }}">{{ commercial }}</span></p>
+    {% if can_finance %}<p class="small"><a href="{{ url_for('admin.finance') }}">Open Admin Finance →</a></p>{% else %}<p class="small muted">Salon Shastra's fees, invoices and collections are visible to Admin Finance only.</p>{% endif %}</div>
+
+  {% if shared %}<div class="card"><h2>Contact details exchanged</h2>
+    <h3>Given to the buyer</h3><table class="small">{% for k, v in shared.to_buyer.items() %}<tr><td class="muted">{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+    <h3>Given to the seller</h3><table class="small">{% for k, v in shared.to_seller.items() %}<tr><td class="muted">{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>{% endif %}
+
+  {% if d.stage in ('closed_lost','withdrawn') %}<div class="card"><h2>Why it ended</h2><p class="small"><strong>{{ d.closed_reason or '—' }}</strong></p><p class="small">{{ d.lessons }}</p></div>{% endif %}
+</div></div>
+{% endblock %}

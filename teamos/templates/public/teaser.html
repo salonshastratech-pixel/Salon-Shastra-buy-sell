@@ -1,0 +1,14 @@
+{% extends "public/layout.html" %}
+{% block title %}Confidential salon summary{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="small muted">CONFIDENTIAL · shared with you by Salon Shastra</div>
+  <h1>{{ c.headline }}</h1>
+  <table>{% for r in c.rows %}<tr><td class="muted">{{ r.label }}</td><td><strong>{{ r.value }}</strong></td></tr>{% endfor %}</table>
+  {% if c.highlights %}<h3>Highlights</h3><p>{{ c.highlights }}</p>{% endif %}
+</div>
+<div class="card small muted">
+  <p>The salon's identity, exact location and documents are shared only after both sides agree and Salon Shastra approves an introduction. Figures are as declared by the seller and are indicative only.</p>
+  <p>This summary is not an offer, a valuation or a guarantee of any return. Please speak to your Salon Shastra contact if you would like to know more. Link valid until {{ expires|ist('%d %b %Y') }}. Summary v{{ version }}.</p>
+</div>
+{% endblock %}

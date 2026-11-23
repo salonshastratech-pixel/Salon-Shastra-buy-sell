@@ -3,7 +3,8 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 
 from .. import audit
 from ..db import get_db
-from ..permissions import CAPABILITIES, MATRIX_VERSION, ROLE_CAPABILITIES, ROLE_LABELS
+from ..domain.errors import ValidationError
+from ..permissions import CAPABILITIES, MATRIX_VERSION, ROLE_CAPABILITIES, ROLE_LABELS, user_can
 from ..security import hash_password, require, revoke_user_sessions, validate_password_strength
 from ..timeutil import now_iso, parse_local_input
 
@@ -167,7 +168,30 @@ def resolve_duplicate(dup_id):
 @bp.route("/finance")
 @require("finance.view")
 def finance():
-    return render_template("admin/finance.html")
+    from ..domain import finance as FN
+    db = get_db()
+    return render_template("admin/finance.html", L=FN.ledger(db, g.user), FN=FN,
+                           can_edit=user_can(db, g.user, "finance.edit"), today=now_iso()[:10])
+
+
+@bp.route("/finance/<kind>", methods=["POST"])
+@require("finance.view")
+def finance_post(kind):
+    from ..domain import finance as FN
+    db = get_db()
+    fns = {"agreement": FN.add_agreement, "invoice": FN.add_invoice, "receipt": FN.add_receipt,
+           "expense": FN.add_expense}
+    try:
+        if kind == "earned":
+            FN.mark_earned(db, g.user, int(request.form.get("agreement_id") or 0))
+        elif kind in fns:
+            fns[kind](db, g.user, request.form.to_dict())
+        else:
+            abort(404)
+        flash("Saved to the finance ledger.", "ok")
+    except ValidationError as e:
+        flash(" ".join(str(v) for v in e.errors.values()), "error")
+    return redirect(url_for("admin.finance"))
 
 
 @bp.route("/users/<int:user_id>/reset-mfa", methods=["POST"])

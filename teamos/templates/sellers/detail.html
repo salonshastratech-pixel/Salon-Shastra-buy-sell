@@ -16,7 +16,7 @@
 </div>
 
 <nav class="tabs">
-  {% for k, l in [('overview','Overview'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('matches','Matches'),('history','History')] %}
+  {% for k, l in [('overview','Overview'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('matches','Matches'),('teaser','Teaser'),('history','History')] %}
   <a href="{{ url_for('sellers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
 </nav>
 
@@ -246,6 +246,9 @@
 
 {% elif tab == 'matches' %}
 {% include "matches/_record_list.html" %}
+
+{% elif tab == 'teaser' %}
+{% include "deals/_teaser_tab.html" %}
 
 {% elif tab == 'history' %}
 <div class="grid g2">

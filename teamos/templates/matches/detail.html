@@ -89,7 +89,7 @@
         <input name="note" placeholder="Who confirmed interest?" required><button class="btn primary">Record interest</button></form>{% endif %}
       {% if c.suppressed or c.stage == 'on_hold' %}<form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}<input type="hidden" name="to" value="suggested"><button class="btn">Reopen</button></form>{% endif %}
     </div>
-    {% if c.stage in ('approved_to_approach', 'interest_confirmed') %}<p class="small muted">{{ M.FUTURE_STAGES }}.</p>{% endif %}
+    {% if c.stage in ('approved_to_approach', 'interest_confirmed') %}<p class="small muted">Next: share the approved teaser, confirm interest, then request the introduction below.</p>{% endif %}
     {% if not c.suppressed %}
     <details class="disclose"><summary>Not suitable / declined</summary>
       <form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}
@@ -105,6 +105,8 @@
         <div class="field"><input name="note" placeholder="Why?"></div><div class="field"><label>Revisit on</label><input type="datetime-local" name="revisit_on"></div><button class="btn">Hold</button></form></details>
     {% else %}<p class="small">Marked <strong>{{ M.STAGES[c.stage]|lower }}</strong>{% if c.suppressed_reason %} ({{ dict(M.REJECT_REASONS).get(c.suppressed_reason) }}){% endif %}{% if c.suppressed_note %}: {{ c.suppressed_note }}{% endif %}.{% if c.revisit_on %} Revisit {{ c.revisit_on|ist('%d %b %Y') }}.{% endif %}</p>{% endif %}
   </div>
+
+  {% include "deals/_intro_card.html" %}
 
   <div class="card">
     <h2>Team</h2>

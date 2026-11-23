@@ -1,7 +1,7 @@
 # Salon Shastra TeamOS — Business Exchange, Match Desk & Team Command Center
 
 Internal operating platform for Salon Shastra's salon buy–sell team. Milestone 1: foundation, access control and
-seller management; Milestone 2: production hardening; Milestone 3: buyer / investor management; Milestone 4: forms & data requests; **Milestone 5: matching engine + Match Desk**. See `docs/` for
+seller management; Milestone 2: production hardening; Milestone 3: buyer / investor management; Milestone 4: forms & data requests; Milestone 5: matching engine + Match Desk; **Milestone 6: teasers, introductions, deals & admin finance**. See `docs/` for
 architecture, roadmap, decisions and feature status.
 
 ## Run locally (5 minutes)
@@ -25,6 +25,11 @@ In development you can switch off two-step sign-in for the demo admin with `expo
 (empty). Production always enforces it for Super Admin and Finance.
 
 Try **Spreadsheet import** as `lead@` with `docs/samples/sample_seller_leads.csv`.
+
+Deals (M6): from a match that is approved to approach, share the salon's approved anonymous teaser (seller's
+*Teaser* tab), record both sides' consent, request the introduction — an approver releases contact details and the
+**Deals** room opens (visits, versioned offers, due diligence, closing). **Admin Finance** holds fees, invoices,
+receipts and expenses; sale prices are never counted as company revenue.
 
 Matching (M5): open **Match Desk** for ranked buyer↔salon matches with the reasons and next steps, or the
 *Matches* tab on any buyer or salon. Each record also shows its *Biggest unlock* — the questions holding up the

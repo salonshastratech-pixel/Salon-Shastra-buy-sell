@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Deals{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Deals</h1><div class="sub">Introduced buyer–salon pairs moving through visits, offers, diligence and handover.</div></div></div>
+<div class="inline small queue-tabs">{% for k, l in [('open','Open'),('won','Closed won'),('lost','Lost / withdrawn'),('all','All')] %}
+  <a class="btn sm {{ 'primary' if view == k }}" href="{{ url_for('deals.index', view=k) }}">{{ l }}</a>{% endfor %}</div>
+
+{% if pending %}<div class="card"><div class="card-h"><h2>Introductions waiting for approval</h2><span class="badge warn">{{ pending|length }}</span></div>
+  <ul class="tasks">{% for i in pending %}<li class="task"><div><div class="t small"><a href="{{ url_for('matches.detail', cid=i.match_id) }}#intro">{{ i.buyer_ref }} ↔ {{ i.seller_ref }}</a></div><div class="meta">requested {{ i.requested_at|rel }}</div></div></li>{% endfor %}</ul></div>{% endif %}
+
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Deal</th><th>Buyer ↔ Salon</th><th>Stage</th><th>Owner</th><th>Next</th><th>Updated</th></tr>
+{% for d in rows %}<tr class="row-link">
+  <td><a href="{{ url_for('deals.detail', deal_id=d.id) }}"><strong>{{ d.ref_code }}</strong></a>{% if d.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
+  <td>{{ d.buyer_name }} <span class="muted">↔</span> {{ d.salon_name }}<div class="small muted">{{ d.buyer_ref }} · {{ d.seller_ref }} · {{ d.salon_locality }}</div></td>
+  <td><span class="badge {{ 'ok' if d.stage == 'closed_won' else 'bad' if d.stage in ('closed_lost','withdrawn') else 'info' }}">{{ D.STAGE_LABELS[d.stage] }}</span></td>
+  <td>{{ d.owner_name or '—' }}</td>
+  <td class="small">{% if d.next %}{{ d.next.title }}<div class="muted">{{ d.next.due_at|rel }}</div>{% else %}—{% endif %}</td>
+  <td class="small muted">{{ d.updated_at|rel }}</td></tr>
+{% else %}<tr><td colspan="6" class="empty">No deals here yet. Deals open when an introduction is approved on the Match Desk.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

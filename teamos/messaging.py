@@ -16,6 +16,8 @@ PROVIDER_LABEL = "TEST-ONLY mock WhatsApp provider — no message leaves this se
 TEMPLATES = {
     "deep_form_link": "Hello {name}, this is {sender} from Salon Shastra. As discussed, please share your details "
                       "securely using this personal link: {link} . It expires on {expires}. Reply STOP to opt out.",
+    "teaser_share": "Hello {name}, this is {sender} from Salon Shastra. Here is a confidential summary of a salon that may "
+                    "fit your requirements: {link} (valid till {expires}). Reply STOP to opt out.",
     "targeted_request": "Hello {name}, this is {sender} from Salon Shastra. To move forward we need a few specific "
                         "details. Please use this personal link: {link} (expires {expires}). Reply STOP to opt out.",
 }

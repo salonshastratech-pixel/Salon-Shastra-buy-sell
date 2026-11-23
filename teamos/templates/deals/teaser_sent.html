@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Teaser shared{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Teaser link created</h1><div class="sub">Anonymous summary only — no name, address or contact details.</div></div></div>
+<div class="card"><h2>The link</h2>
+  <p class="small">Shown once. Valid for 14 days. Opening it is recorded on the match.</p>
+  <div class="link-box">{{ link }}</div></div>
+{% if comm %}<div class="card"><h2>WhatsApp message</h2><p><span class="badge warn">{{ MOCK_LABEL }}</span></p>
+  <p class="small">Status: <strong>{{ comm.status|replace('_',' ') }}</strong> · message ID <span class="mono">{{ comm.provider_message_id }}</span></p>
+  <div class="link-box">{{ comm.body }}</div></div>{% endif %}
+<p><a class="btn primary" href="{{ url_for('matches.detail', cid=cid) }}#intro">Back to the match</a></p>
+{% endblock %}

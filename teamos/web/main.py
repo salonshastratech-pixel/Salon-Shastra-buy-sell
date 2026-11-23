@@ -158,7 +158,7 @@ def dictionary():
 @bp.route("/planned/<module>")
 @login_required
 def planned(module):
-    shipped = {"buyers": "buyers.index", "forms": "forms.inbox", "match": "matches.desk"}  # M3, M4, M5
+    shipped = {"buyers": "buyers.index", "forms": "forms.inbox", "match": "matches.desk", "deals": "deals.index"}
     if module in shipped:
         return redirect(url_for(shipped[module]))
     names = {"match": ("Match Desk", "Milestone 5"),

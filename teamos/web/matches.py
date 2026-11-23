@@ -97,7 +97,22 @@ def detail(cid):
     snaps = db.all("SELECT id, trigger, rules_version, buyer_version, seller_version, computed_at FROM match_snapshots "
                    "WHERE candidate_id = ? ORDER BY id DESC LIMIT 10", (cid,))
     questions = r.get("questions", [])
-    return render_template("matches/detail.html", c=c, r=r, families=families, events=events, snaps=snaps,
+    from ..domain import teasers as TZ
+    intro_ctx = {
+        "teaser": TZ.approved_teaser(db, c["seller_opp_id"]),
+        "shares": db.all("SELECT s.*, u.full_name AS by_name FROM teaser_shares s LEFT JOIN users u ON u.id = s.shared_by "
+                         "WHERE match_id = ? ORDER BY s.id DESC", (cid,)),
+        "intro": db.one("SELECT i.*, u.full_name AS requested_name, d.full_name AS decided_name FROM introductions i "
+                        "LEFT JOIN users u ON u.id = i.requested_by LEFT JOIN users d ON d.id = i.decided_by "
+                        "WHERE match_id = ? ORDER BY i.id DESC LIMIT 1", (cid,)),
+        "intro_blockers": TZ.intro_blockers(db, cid) if c["stage"] in ("approved_to_approach", "interest_confirmed") else [],
+        "identity": {side: TZ._latest_consent(db, db.scalar("SELECT contact_id FROM opportunities WHERE id = ?", (oid,)),
+                                              "share_identity")
+                     for side, oid in (("buyer", c["buyer_opp_id"]), ("seller", c["seller_opp_id"]))},
+        "deal": db.one("SELECT id, ref_code, stage FROM deals WHERE match_id = ?", (cid,)),
+        "can_intro": user_can(db, g.user, "listing.approve"),
+    }
+    return render_template("matches/detail.html", **intro_ctx, c=c, r=r, families=families, events=events, snaps=snaps,
                            buyer_q=[q for q in questions if q["side"] == "buyer"],
                            seller_q=[q for q in questions if q["side"] == "seller"],
                            tasks=M.subtask_progress(db, cid), users=_active_users(db), M=M,

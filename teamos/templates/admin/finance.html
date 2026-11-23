@@ -1,8 +1,82 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}Admin Finance{% endblock %}
 {% block content %}
-<div class="ph"><div><h1>Admin Finance</h1><div class="sub">Salon Shastra's own fees, invoices, collections and costs.</div></div></div>
-<div class="card"><p><strong>Access boundary: built and enforced.</strong> Only roles with <span class="mono">finance.view</span> reach this page; every other attempt — including crafted requests — is denied server-side and written to the audit log.</p>
-<p><strong>Ledger: planned for Milestone 6</strong> (fee agreements, earning triggers, invoices, receipts, outstanding balances). Fee rules, payer and tax treatment are open founder/accountant decisions (D-03 to D-05), so nothing is pre-configured.</p>
-<p class="muted small">Sale consideration belongs to the parties and will never be counted as company revenue.</p></div>
+<div class="ph"><div><h1>Admin Finance</h1><div class="sub">Salon Shastra's own fees, invoices, collections and costs. Visible only to Admin and Finance.</div></div></div>
+
+<div class="grid g4">
+  <div class="stat"><div class="n">{{ L.totals.earned|inr }}</div><div class="l">Fees earned</div></div>
+  <div class="stat"><div class="n">{{ L.totals.received|inr }}</div><div class="l">Fees received</div></div>
+  <div class="stat {{ 'bad' if L.totals.due }}"><div class="n">{{ L.totals.due|inr }}</div><div class="l">Due (earned − received, before tax)</div></div>
+  <div class="stat"><div class="n">{{ L.totals.expenses|inr }}</div><div class="l">Recorded expenses</div></div>
+</div>
+<p class="small muted">Company revenue = fees only. Closed deals moved {{ L.totals.consideration_closed|inr }} between buyers and sellers — that money belongs to the parties and is <strong>never</strong> Salon Shastra revenue. Contracted fees (incl. not yet earned): {{ L.totals.contractual|inr }}. Tax is shown only where a rate is entered on an invoice (tax treatment D-05 is open).</p>
+
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Fee agreements</h2></div><div class="table-wrap"><table class="small">
+  <tr><th>Deal</th><th>Payer · type</th><th>Terms</th><th class="right">Contractual</th><th>Earned when</th><th class="right">Earned</th><th class="right">Invoiced</th><th class="right">Received</th><th class="right">Due</th></tr>
+  {% for a in L.rows %}<tr class="{{ 'muted' if a.status != 'active' }}">
+    <td><strong>{{ a.deal_ref or '—' }}</strong><div class="muted">{{ (a.deal_stage or '')|replace('_',' ') }}</div></td>
+    <td>{{ dict(FN.PAYERS)[a.payer] }} · {{ dict(FN.FEE_TYPES)[a.fee_type] }}<div class="muted">v{{ a.version }}{% if a.status != 'active' %} · {{ a.status }}{% endif %}{% if a.agreement_ref %} · {{ a.agreement_ref }}{% endif %}</div></td>
+    <td>{% if a.basis == 'fixed' %}Fixed {{ a.fixed_amount|inr }}{% else %}{{ a.rate_pct }}% of {{ a.calc.basis_amount|inr if a.calc.basis_amount is not none else 'agreed price (not set yet)' }}{% endif %}</td>
+    <td class="right nowrap">{{ a.calc.contractual|inr if a.calc.contractual is not none else '—' }}</td>
+    <td>{{ dict(FN.EARNING)[a.earning_condition] }}{% if a.calc.earned_condition_met %} <span class="badge ok">met</span>{% else %} <span class="badge grey">not yet</span>{% endif %}
+      {% if a.earning_condition == 'manual' and not a.earned_manually_at and can_edit and a.status == 'active' %}<form method="post" action="{{ url_for('admin.finance_post', kind='earned') }}" class="inline">{{ csrf() }}<input type="hidden" name="agreement_id" value="{{ a.id }}"><button class="btn sm">Mark earned</button></form>{% endif %}</td>
+    <td class="right nowrap">{{ a.calc.earned|inr }}</td><td class="right nowrap">{{ a.invoiced|inr }}</td><td class="right nowrap">{{ a.received|inr }}</td>
+    <td class="right nowrap"><strong>{{ a.calc.due|inr }}</strong>{% if a.calc.unearned_received %}<div class="unknown">{{ a.calc.unearned_received|inr }} received before earned</div>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="9" class="empty">No fee agreements yet.</td></tr>{% endfor %}
+</table></div></div>
+
+{% if can_edit %}
+<div class="split"><div>
+  <form method="post" action="{{ url_for('admin.finance_post', kind='agreement') }}" class="card">{{ csrf() }}
+    <h2>Record a fee agreement</h2>
+    <p class="small muted">Enter the terms actually agreed for this deal — there is no default fee policy. Changing terms later creates a new version; the old one is kept.</p>
+    <div class="form-grid">
+      <div class="field"><label>Deal</label><select name="deal_id" required><option value="">Choose…</option>{% for d in L.deals %}<option value="{{ d.id }}">{{ d.ref_code }} · {{ d.stage|replace('_',' ') }}{% if d.agreed_consideration %} · {{ d.agreed_consideration|inr }}{% endif %}</option>{% endfor %}</select></div>
+      <div class="field"><label>Who pays</label><select name="payer">{% for v, l in FN.PAYERS %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Fee type</label><select name="fee_type">{% for v, l in FN.FEE_TYPES %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Basis</label><select name="basis"><option value="percent">% of agreed sale price</option><option value="fixed">Fixed amount</option></select></div>
+      <div class="field"><label>Rate %</label><input name="rate_pct" placeholder="e.g. 5"></div>
+      <div class="field"><label>Fixed amount</label><input name="fixed_amount" placeholder="e.g. 50000"></div>
+      <div class="field"><label>Earned</label><select name="earning_condition">{% for v, l in FN.EARNING %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Agreement reference</label><input name="agreement_ref" placeholder="e.g. engagement letter no."></div>
+      <div class="field full"><input name="note" placeholder="Note"></div>
+    </div><button class="btn primary">Save agreement</button></form>
+  <form method="post" action="{{ url_for('admin.finance_post', kind='expense') }}" class="card">{{ csrf() }}
+    <h2>Record an expense</h2><div class="form-grid">
+      <div class="field"><label>Category</label><select name="category">{% for cat in FN.EXPENSE_CATEGORIES %}<option>{{ cat }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Amount</label><input name="amount" required></div>
+      <div class="field"><label>Date</label><input type="date" name="spent_on" value="{{ today }}"></div>
+      <div class="field"><label>Deal (optional)</label><select name="deal_id"><option value="">—</option>{% for d in L.deals %}<option value="{{ d.id }}">{{ d.ref_code }}</option>{% endfor %}</select></div>
+      <div class="field full"><input name="note" placeholder="Note"></div></div><button class="btn">Save expense</button></form>
+</div><div>
+  <form method="post" action="{{ url_for('admin.finance_post', kind='invoice') }}" class="card">{{ csrf() }}
+    <h2>Record an invoice</h2>
+    <div class="field"><label>Agreement</label><select name="agreement_id" required>{% for a in L.rows if a.status == 'active' %}<option value="{{ a.id }}">{{ a.deal_ref }} · {{ a.payer }} · {{ a.fee_type }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Invoice no.</label><input name="invoice_no" required></div>
+    <div class="field"><label>Amount before tax</label><input name="amount" required></div>
+    <div class="field"><label>Tax % (leave blank until the accountant confirms)</label><input name="tax_pct"></div>
+    <div class="field"><label>Issued on</label><input type="date" name="issued_on" value="{{ today }}"></div>
+    <button class="btn">Save invoice</button></form>
+  <form method="post" action="{{ url_for('admin.finance_post', kind='receipt') }}" class="card">{{ csrf() }}
+    <h2>Record a payment received</h2>
+    <div class="field"><label>Agreement</label><select name="agreement_id" required>{% for a in L.rows if a.status == 'active' %}<option value="{{ a.id }}">{{ a.deal_ref }} · {{ a.payer }} · {{ a.fee_type }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Amount</label><input name="amount" required></div>
+    <div class="field"><label>Received on</label><input type="date" name="received_on" value="{{ today }}"></div>
+    <div class="field"><label>Mode / reference</label><input name="mode" placeholder="UPI / NEFT / cheque"> <input name="reference" placeholder="Txn ref"></div>
+    <button class="btn">Save receipt</button></form>
+</div></div>
+{% endif %}
+
+<div class="split"><div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Receipts</h2></div><div class="table-wrap"><table class="small">
+    <tr><th>Date</th><th>Deal</th><th>Payer</th><th class="right">Amount</th><th>Mode / ref</th></tr>
+    {% for r in L.receipts %}<tr><td>{{ r.received_on }}</td><td>{{ r.deal_ref }}</td><td>{{ r.payer }}</td><td class="right">{{ r.amount|inr }}</td><td>{{ r.mode or '' }} {{ r.reference or '' }}</td></tr>{% else %}<tr><td colspan="5" class="empty">None.</td></tr>{% endfor %}</table></div></div>
+</div><div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Invoices</h2></div><div class="table-wrap"><table class="small">
+    <tr><th>No.</th><th>Deal</th><th class="right">Amount</th><th class="right">Tax</th><th>Issued</th></tr>
+    {% for i in L.invoices %}<tr><td>{{ i.invoice_no }}</td><td>{{ i.deal_ref }}</td><td class="right">{{ i.amount|inr }}</td><td class="right">{{ i.tax_amount|inr if i.tax_amount is not none else 'not set' }}</td><td>{{ i.issued_on }}</td></tr>{% else %}<tr><td colspan="5" class="empty">None.</td></tr>{% endfor %}</table></div></div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Expenses</h2></div><div class="table-wrap"><table class="small">
+    {% for e in L.expenses %}<tr><td>{{ e.spent_on }}</td><td>{{ e.category }}</td><td>{{ e.deal_ref or '' }}</td><td class="right">{{ e.amount|inr }}</td></tr>{% else %}<tr><td class="empty">None.</td></tr>{% endfor %}</table></div></div>
+</div></div>
+<p class="small muted">Every change here is audited. Ordinary staff see only "commercial verification pending / terms recorded" on a deal — never amounts.</p>
 {% endblock %}

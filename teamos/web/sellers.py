@@ -127,6 +127,10 @@ def detail(opp_id):
     )
     from .forms import record_context
     ctx.update(record_context(db, g.user, opp))
+    if tab == "teaser":
+        from ..domain import teasers as TZ
+        ctx.update(teasers=TZ.teasers_for(db, opp_id), TZ=TZ,
+                   teaser_preview=TZ.build_content(db, opp_id, list(TZ.TEASER_FIELDS), "", ""))
     if tab in ("overview", "matches"):
         from ..domain import matching as MM
         from .matches import record_matches

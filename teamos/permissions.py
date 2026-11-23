@@ -30,6 +30,7 @@ CAPABILITIES = {
     "users.manage": "Create, deactivate users and grant capabilities",
     "audit.view": "View the audit log",
     "finance.view": "View Salon Shastra fees, invoices, collections and costs",
+    "finance.edit": "Record fee agreements, invoices, receipts and company expenses",
     "settings.manage": "Change integrations, secrets and global settings",
     "export.restricted": "Export restricted data",
 }
@@ -41,7 +42,7 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
     "team_lead": _TEAM_BASE | {"crm.assign", "evidence.review", "crm.import"},
     "team_member": set(_TEAM_BASE),
     # Finance specialist: no operational CRM by default ("limited deal references" arrive with Deals milestone).
-    "finance": {"finance.view"},
+    "finance": {"finance.view", "finance.edit"},
 }
 
 ROLE_LABELS = {

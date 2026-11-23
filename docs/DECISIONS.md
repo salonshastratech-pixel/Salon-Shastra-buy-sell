@@ -71,3 +71,13 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-36 | Suppression | Declined / not suitable needs a reason; resurfaces only on changed facts or a revisit date. | Team lead | Proposed |
 | D-37 | Strong-match alert | One internal alert to the buyer and salon owners when a match first reaches fit ≥ 70 with ≥ 60% known (ready or near). Never sent to customers. | Team lead | Proposed |
 | D-38 | City mismatch | Different city is a hard conflict unless the buyer said they would relocate (then a partial fit). | Founder | **Approved 23 Nov 2026** |
+
+## Added in Milestone 6 (proposals — configurable, pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-11 | Teaser fields before NDA | Whitelist in `teamos/domain/teasers.py` (`TEASER_FIELDS`); money and size shown as bands; the seller approves each version's items. No NDA step is built — say if one is required before identity release. | Founder | **Needs decision** (proposal built) |
+| D-39 | Who approves introductions | Super Admin (or anyone granted `listing.approve`), only with both sides' identity consent and a shared teaser. | Founder | Proposed |
+| D-40 | Finance specialist rights | View and edit fee agreements, invoices, receipts and expenses; no access to the CRM deal room (sees deal references only). | Founder | Proposed |
+| D-41 | Closing a deal as won | Approver only; accepted offer, all diligence items reviewed / not applicable, handover date recorded. | Founder | Proposed |
+| D-42 | Fee earning | Each agreement states when it is earned (signing / agreement / handover / closing / manual). The demo's "5% seller success fee on closing" is an illustration only, not a policy (D-03, D-04 still open). | Founder / accountant | Proposed |
