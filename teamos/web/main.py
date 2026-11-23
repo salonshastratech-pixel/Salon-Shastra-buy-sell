@@ -108,11 +108,10 @@ def team_board():
                          "OR o.stage IN ('form_received','funding_review')) ORDER BY o.updated_at")
     dup_open = db.scalar("SELECT COUNT(*) FROM duplicate_reviews WHERE status = 'open'")
     from ..domain import matching as MM
-    match_counts = {k: db.scalar("SELECT COUNT(*) FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
-                                 "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + MM.ACTIVE_WHERE +
-                                 f" AND ({MM.QUEUES[k][1]})") for k in ("new", "info", "near", "consent", "ready", "stale")}
-    top_matches = db.all(MM.CAND_SELECT + "WHERE " + MM.ACTIVE_WHERE + " AND mc.suppressed = 0 AND mc.outcome IN "
-                         "('ready','near') ORDER BY mc.rank_score DESC LIMIT 5")
+    allq = MM.queue_counts(db)
+    match_counts = {k: allq[k] for k in ("new", "info", "near", "consent", "ready", "stale")}
+    top_matches = MM.attach_open_tasks(db, db.all(MM.CAND_SELECT_LIGHT + "WHERE " + MM.ACTIVE_WHERE + " AND mc.suppressed = 0 "
+                                                  "AND mc.outcome IN ('ready','near') ORDER BY mc.rank_score DESC LIMIT 5"))
     return render_template("team.html", users=users, overdue=overdue, due_today=due_today, later=later,
                            exceptions=exceptions, unowned=unowned, review_queue=review_queue, buyer_queue=buyer_queue, dup_open=dup_open,
                            match_counts=match_counts, top_matches=top_matches, MQ=MM.QUEUES,

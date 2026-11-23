@@ -1,3 +1,38 @@
+# QA report — load test: 100 sellers + 100 buyers through every module (23 Nov 2026, v0.7.5)
+
+`scripts/qa/load_and_sweep.py` copies the demo database, signs in as each role and creates 100 synthetic sellers and
+100 synthetic buyers **through the real screens**, then exercises every module:
+
+* Sellers: create (incl. a deliberate duplicate), 11 intake sections, monthly financials, SWOT, calls with next
+  actions, notes, checklist → review → listing approval for 40 salons.
+* Buyers: create, 6 requirement sections with importance, salon-type/floor/area preferences, ranked areas, funding
+  review, criteria confirmation, calls.
+* Forms: 20 personal detailed forms sent, answered by "customers" on the public link, reviewed and applied.
+* Matching: full recompute (8,230 pairs in ~15 s), every Match Desk queue, match pages, shortlist, split tasks,
+  "ask buyer", notes, decline with reason.
+* Deals: approach → teaser (create, seller approval, approval) → share link opened → both consents → introduction →
+  deal room → visit → offer → accepted → diligence → dates → closed won (and one closed lost); fee agreement, invoice,
+  receipt, expense.
+* WhatsApp: conversations started, quick messages, inbound simulations, replies, hand-overs, STOP, unknown number,
+  batch draft → approve → send.
+* Tasks (complete with next step), My Day for every role, Team, search, reports (today/week/month), digest, every
+  admin page, smart import of a generated workbook (20 new + 10 existing people), background jobs.
+
+**Result: 3,206 actions, 0 crashes, 0 pages slower than 1.5 s; crawl of 2,447 pages across 5 roles on the loaded
+data: 0 errors.** The 42 remaining refusals are correct validations (an area already in the buyer's list, a form not
+sent without recorded consent, a reviewer-only field ignored).
+
+Fixed during the load test:
+* Match Desk took ~1.8 s with 8,000+ pairs → 0.3–0.5 s: queue counts in one pass instead of 14 queries, open-task
+  counts only for the rows shown, the staleness check at most once a minute (the background job still runs it).
+  The desk also accepts `?q=` as well as `?queue=`.
+* Team Command Center 1.1 s → 0.25 s (same techniques; the "Later" list shows the next 100 with a link to all tasks).
+* Seller financial notes ("figures are seller-declared") were shown in red as errors → now an amber warning.
+* "Ask the buyer/seller" on a match failed with "Pick at least one question" when the open questions need a call →
+  it now says which questions to ask on a call.
+
+---
+
 # QA report — after Milestone 7 (23 Nov 2026, v0.7.0)
 
 Re-run of every check below on the Milestone 7 build, with the new WhatsApp, batch, report and admin pages added.

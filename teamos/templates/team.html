@@ -20,7 +20,8 @@
     <div class="card"><div class="card-h"><h2>Due today</h2><span class="badge">{{ due_today|length }}</span></div>
       <ul class="tasks">{% for t in due_today %}{{ task_item(t, show_assignee=true) }}{% else %}<li class="empty">Nothing else due today.</li>{% endfor %}</ul></div>
     <details class="card disclose"><summary>Later ({{ later|length }})</summary>
-      <ul class="tasks">{% for t in later %}{{ task_item(t, show_assignee=true) }}{% endfor %}</ul></details>
+      <ul class="tasks">{% for t in later[:100] %}{{ task_item(t, show_assignee=true) }}{% endfor %}</ul>
+      {% if later|length > 100 %}<p class="small muted">Showing the next 100 — <a href="{{ url_for('tasks.index', view='all') }}">see all open tasks</a>.</p>{% endif %}</details>
   </div>
   <div>
     <div class="card"><div class="card-h"><h2>Exceptions: no next action</h2><span class="badge {{ 'bad' if exceptions else 'ok' }}">{{ exceptions|length }}</span></div>

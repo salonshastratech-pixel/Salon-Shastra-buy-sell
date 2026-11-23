@@ -184,7 +184,7 @@
       <td><span class="badge grey">{{ SF.EVIDENCE_LABELS.get(r.evidence_status, r.evidence_status) }}</span></td><td class="small">{{ r.source }}</td></tr>
     {% else %}<tr><td colspan="7" class="empty">No monthly figures yet.</td></tr>{% endfor %}
   </table></div></div>
-  {% for w in fin.warnings %}<div class="flash error">{{ w }}</div>{% endfor %}
+  {% for w in fin.warnings %}<div class="flash warn">{{ w }}</div>{% endfor %}
 </div><div>
   <div class="card"><h2>Summary</h2>
     <div class="stat"><div class="n">{{ fin.avg_reported_surplus|inr if fin.avg_reported_surplus is not none else '—' }}</div><div class="l">Average reported operating surplus / month ({{ fin.months_complete }} complete month(s))</div></div>

@@ -1,3 +1,11 @@
+# v0.7.5 — load-tested with 100 sellers + 100 buyers (23 Nov 2026)
+
+Every module was exercised with 200 synthetic people created through the screens: 3,206 actions, 0 crashes, no slow
+pages; see `docs/QA_REPORT.md`. Speed fixes for the Match Desk and Team Command Center; clearer financial warnings and
+"ask on a call" messages. Regression tests in `tests/test_load_fixes.py`.
+
+---
+
 # Milestone 7.4 — smart import from Google Sheets / Excel, tested on real pilot data (23 Nov 2026, v0.7.4)
 
 | Area | Status | Evidence |

@@ -722,6 +722,41 @@ def refresh(db, buyer_id: int | None = None, seller_id: int | None = None, force
     return stats
 
 
+_LAST_STALE_CHECK = {"at": 0.0, "n": 0}
+
+
+def mark_stale_throttled(db, every_seconds: int = 60) -> int:
+    """Pages call this; the full check runs at most once a minute per process (jobs run it too)."""
+    import time as _t
+    if _t.time() - _LAST_STALE_CHECK["at"] < every_seconds:
+        return _LAST_STALE_CHECK["n"]
+    n = mark_stale(db)
+    _LAST_STALE_CHECK.update(at=_t.time(), n=n)
+    return n
+
+
+def queue_counts(db, extra_where: str = "", params: list | None = None) -> dict:
+    """All queue counts in ONE pass over the candidates."""
+    sums = ", ".join(f"SUM(CASE WHEN ({cond}) THEN 1 ELSE 0 END) AS q_{k}" for k, (_l, cond) in QUEUES.items())
+    row = db.one("SELECT " + sums + " FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
+                 "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + ACTIVE_WHERE + extra_where, params or [])
+    return {k: (row[f"q_{k}"] or 0) if row else 0 for k in QUEUES}
+
+
+def attach_open_tasks(db, rows: list[dict]) -> list[dict]:
+    """Open sub-task counts for just the rows shown (instead of a sub-query per candidate)."""
+    ids = [r["id"] for r in rows]
+    counts = {}
+    if ids:
+        for r in db.all("SELECT p.entity_id AS cid, COUNT(*) AS n FROM tasks t JOIN tasks p ON p.id = t.parent_task_id "
+                        "WHERE t.status = 'open' AND p.entity_type = 'match' AND p.entity_id IN (%s) GROUP BY p.entity_id"
+                        % ",".join("?" * len(ids)), ids):
+            counts[r["cid"]] = r["n"]
+    for r in rows:
+        r["open_tasks"] = counts.get(r["id"], 0)
+    return rows
+
+
 def mark_stale(db) -> int:
     """Flag candidates whose inputs changed since evaluation (UAT-14). Cheap: fingerprints only."""
     n = 0
@@ -959,3 +994,10 @@ def set_owner(db, actor, cid: int, user_id: int | None) -> None:
         if u and u["id"] != actor["id"]:
             T.notify(db, u["id"], "assignment", f"You are co-ordinating match {c['buyer_ref']} ↔ {c['seller_ref']}",
                      f"/matches/{cid}")
+
+
+# The desk lists up to 200 rows: the open-task count is attached afterwards for just those rows.
+CAND_SELECT_LIGHT = CAND_SELECT.replace(
+    "(SELECT COUNT(*) FROM tasks t WHERE t.status = 'open' AND t.parent_task_id IN "
+    " (SELECT id FROM tasks p WHERE p.entity_type = 'match' AND p.entity_id = mc.id)) AS open_tasks ", "0 AS open_tasks ")
+assert CAND_SELECT_LIGHT != CAND_SELECT

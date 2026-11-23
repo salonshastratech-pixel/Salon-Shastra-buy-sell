@@ -22,6 +22,10 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Load test (any time)
+`python -I scripts/qa/load_and_sweep.py . instance/qa-load.db` — copies the demo database, creates 100 synthetic
+sellers and buyers through the screens, exercises every module and prints crashes, refused actions and slow pages.
+
 ## Milestone 7.4 — smart import from sheets
 * **Imports → Smart import**: upload an Excel/CSV file or paste a Google Sheets link; check the preview (tabs, what was
   understood, what was left out and why), then **Import now**.

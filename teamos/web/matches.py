@@ -22,8 +22,8 @@ def _msg(e: ValidationError) -> str:
 @require("crm.view")
 def desk():
     db = get_db()
-    stale = M.mark_stale(db)
-    queue = request.args.get("queue") or "new"
+    stale = M.mark_stale_throttled(db)
+    queue = request.args.get("queue") or request.args.get("q") or "new"
     if queue not in M.QUEUES:
         queue = "new"
     buyer = request.args.get("buyer") or ""
@@ -43,17 +43,11 @@ def desk():
     if min_fit.isdigit():
         where.append("mc.fit_score >= ?")
         params.append(int(min_fit))
-    rows = db.all(M.CAND_SELECT + "WHERE " + " AND ".join(f"({w})" for w in where) +
+    rows = db.all(M.CAND_SELECT_LIGHT + "WHERE " + " AND ".join(f"({w})" for w in where) +
                   " ORDER BY mc.rank_score DESC LIMIT 200", params)
-    counts = {}
-    for k, (_label, cond) in M.QUEUES.items():
-        extra, p = "", []
-        if mine:
-            extra = " AND (bo.primary_owner_id = ? OR so.primary_owner_id = ? OR mc.match_owner_id = ?)"
-            p = [g.user["id"]] * 3
-        counts[k] = db.scalar("SELECT COUNT(*) FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
-                              "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + M.ACTIVE_WHERE +
-                              f" AND ({cond})" + extra, p)
+    M.attach_open_tasks(db, rows)
+    counts = M.queue_counts(db, " AND (bo.primary_owner_id = ? OR so.primary_owner_id = ? OR mc.match_owner_id = ?)"
+                            if mine else "", [g.user["id"]] * 3 if mine else [])
     buyers = db.all("SELECT o.id, o.ref_code, c.full_name FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
                     "WHERE o.kind = 'buyer' AND o.status = 'active' ORDER BY o.ref_code")
     sellers = db.all("SELECT o.id, o.ref_code, b.name FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id "
@@ -168,6 +162,10 @@ def ask(cid, side):
     if request.form.getlist("fields"):
         fields = [k for k in request.form.getlist("fields") if k in fields]
     opp_id = c["buyer_opp_id"] if side == "buyer" else c["seller_opp_id"]
+    if not fields:
+        talk = "; ".join(q["text"] for q in questions[:4]) or "nothing is open on this side"
+        flash(f"Nothing for the {side} can go in a form here — these need a quick call: {talk}.", "warn")
+        return _back(cid)
     base = __import__("teamos.messaging", fromlist=["public_base"]).public_base(request)
     try:
         res = F.create_invitation(db, g.user, opp_id, "targeted", request.form.get("channel") or "copy_link", fields, [],
