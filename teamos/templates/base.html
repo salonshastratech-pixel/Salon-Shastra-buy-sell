@@ -44,7 +44,7 @@
     </nav>
   </aside>
   <div class="main">
-    {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} environment · synthetic demo data · no live integrations connected · v{{ app_version }}</div>{% endif %}
+    {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} environment · {{ data_notice }} · no live integrations connected · v{{ app_version }}</div>{% endif %}
     <header class="top">
       <button class="btn sm menu-toggle" type="button">Menu</button>
       {% if can('crm.view') %}

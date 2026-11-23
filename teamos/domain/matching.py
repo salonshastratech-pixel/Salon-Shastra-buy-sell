@@ -56,6 +56,7 @@ CRITERIA = {
 SELL_PURPOSES = {"sell_entire", "partnership", "franchise_transfer"}
 NEAR_GAP_INR = 3_00_000          # "₹3 lakh budget gap where seller is explicitly negotiable" (§8.4)
 NEAR_GAP_PCT = 0.10
+MIN_COVERAGE_TO_LIST = 30       # a pair with less than 30% of facts known is not listed yet (D-58)
 
 READINESS = {
     "blocked": "Not suitable as things stand", "info_required": "Information required",
@@ -319,12 +320,16 @@ def evaluate(b: dict, s: dict) -> dict:
                ratio=0.3)
 
     # B. Location --------------------------------------------------------------------------
-    bcity = (m.get("preferred_city") or "").strip().lower()
-    scity = (so.get("city") or "").strip().lower()
-    loc = (so.get("locality") or "").strip()
+    from .common import known_place
+    bcity = (known_place(m.get("preferred_city")) or "").strip().lower()
+    scity = (known_place(so.get("city")) or "").strip().lower()
+    loc = (known_place(so.get("locality")) or "").strip()
     if not bcity:
-        ev.add("city", "unknown", None, so.get("city"))
+        ev.add("city", "unknown", None, known_place(so.get("city")))
         ev.ask("buyer", "Confirm the buyer's preferred city", ["preferred_city"], 1.5)
+    elif not scity:
+        ev.add("city", "unknown", m["preferred_city"], None, "Salon's city not recorded yet")
+        ev.ask("seller", "Confirm the salon's city and area", [], 1.5)
     elif bcity == scity:
         ev.add("city", "match", m["preferred_city"], so.get("city"))
     elif m.get("relocate_willing") == "yes":
@@ -703,6 +708,11 @@ def refresh(db, buyer_id: int | None = None, seller_id: int | None = None, force
                     stats["unchanged"] += 1
                     continue
                 r = evaluate(b, s)
+                if cand is None and r["outcome"] == "insufficient" and (r["coverage"] or 0) < MIN_COVERAGE_TO_LIST:
+                    # too little known on either side to be worth a row on the Match Desk yet; the records' own
+                    # "Still to collect" cards drive the missing questions, and the pair appears once data arrives
+                    stats["held_back"] = stats.get("held_back", 0) + 1
+                    continue
                 if cand:
                     _maybe_resurface(db, cand, b, s, actor_id)
                 cid = _persist(db, b, s, r, cand, "manual" if force else "data_change" if cand else "created", actor_id)

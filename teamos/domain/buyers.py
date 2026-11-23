@@ -243,7 +243,8 @@ def _insert_buyer(db, actor_id, *, contact: dict, phone, data, contact_id, owner
         "created_by": actor_id, "created_at": now, "updated_at": now})
     db.update("opportunities", opp_id, {"ref_code": f"BY-{opp_id:05d}"})
     mandate_id = db.insert("buyer_mandates", {"opportunity_id": opp_id, "created_at": now, "updated_at": now})
-    if not values.get("preferred_city"):
+    from .common import known_place
+    if not values.get("preferred_city") and known_place(contact["city"]):
         values["preferred_city"] = (contact["city"], "value")
     _apply_values(db, actor_id, mandate_id, values, source=source_tag, evidence=evidence, bump_version=False)
     if contact["locality"]:

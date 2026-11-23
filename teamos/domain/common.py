@@ -41,6 +41,14 @@ def format_inr(amount: int | float | None, short: bool = True) -> str:
     return ("−" if neg else "") + text
 
 
+PLACEHOLDER_PLACES = {"city not given", "area not given", "not given", "salon name not given"}
+
+
+def known_place(v):
+    """None for placeholder text like 'City not given' (imports with missing values)."""
+    return None if not v or str(v).strip().lower() in PLACEHOLDER_PLACES else v
+
+
 def parse_inr(value: str | None) -> int | None:
     """Parse '20,00,000', '20L', '20 lakh', '1.2 cr', '500000' -> int rupees. Blank -> None."""
     if value is None:

@@ -1,21 +1,42 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}Imports{% endblock %}
 {% block content %}
-<div class="ph"><div><h1>Spreadsheet import</h1><div class="sub">Bring seller leads from Excel or Google Sheets exports. You'll see every row before anything is saved.</div></div></div>
+<div class="ph"><div><h1>Import from sheets</h1><div class="sub">Drop in any Google Sheet or Excel file — sellers, buyers or both. TeamOS reads every tab, keeps only the relevant people, merges repeats and updates people already in the system. You see everything before it is saved.</div></div></div>
 <div class="split">
-  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Recent imports</h2></div><div class="table-wrap"><table>
-    <tr><th>#</th><th>File</th><th>Rows</th><th>Created</th><th>Status</th><th>By</th><th>When</th></tr>
-    {% for b in batches %}<tr class="row-link"><td><a href="{{ url_for('imports.preview', batch_id=b.id) }}">{{ b.id }}</a></td><td><a href="{{ url_for('imports.preview', batch_id=b.id) }}">{{ b.filename }}</a></td>
-    <td>{{ b.total_rows }}</td><td>{{ b.created_count if b.created_count is not none else '—' }}</td>
-    <td><span class="badge {{ 'ok' if b.status == 'committed' else 'grey' if b.status == 'discarded' else 'info' }}">{{ b.status }}</span></td>
-    <td>{{ b.uploader }}</td><td class="small">{{ b.created_at|ist }}</td></tr>{% else %}<tr><td colspan="7" class="empty">No imports yet.</td></tr>{% endfor %}
+  <div class="card"><h2>Smart import</h2>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.smart_upload') }}">{{ csrf() }}
+      <div class="field"><label for="sm-file">Excel (.xlsx, all tabs) or CSV — up to 8 MB</label><input id="sm-file" type="file" name="file" accept=".csv,.xlsx"></div>
+      <div class="field"><label for="sm-link">…or a Google Sheets link</label><input id="sm-link" name="link" placeholder="https://docs.google.com/spreadsheets/d/…">
+        <div class="help">The sheet must be shared as "Anyone with the link can view". Private sheets: File → Download → Microsoft Excel (.xlsx), then upload the file.</div></div>
+      <button class="btn primary">Read &amp; preview</button></form>
+    <h3>What it does for you</h3>
+    <ul class="small">
+      <li>Finds the seller and buyer tabs; ignores staff lists, dashboards, dropdown lists, instructions and empty tabs.</li>
+      <li>Understands columns by meaning (any wording), and ignores advertising columns.</li>
+      <li>Cleans phones, amounts ("10–20 Lakhs", "40k"), chair bands, floors, years, cities and areas.</li>
+      <li>Leaves out test rows, invalid numbers, "not interested", "wrong number" and job seekers — with the reason.</li>
+      <li>One person = one record: repeats are merged; people already in TeamOS get only their empty fields filled.</li>
+      <li>New leads go to the least-busy person in the seller or buyer team, first call due next working morning.</li>
+    </ul>
+  </div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Recent sheet imports</h2></div><div class="table-wrap"><table class="small">
+    <tr><th>#</th><th>File</th><th>Status</th><th>Result</th><th>By</th><th>When</th></tr>
+    {% for i in smart %}<tr><td><a href="{{ url_for('imports.smart_preview', import_id=i.id) }}">{{ i.id }}</a></td><td><a href="{{ url_for('imports.smart_preview', import_id=i.id) }}">{{ i.filename }}</a></td>
+      <td><span class="badge {{ 'ok' if i.status == 'committed' else 'grey' if i.status == 'discarded' else 'info' }}">{{ i.status }}</span></td>
+      <td>{% if i.counts_d %}{{ i.counts_d.created_seller }} sellers · {{ i.counts_d.created_buyer }} buyers · {{ i.counts_d.updated }} updated{% else %}—{% endif %}</td>
+      <td>{{ i.by_name }}</td><td>{{ i.created_at|ist }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No sheet imports yet.</td></tr>{% endfor %}
   </table></div></div>
-  <div class="card"><h2>Upload</h2>
-    <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.upload') }}">{{ csrf() }}
-      <div class="field"><label>CSV or XLSX (max 5 MB, 2,000 rows)</label><input type="file" name="file" accept=".csv,.xlsx" required></div>
-      <button class="btn primary">Upload &amp; preview</button></form>
-    <h3>Columns we recognise</h3>
-    <p class="small">{% for k, (label, syn) in TARGETS.items() %}<span class="badge {{ 'warn' if k in REQUIRED else 'grey' }}">{{ label }}</span> {% endfor %}</p>
-    <p class="small muted">Orange = required. You can re-map any column on the preview screen. Imported contacts get <strong>no</strong> contact consent by default — legacy data needs a permission basis (decision D-17).</p></div>
 </div>
+
+<details class="card disclose"><summary>Manual column-by-column import (sellers only)</summary>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.upload') }}">{{ csrf() }}
+    <div class="field"><label>CSV or XLSX (first tab only, max 5 MB, 2,000 rows)</label><input type="file" name="file" accept=".csv,.xlsx" required></div>
+    <button class="btn">Upload &amp; map columns</button></form>
+  <p class="small">{% for k, (label, syn) in TARGETS.items() %}<span class="badge {{ 'warn' if k in REQUIRED else 'grey' }}">{{ label }}</span> {% endfor %}</p>
+  <div class="table-wrap"><table class="small">
+    <tr><th>#</th><th>File</th><th>Rows</th><th>Created</th><th>Status</th><th>By</th><th>When</th></tr>
+    {% for b in batches %}<tr><td><a href="{{ url_for('imports.preview', batch_id=b.id) }}">{{ b.id }}</a></td><td>{{ b.filename }}</td><td>{{ b.total_rows }}</td><td>{{ b.created_count if b.created_count is not none else '—' }}</td>
+    <td><span class="badge {{ 'ok' if b.status == 'committed' else 'grey' if b.status == 'discarded' else 'info' }}">{{ b.status }}</span></td><td>{{ b.uploader }}</td><td>{{ b.created_at|ist }}</td></tr>{% else %}<tr><td colspan="7" class="empty">None.</td></tr>{% endfor %}
+  </table></div>
+</details>
 {% endblock %}

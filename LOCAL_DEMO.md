@@ -22,6 +22,13 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 7.4 — smart import from sheets
+* **Imports → Smart import**: upload an Excel/CSV file or paste a Google Sheets link; check the preview (tabs, what was
+  understood, what was left out and why), then **Import now**.
+* Real data is kept apart from the demo: a separate local pilot database (`instance/teamos-pilot.db`, never committed)
+  can be run on port 8001:
+  `DATABASE_URL=sqlite:///instance/teamos-pilot.db PORT=8001 DATA_NOTICE="PILOT — real customer data" python run_local.py`
+
 ## Milestone 7.3 — templates and staff accounts
 * Real staff logins (Super Admin, seller team, buyer team) were created on the local demo database only — their
   details are not stored in this repository. Each is asked to choose their own password at first sign-in.

@@ -1,3 +1,27 @@
+# Milestone 7.4 — smart import from Google Sheets / Excel, tested on real pilot data (23 Nov 2026, v0.7.4)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Smart import (Imports → Smart import) | **Built** | Upload an Excel/CSV file (every tab) or paste a Google Sheets link shared "anyone with the link". Each tab is judged: sellers, buyers (incl. "open a new salon"), salon owners asking for help, or not relevant (staff lists, dashboards, dropdown lists, instructions, templates, tabs without phones). Header-less tabs borrow a matching sibling header only when phone/id/date columns line up. |
+| Understanding columns and values | **Built** | Columns recognised by meaning in any wording; advertising columns ignored. Phones in any format (two numbers in one cell → second becomes the alternate), money ("10–20 Lakhs", "under ₹20 lakhs", "40k", "2.5Lakh", "1.8" in an expenses column = ₹1.8 L), chair bands (lowest used), "Years in operation: 2024" = started 2024, floors, salon types, timelines, cities/areas (Hyderabad localities recognised; long addresses kept privately, area shortened). Remarks typed into the Email or City column become notes. |
+| Only relevant people | **Built** | Left out with a reason: test/dummy rows, invalid or foreign numbers, "not interested", "wrong number", job seekers / people asking for staff, "not looking to buy", non-owners in owner campaigns. A "not interested" in one tab applies to the same person in every tab. A buyer-sheet remark like "want to sell my salon" creates a seller lead. |
+| Sync | **Built** | One person = one record across tabs (merged, notes combined). People already in TeamOS: only empty fields are filled, nothing is overwritten; a new buyer/seller record is linked to a known contact. Raw cells of every row are kept with the import. |
+| Workload | **Built** | New leads go to the least-busy person in the seller / buyer team; first calls are spread over working days (25 per person per day, Mon–Sat, 10:00–18:00 IST, hottest first: form submitters, buying/selling soon, budget known, most recent), 8 high-priority a day, and one summary alert per person instead of one per lead. Form submitters get contact consent recorded (they asked to be contacted); cold-call rows do not. |
+| Matching with real data | **Improved** | Unknown city/area ("not given") is treated as unknown — it asks, never blocks. Pairs with under 30% of facts known are not listed on the Match Desk until more is known (the records' "Still to collect" drives the questions). |
+
+**Pilot test on the founder's two shared workbooks** (imported into a separate local pilot database, never into the
+repository): 52 seller leads (incl. 4 found in buyer call notes), 208 buyer/investor leads, 297 repeats merged,
+92 rows left out with reasons, 1 existing record updated by the second workbook. Matching: 10 near matches worth
+negotiating, 677 pairs needing information, 3,840 blocked for a real reason (budget below the salon's all-in cost or a
+different city). Page crawl over the pilot data: 0 errors.
+
+Found and fixed while testing on real data: amounts with "L"/"k" attached were misread; a header-less lead-ads tab
+was ignored; remarks typed into City/Email columns became cities/emails; one person's "not interested" did not reach
+their other rows; "City not given" placeholders blocked matches; 208 first calls were all due the next morning with
+208 separate alerts; the Match Desk would have listed ~7,000 empty pairs; decorative Unicode names.
+
+---
+
 # Milestone 7.3 — Meta-approved templates only, real staff logins, whole-journey check (23 Nov 2026, v0.7.3)
 
 | Area | Status | Evidence |

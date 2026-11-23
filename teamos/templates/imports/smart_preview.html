@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Sheet import #{{ imp.id }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ imp.filename }}</h1><div class="sub">Sheet import #{{ imp.id }} by {{ imp.by_name }} · {{ imp.created_at|ist }} ·
+  <span class="badge {{ 'ok' if imp.status == 'committed' else 'grey' if imp.status == 'discarded' else 'info' }}">{{ imp.status }}</span></div></div>
+  {% if imp.status == 'preview' %}<div class="actions">
+    <form method="post" action="{{ url_for('imports.smart_discard', import_id=imp.id) }}" data-confirm="Discard this import? Nothing will be saved.">{{ csrf() }}<button class="btn">Discard</button></form>
+    <form method="post" action="{{ url_for('imports.smart_commit', import_id=imp.id) }}" data-confirm="Save {{ s.new.seller }} sellers and {{ s.new.buyer }} buyers, and update {{ s.existing.seller + s.existing.buyer }} existing records?">{{ csrf() }}<button class="btn primary">Import now</button></form></div>{% endif %}</div>
+
+<div class="grid g4">
+  <div class="stat ok"><div class="n">{{ s.new.seller }}</div><div class="l">New sellers / salon owners</div></div>
+  <div class="stat ok"><div class="n">{{ s.new.buyer }}</div><div class="l">New buyers / investors</div></div>
+  <div class="stat"><div class="n">{{ s.existing.seller + s.existing.buyer }}</div><div class="l">Already in TeamOS — gaps filled</div></div>
+  <div class="stat"><div class="n">{{ s.merged }} / {{ s.skip }}</div><div class="l">Repeats merged / left out</div></div>
+</div>
+{% if counts %}<p class="flash ok">Saved: {{ counts.created_seller }} sellers and {{ counts.created_buyer }} buyers created, {{ counts.updated }} updated{% if counts.failed %}, {{ counts.failed }} could not be saved (shown below){% endif %}.</p>{% endif %}
+
+<div class="card"><h2>Tabs in this file</h2><div class="table-wrap"><table class="small">
+  <tr><th>Tab</th><th>Treated as</th><th>Why</th><th>Columns used</th></tr>
+  {% for t in tabs %}<tr><td><strong>{{ t.name }}</strong><div class="muted">{{ t.rows }} rows{% if t.header_borrowed %} · header taken from a similar tab{% endif %}</div></td>
+    <td>{% if t.kind == 'skip' %}<span class="badge grey">not relevant</span>{% else %}<span class="badge ok">{{ 'buyers' if t.kind == 'buyer' else 'sellers' }}</span>{% if t.flavour == 'new_salon' %} <span class="badge info">new salon</span>{% elif t.flavour == 'seek_help' %} <span class="badge warn">owners seeking help</span>{% endif %}{% endif %}</td>
+    <td>{{ t.why }}</td>
+    <td>{% if t.mapping %}<details><summary>{{ t.mapping|length }} used · {{ t.ignored|length }} ignored</summary>
+      {% for h, f in t.mapping.items() %}<div><span class="muted">{{ h[:60] }}</span> → {{ f|replace('_',' ') }}</div>{% endfor %}
+      {% if t.ignored %}<div class="muted">Ignored: {{ t.ignored|join(' · ') }}</div>{% endif %}</details>{% endif %}</td></tr>{% endfor %}
+</table></div></div>
+
+{% if s.skip_reasons %}<div class="card small"><h2>Left out, and why</h2>
+  {% for r in s.skip_reasons %}<span class="badge grey">{{ r.n }}</span> {{ r.reason }}<br>{% endfor %}</div>{% endif %}
+
+<div class="tabs">{% for k, label in [('create','New'),('update','Updates'),('merged','Merged repeats'),('skip','Left out'),('all','All')] %}
+  <a class="{{ 'on' if show == k }}" href="{{ url_for('imports.smart_preview', import_id=imp.id, show=k) }}">{{ label }}</a>{% endfor %}</div>
+<div class="card flush"><div class="table-wrap"><table class="small">
+  <tr><th>From</th><th>Person</th><th>Side</th><th>What TeamOS understood</th><th>Notes</th><th>Result</th></tr>
+  {% for r in rows %}<tr>
+    <td class="muted">{{ r.tab }}<br>row {{ r.row_no }}</td>
+    <td><strong>{{ r.canon.full_name or '—' }}</strong>{% if r.canon.salon_name %}<div>{{ r.canon.salon_name }}</div>{% endif %}<div class="mono muted">{{ r.phone or r.canon.phone or '' }}</div></td>
+    <td>{{ r.kind }}</td>
+    <td>{% if r.u.city or r.u.area %}<div>{{ r.u.area ~ ', ' if r.u.area }}{{ r.u.city or '' }}</div>{% endif %}
+      {% for k, v in (r.u.fields or {}).items() if k not in ('sale_reason_note', 'inclusions_note', 'top_services', 'booking_software') %}<span class="badge grey">{{ k|replace('_',' ') }}: {{ v|inr if k in ('asking_price','all_in_max','budget_min','monthly_rent','rent_deposit','avg_monthly_sales','avg_monthly_expenses') else v }}</span> {% endfor %}</td>
+    <td>{% if r.notes_l %}<details><summary>{{ r.notes_l|length }}</summary>{% for n in r.notes_l %}<div>{{ n[:200] }}</div>{% endfor %}</details>{% endif %}</td>
+    <td>{% if r.outcome %}<span class="badge {{ 'ok' if r.outcome in ('created','updated') else 'bad' if r.outcome == 'failed' else 'grey' }}">{{ r.outcome }}</span>{% if r.ref_code %} <a href="{{ opp_url(r.kind, r.opportunity_id) }}">{{ r.ref_code }}</a>{% endif %}{% else %}<span class="badge {{ 'ok' if r.action == 'create' else 'info' if r.action == 'update' else 'grey' }}">{{ r.action }}</span>{% endif %}
+      {% if r.reason %}<div class="muted">{{ r.reason }}</div>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="6" class="empty">Nothing in this list.</td></tr>{% endfor %}
+</table></div></div>
+<p class="small muted">Showing up to 400 rows. Raw cells of every row are kept with the import. Nothing the team already recorded is overwritten.</p>
+{% endblock %}

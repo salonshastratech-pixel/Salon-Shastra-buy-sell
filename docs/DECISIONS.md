@@ -100,3 +100,7 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-54 | Meta-approved templates only | Live WhatsApp uses only templates Meta has approved with identical wording, confirmed by "Check with Meta"; no manual override. | Founder | **Decided 23 Nov 2026** (founder instruction) |
 | D-55 | Re-engagement message category | "Polite follow-up" is MARKETING (Meta's rules) and needs marketing consent. | Founder | Proposed |
 | D-56 | Staff passwords | Temporary passwords (set by an admin) must be changed at first sign-in; minimum 10 characters with upper/lower case and a number. | Founder | Proposed |
+| D-57 | First calls after an import | Spread at 25 per person per working day (Mon–Sat), hottest first, 8 high-priority per day; one summary alert. | Team lead | Proposed |
+| D-58 | Match Desk noise | A buyer–salon pair is listed only once ≥ 30% of the facts are known on both sides (or it is a ready/near match). | Founder | Proposed |
+| D-59 | Consent for imported leads | People who submitted a form or lead-ad (timestamped responses) get service-contact consent recorded with the sheet as source; call-log rows get none until consent is captured on a call. | Founder | Proposed |
+| D-60 | Pilot owners vs sellers | Salon owners from growth-program / "struggling salons" campaigns are imported as owners seeking help (not confirmed sellers) and are not matched to buyers. | Founder | Proposed |

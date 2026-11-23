@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.7.3-m7"
+__version__ = "0.7.4-m7"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -107,7 +107,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["ist"] = timeutil.fmt_ist
     app.jinja_env.filters["rel"] = timeutil.relative
     app.jinja_env.globals.update(
-        can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__,
+        can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
         now_iso=timeutil.now_iso,
         # A global (not context variable) so imported macros can read it.
         csrf_value=lambda: g.session["csrf_token"] if g.get("session") else "",
