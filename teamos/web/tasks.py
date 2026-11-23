@@ -28,8 +28,9 @@ def index():
     else:
         rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.assignee_id = ?", (g.user["id"],))
     if not can("crm.view"):
-        # Same rule as the task detail page: seller-linked tasks need crm.view unless assigned to you.
-        rows = [t for t in rows if t["entity_type"] != "opportunity" or t["assignee_id"] == g.user["id"]]
+        # Same rule as the task detail page: tasks linked to any CRM record (seller, buyer, match, deal)
+        # need crm.view unless assigned to you.
+        rows = [t for t in rows if not t["entity_type"] or t["assignee_id"] == g.user["id"]]
     if view != "done":
         rows = _sort(rows)
     for t in rows:
@@ -63,7 +64,7 @@ def detail(task_id):
     task = db.one(TASK_SELECT + "WHERE t.id = ?", (task_id,))
     if not task:
         abort(404)
-    if task["entity_type"] == "opportunity" and not can("crm.view") and task["assignee_id"] != g.user["id"]:
+    if task["entity_type"] and not can("crm.view") and task["assignee_id"] != g.user["id"]:
         deny("crm.view", "task", task_id)
     events = db.all("SELECT e.*, u.full_name AS actor_name FROM task_events e LEFT JOIN users u ON u.id = e.actor_id "
                     "WHERE task_id = ? ORDER BY e.at, e.id", (task_id,))

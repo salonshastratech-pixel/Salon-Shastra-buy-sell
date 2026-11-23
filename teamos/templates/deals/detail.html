@@ -52,10 +52,10 @@
   </div>
 
   <div class="card" id="diligence"><div class="card-h"><h2>Due diligence</h2><span class="small muted">{{ checklist|selectattr('status', 'in', ['reviewed','not_applicable'])|list|length }}/{{ checklist|length }} done</span></div>
-    <table class="small">{% for ch in checklist %}<tr><td>{{ ch.label }}</td><td>
+    <div class="table-wrap"><table class="small">{% for ch in checklist %}<tr><td>{{ ch.label }}</td><td>
       <form method="post" action="{{ url_for('deals.check', deal_id=d.id) }}" class="inline">{{ csrf() }}<input type="hidden" name="item_key" value="{{ ch.key }}">
         <select name="status">{% for v, l in D.CHECK_STATUSES %}<option value="{{ v }}" {{ 'selected' if ch.status == v }}>{{ l }}</option>{% endfor %}</select>
-        <input name="note" value="{{ ch.note or '' }}" placeholder="note"><button class="btn sm">Save</button></form></td></tr>{% endfor %}</table>
+        <input name="note" value="{{ ch.note or '' }}" placeholder="note"><button class="btn sm">Save</button></form></td></tr>{% endfor %}</table></div>
     <p class="small muted">Tracking only — legal, tax and valuation checks are done by qualified professionals outside the platform.</p></div>
 
   <div class="card"><h2>Timeline</h2>

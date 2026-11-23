@@ -683,7 +683,9 @@ def mark_stale(db) -> int:
     """Flag candidates whose inputs changed since evaluation (UAT-14). Cheap: fingerprints only."""
     n = 0
     fps_b, fps_s = {}, {}
-    for c in db.all("SELECT id, buyer_opp_id, seller_opp_id, buyer_fp, seller_fp, stale FROM match_candidates"):
+    for c in db.all("SELECT mc.id, mc.buyer_opp_id, mc.seller_opp_id, mc.buyer_fp, mc.seller_fp, mc.stale "
+                    "FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
+                    "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + ACTIVE_WHERE):  # closed = not stale
         if c["buyer_opp_id"] not in fps_b:
             b = load_buyer(db, c["buyer_opp_id"])
             fps_b[c["buyer_opp_id"]] = b["fp"] if b else None

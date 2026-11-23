@@ -276,3 +276,12 @@ table.cmp tr.res-unknown td:first-child { box-shadow: inset 3px 0 #c9c3bb; }
 .stagebar span.done { background: var(--ok-soft); color: var(--ok); }
 .stagebar span.on { background: var(--brand); color: #fff; font-weight: 600; }
 .teaser-mini { background: #faf6f2; border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+
+/* QA fixes — phone widths (no page should ever scroll sideways) */
+.split > *, .desk > *, .four > *, .grid > * { min-width: 0; }
+.card-h { flex-wrap: wrap; gap: 4px 10px; }
+.inline { flex-wrap: wrap; }
+.inline select, .inline input, form select, form input { max-width: 100%; min-width: 0; }
+.mc-pair { min-width: 0; overflow-wrap: anywhere; }
+.badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.link-box, .mono { overflow-wrap: anywhere; }

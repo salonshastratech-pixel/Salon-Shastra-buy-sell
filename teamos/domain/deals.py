@@ -294,6 +294,10 @@ def set_offer_status(db, actor, offer_id: int, status: str) -> None:
             if d["stage"] in ("offer_received", "negotiation", "visit_completed", "introduced", "visit_scheduled"):
                 db.update("deals", d["id"], {"stage": "due_diligence"})
                 _event(db, d["id"], "stage", actor["id"], d["stage"], "due_diligence", "Automatic: offer accepted")
+            # every live deal keeps a next step (QA finding): diligence starts as soon as an offer is accepted
+            T.create_task(db, actor, title=f"Complete due diligence for {d['ref_code']}",
+                          assignee_id=d["owner_id"] or actor["id"], due_at=T.first_contact_due(7 * 24 * 60),
+                          task_type="review", priority="high", entity_type="deal", entity_id=d["id"])
         _event(db, d["id"], "offer", actor["id"], body=f"Offer v{o['version']} {status}")
         _close_tasks(db, actor["id"], d["id"], f"Respond to offer v{o['version']}", f"Offer {status}")
         _log_both(db, actor["id"], d, f"Offer v{o['version']} {status}")

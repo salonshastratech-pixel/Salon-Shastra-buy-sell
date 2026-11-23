@@ -133,6 +133,8 @@ def test_uat17_visit_and_versioned_offers_with_timeline_and_tasks(db, login):
     m.post(f"/deals/offers/{db.scalar('SELECT id FROM deal_offers WHERE version = 2')}", {"status": "accepted"})
     d = db.one("SELECT * FROM deals")
     assert d["agreed_consideration"] == 20_00_000 and d["stage"] == "due_diligence"
+    assert db.scalar("SELECT COUNT(*) FROM tasks WHERE entity_type = 'deal' AND status = 'open' "
+                     "AND title LIKE 'Complete due diligence%'") == 1  # the deal always has a next step
     # no stale to-dos: scheduling closed "arrange a visit"; the counter-offer closed "respond to v1"
     open_titles = [r["title"] for r in db.all("SELECT title FROM tasks WHERE entity_type = 'deal' AND status = 'open'")]
     assert not any(t.startswith("Arrange a site visit") for t in open_titles)
@@ -241,3 +243,14 @@ def test_teaser_tab_preview_shows_every_available_item(db, login):
     s = seller(db, avg_monthly_sales="10.5L")
     html = login("seller@t.test").get(f"/sellers/{s}?tab=teaser").data.decode()
     assert "₹10 L – ₹12 L" in html  # a non-default item is previewed with its real value, not "(no data yet)"
+
+
+def test_finance_user_cannot_see_match_or_deal_tasks(db, login):
+    """QA finding: match/deal tasks carry buyer and salon names, so they need CRM access like seller tasks."""
+    s, b, cid, deal = full_deal(db, login)
+    login("lead@t.test").post(f"/matches/{cid}/tasks", {"buyer_task": "Check funds", "seller_task": "Check lease"})
+    fin = login("fin@t.test")
+    html = fin.get("/tasks/?view=all").data.decode()
+    assert "Resolve match" not in html and "Site visit" not in html and "Test Salon" not in html
+    for tid in [r["id"] for r in db.all("SELECT id FROM tasks WHERE entity_type IN ('match','deal')")]:
+        assert fin.get(f"/tasks/{tid}").status_code == 403
