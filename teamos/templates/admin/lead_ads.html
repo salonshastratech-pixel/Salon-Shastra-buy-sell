@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Lead ads{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Facebook / Instagram lead ads</h1><div class="sub">Each lead becomes a seller or buyer lead with an owner and a first-call task — the same checks as a sheet import (duplicates, junk, "not interested").</div></div>
+  <div class="actions"><a class="btn sm" href="{{ url_for('admin.integrations') }}">Integrations</a></div></div>
+<div class="flash {{ 'ok' if live else 'warn' }}">{% if live %}<strong>Live.</strong> New leads from Meta arrive automatically.{% else %}<strong>Test only.</strong> Real leads are not connected. Use “Try a lead ad” below to see what happens. When the founder approves, connect the page in Integrations and point Meta's webhook to <code>{{ hook }}</code>.{% endif %}</div>
+
+<div class="split">
+  <form method="post" class="card">{{ csrf() }}<h2>Try a lead ad</h2>
+    <div class="chips" role="radiogroup">{% for v, l in [('buyer', 'Buyer form'), ('seller', 'Seller form'), ('new_salon', 'New salon form')] %}<label class="chip"><input type="radio" name="kind" value="{{ v }}" {{ 'checked' if loop.first }}><span>{{ l }}</span></label>{% endfor %}</div>
+    <div class="form-grid">{% for k, l in fields %}<div class="field {{ 'has-err' if errors.get(k) }}"><label for="f-{{ loop.index }}">{{ l }}</label><input id="f-{{ loop.index }}" name="{{ k }}" maxlength="120">{% if errors.get(k) %}<div class="err">{{ errors[k] }}</div>{% endif %}</div>{% endfor %}</div>
+    <p class="small muted">Use made-up details. The lead is marked as a test (SIM-…) in the list.</p>
+    <button class="btn primary">Send test lead</button></form>
+  <div class="card"><h2>Recent leads</h2>
+    <ul class="tasks">{% for e in recent %}<li class="task"><div><div class="t small">{% if e.opportunity_id %}<a href="{{ opp_url(e.kind, e.opportunity_id) }}">{{ e.ref_code }}</a> · {% endif %}{{ e.form_name }} <span class="badge {{ 'ok' if e.status == 'imported' else 'warn' if e.status == 'skipped' else 'grey' }}">{{ e.status }}</span>{% if e.source == 'simulation' %} <span class="badge syn">test</span>{% endif %}</div>
+      <div class="meta">{{ e.detail or 'Waiting' }} · {{ e.received_at|rel }}</div></div></li>{% else %}<li class="empty">No leads yet.</li>{% endfor %}</ul></div>
+</div>
+{% endblock %}

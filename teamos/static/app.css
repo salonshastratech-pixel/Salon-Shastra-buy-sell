@@ -385,3 +385,22 @@ details.pop .pop-body form { display: grid; gap: 6px; }
 .lang-switch a:hover { text-decoration: none; }
 html[lang="te"] body.public { font-size: 15px; line-height: 1.65; }
 @media (max-width: 960px) { details.pop .pop-body { position: fixed; left: 16px; right: 16px; width: auto; top: 20%; } }
+
+/* Milestone 9: tap-to-call, calendar */
+a.tel { color: var(--brand-dark); }
+.card.pulse { box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow); transition: box-shadow .3s; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.day { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; min-height: 160px; }
+.day.today { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+.day-h { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.day-h b { color: var(--text); }
+.ev { display: block; border-left: 3px solid var(--info); background: var(--info-soft); border-radius: 8px; padding: 5px 7px; margin-bottom: 6px; color: var(--text); font-size: 12px; }
+.ev:hover { text-decoration: none; filter: brightness(.97); }
+.ev.hi { border-left-color: var(--brand); }
+.ev-visit { background: var(--ok-soft); border-left-color: var(--ok); }
+.ev-first_contact { background: var(--brand-tint); }
+.ev-time { display: block; font-weight: 600; }
+.ev-ref { display: block; color: var(--muted); font-size: 11px; }
+.ev-empty { color: var(--muted); font-size: 12px; text-align: center; padding-top: 30px; }
+code.copy { user-select: all; word-break: break-all; }
+@media (max-width: 960px) { .week { grid-template-columns: 1fr; } .day { min-height: 0; } .ev-empty { display: none; } }

@@ -133,6 +133,8 @@ TOOLS = [  # (endpoint, title, what, capability or None for everyone with crm.vi
      "users.manage"),
     ("admin.integrations", "Integrations", "WhatsApp, e-mail, AI assistant, customer links — and what's next.",
      "settings.manage"),
+    ("channels.lead_ads", "Lead ads", "Facebook / Instagram ad forms become leads. Try a test lead.",
+     "settings.manage"),
     ("admin.templates", "Message templates", "WhatsApp wording, checked against Meta before use.",
      "settings.manage"),
     ("admin.duplicates", "Duplicate review", "People who may have been entered twice.", "duplicates.resolve"),

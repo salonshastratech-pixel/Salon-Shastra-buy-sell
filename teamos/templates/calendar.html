@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Calendar</h1><div class="sub">Calls, call-backs, follow-ups and salon visits — week of {{ start.strftime('%d %b %Y') }}</div></div>
+  <div class="actions">
+    {% if people %}<form method="get" class="inline"><input type="hidden" name="week" value="{{ start.isoformat() }}"><select name="who" data-autosubmit aria-label="Whose calendar">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if p.id == who }}>{{ p.full_name }}</option>{% endfor %}</select><button class="btn sm">Show</button></form>{% endif %}
+    <a class="btn sm" href="{{ url_for('channels.calendar', week=prev, who=who) }}">← Previous</a>
+    <a class="btn sm" href="{{ url_for('channels.calendar', who=who) }}">This week</a>
+    <a class="btn sm" href="{{ url_for('channels.calendar', week=next, who=who) }}">Next →</a></div></div>
+
+{% if new_link %}<div class="flash ok"><strong>Your private calendar link</strong> (shown only now — copy it):<br><code class="copy">{{ new_link }}</code><br>
+  In Google Calendar: <em>Other calendars → + → From URL</em> → paste. On iPhone: <em>Settings → Calendar → Accounts → Add subscribed calendar</em>. It updates every few hours and shows only the kind of task, the reference code and the area — no customer names or numbers.</div>{% endif %}
+
+<div class="week">{% for d in days %}
+  <div class="day {{ 'today' if d.today }}"><div class="day-h">{{ d.date.strftime('%a') }} <b>{{ d.date.strftime('%d %b') }}</b></div>
+    {% for e in d.events %}<a class="ev ev-{{ e.type }} {{ 'hi' if e.priority in ('urgent','high') }}" href="{{ e.link }}"><span class="ev-time">{{ e.time }}</span><span class="ev-t">{{ e.title }}</span>{% if e.ref %}<span class="ev-ref">{{ e.ref }}{% if e.area %} · {{ e.area }}{% endif %}</span>{% endif %}</a>
+    {% else %}<div class="ev-empty">—</div>{% endfor %}
+  </div>{% endfor %}
+</div>
+
+<div class="card small"><div class="card-h"><h2>See this in Google Calendar or on your phone</h2></div>
+  {% if feed %}<p>Your private link is on (made {{ feed.created_at|rel }}{% if feed.last_used_at %}, last read {{ feed.last_used_at|rel }}{% endif %}).</p>{% else %}<p>Get a private link to add your TeamOS work to Google Calendar or your phone's calendar. Only you should have it.</p>{% endif %}
+  <div class="inline"><form method="post" action="{{ url_for('channels.calendar_link') }}">{{ csrf() }}<button class="btn sm primary">{{ 'Make a new link' if feed else 'Get my calendar link' }}</button></form>
+    {% if feed %}<form method="post" action="{{ url_for('channels.calendar_revoke') }}">{{ csrf() }}<button class="btn sm">Switch the link off</button></form>{% endif %}</div>
+  {% if feed %}<p class="muted">Making a new link switches the old one off.</p>{% endif %}
+</div>
+{% endblock %}

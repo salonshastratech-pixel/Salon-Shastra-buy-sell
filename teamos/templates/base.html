@@ -18,6 +18,7 @@
       <div class="group">Today</div>
       {{ item('main.my_day', 'My Day', ep == 'main.my_day') }}
       {{ item('tasks.index', 'Tasks', ep.startswith('tasks.'), nc.tasks, true) }}
+      {{ item('channels.calendar', 'Calendar', ep == 'channels.calendar') }}
       {% if can('crm.view') %}{{ item('main.team_board', 'Team', ep in ('main.team_board', 'improve.hand_over')) }}
       <div class="group">People</div>
       {{ item('sellers.index', 'Sellers', ep.startswith('sellers.')) }}

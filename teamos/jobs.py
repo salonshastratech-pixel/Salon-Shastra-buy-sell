@@ -171,6 +171,14 @@ def learning_propose(db, payload) -> str:
     return f"{len(made)} proposals"
 
 
+@handler("lead_ads")
+def lead_ads(db, payload) -> str:
+    """New Facebook / Instagram lead ads → smart import (M9). Retried by the job runner if it fails."""
+    from .domain import leadads
+    done = [leadads.process(db, i)["status"] for i in payload.get("ids") or []]
+    return f"{len(done)} lead(s): " + ", ".join(done)
+
+
 @handler("noop")
 def noop(db, payload) -> str:
     if payload.get("fail"):

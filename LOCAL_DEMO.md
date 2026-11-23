@@ -22,6 +22,11 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 9 — what to try
+* Open any seller or buyer: tap the phone number or **Call** (on a phone it dials), then the page jumps to **Log a call**.
+* **Calendar** in the menu; **Get my calendar link** to add your work to Google Calendar (no customer details in it).
+* **Tools & admin → Lead ads → Try a lead ad** with made-up details; the new lead appears with an owner and a first call.
+
 ## Milestone 8 — what to try
 * **Menu**: shorter, grouped, with counts. Admin pages are under **Tools & admin**.
 * **Team** (sign in as the team lead): Workload table → **More** → *Mark away* or *Preview hand-over*; **Not moving** list.

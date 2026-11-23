@@ -175,4 +175,21 @@
         .finally(function () { btn.disabled = false; });
     });
   });
+  // Tap-to-call: the phone dials; this page then jumps to "Log a call" so the outcome is recorded straight away.
+  document.querySelectorAll('[data-call-log]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      var box = document.getElementById('log-call');
+      if (!box) return;
+      setTimeout(function () {
+        box.scrollIntoView({behavior: 'smooth', block: 'center'});
+        box.classList.add('pulse');
+        var sel = box.querySelector('select[name=outcome]');
+        if (sel) sel.focus();
+      }, 400);
+    });
+  });
+  // Selects marked data-autosubmit submit their form on change (CSP forbids inline handlers).
+  document.querySelectorAll('select[data-autosubmit]').forEach(function (sel) {
+    sel.addEventListener('change', function () { sel.form.submit(); });
+  });
 })();

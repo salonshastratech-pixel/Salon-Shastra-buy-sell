@@ -108,3 +108,5 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-62 | Changing match weights | System proposes from declined good-fit matches (≥5 and ≥25%), +25% per step, never above 2× the start; founder approves; reset any time. | Founder | Proposed |
 | D-63 | Telugu wording | First-draft translation of all customer form text; a Telugu-speaking team member reviews `teamos/i18n.py` before customers see it. | Founder | Proposed |
 | D-64 | AI-drafted summaries | Off by default. When on: Claude receives only non-identifying facts (no names, phones, e-mails, addresses, map links, private notes); a person always edits and saves. | Founder | Proposed |
+| D-65 | What a calendar subscribe link may show | Kind of task, reference code and area only; Google / phone calendars keep copies outside TeamOS, so no names, numbers or task titles. | Founder | Proposed |
+| D-66 | Going live with lead ads | Stays test-only until the founder approves; then the Facebook page token is added and "yes" typed in Integrations. | Founder | Proposed |

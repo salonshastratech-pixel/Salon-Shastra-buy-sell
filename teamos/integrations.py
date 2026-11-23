@@ -48,9 +48,17 @@ CONNECTORS = [
          ("ANTHROPIC_API_KEY", "Anthropic API key", True, "From console.anthropic.com → API keys."),
          ("AI_MODEL", "Model (optional)", False, "Leave empty for claude-opus-5-5."),
      ]},
-    {"key": "meta_leads", "name": "Facebook / Instagram lead forms", "status": "planned",
-     "what": "New leads from Meta ad forms appear automatically as seller or buyer leads, with the first-call task.",
-     "settings": []},
+    {"key": "meta_leads", "name": "Facebook / Instagram lead ads", "status": "built",
+     "what": "New leads from Meta ad forms become seller or buyer leads automatically, with an owner and a first-call "
+             "task, through the same smart import as Google Sheets. Test it any time with \"Try a lead ad\"; real "
+             "leads arrive only after the page is connected and this is switched on.",
+     "settings": [
+         ("META_LEADS_VERIFY_TOKEN", "Webhook verify token", True, "Any long random text; paste the same in Meta."),
+         ("META_LEADS_APP_SECRET", "Meta app secret", True, "Leave empty to use the WhatsApp app secret."),
+         ("META_LEADS_PAGE_TOKEN", "Page access token (leads_retrieval)", True,
+          "Business settings → System users → token for the Facebook page."),
+         ("META_LEADS_LIVE", "Switched on? (yes / no)", False, "Type yes only when the founder approves going live."),
+     ]},
     {"key": "telephony", "name": "Click-to-call & call logging (e.g. Exotel, Knowlarity)", "status": "planned",
      "what": "Call from TeamOS; calls, durations and recordings are logged on the record automatically.",
      "settings": []},

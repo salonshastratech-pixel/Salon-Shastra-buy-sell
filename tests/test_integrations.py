@@ -84,4 +84,4 @@ def test_new_staff_member_gets_their_whatsapp_number_at_creation(app, db, login)
     assert u["wa_number"] == "+919876512345" and u["wa_phone_number_id"] == "555666777888"
     assert "+919876512345" in admin.get("/admin/users").data.decode()
     page = admin.get("/admin/integrations").data.decode()
-    assert "Coming next" in page and "Facebook / Instagram lead forms" in page
+    assert "Coming next" in page and "Google Calendar" in page and "Facebook / Instagram lead ads" in page

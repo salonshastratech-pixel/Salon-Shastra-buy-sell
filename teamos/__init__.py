@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.8.0-m8"
+__version__ = "0.9.0-m9"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -106,6 +106,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["inr"] = format_inr
     app.jinja_env.filters["ist"] = timeutil.fmt_ist
     app.jinja_env.filters["rel"] = timeutil.relative
+    app.jinja_env.filters["tel"] = _tel_link
     app.jinja_env.globals.update(
         can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
         now_iso=timeutil.now_iso,
@@ -127,11 +128,21 @@ def create_app(overrides: dict | None = None) -> Flask:
             ctx["nav_counts"] = _nav_counts(get_db(), g.user)
         return ctx
 
-    from .web import admin, auth, buyers, deals, forms, improve, imports, inbox, main, matches, public, sellers, tasks
+    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, public,
+                      sellers, tasks)
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
-               matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp):
+               matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp,
+               channels.bp, channels.feed_bp):
         app.register_blueprint(bp)
     return app
+
+
+def _tel_link(phone) -> str:
+    """tel: link for tap-to-call on phones (Indian 10-digit numbers get +91)."""
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(digits) == 10:
+        digits = "91" + digits
+    return "tel:+" + digits if digits else "#"
 
 
 def _nav_counts(db, user) -> dict:

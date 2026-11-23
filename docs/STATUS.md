@@ -1,3 +1,17 @@
+# Milestone 9 — calls, calendar & lead ads (24 Nov 2026, v0.9.0)
+
+| Area | Status | How it works |
+|---|---|---|
+| Tap-to-call | **Built** | Phone numbers on a seller / buyer are tap-to-call links (and a **Call** button). On a phone it dials; the page then jumps to **Log a call** so the outcome is recorded straight away. No link for do-not-contact people. |
+| Calendar | **Built** | **Calendar** in the menu: this week's calls, call-backs, follow-ups and salon visits, day by day; team leads can pick a person. |
+| Calendar on phone / Google | **Built** | "Get my calendar link" makes a private subscribe link (only its hash is stored; making a new one or switching it off stops the old one). The feed shows the kind of task, the reference code and the area — never customer names, numbers or free-text titles (D-65). |
+| Facebook / Instagram lead ads | **Built, test-only** | Tools & admin → **Lead ads**: "Try a lead ad" simulates a lead; real leads arrive at `/webhooks/meta-leads` (Meta signature checked, each lead stored once) and are fetched only when an admin connects the page and types *yes* in Integrations (D-66). Every lead runs through the smart import — same duplicate, junk and "not interested" checks, least-busy available owner, first-call task, consent recorded. |
+
+Found and fixed while testing: the calendar feed looked up the person by the link's id instead of the person's id,
+which would have shown another person's schedule.
+
+---
+
 # Milestone 8 — measured improvements + simpler screens (24 Nov 2026, v0.8.0)
 
 | Area | Status | How it works |
