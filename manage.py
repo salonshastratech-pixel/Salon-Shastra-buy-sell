@@ -13,10 +13,26 @@ import getpass
 import os
 import sys
 
-from teamos import create_app
-from teamos.db import migrate, open_standalone
-from teamos.security import hash_password, validate_password_strength
-from teamos.timeutil import now_iso
+
+
+def _load_dotenv(path: str = ".env") -> None:
+    """Load KEY=VALUE lines from .env next to this file. Real environment variables always win."""
+    full = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+    if not os.path.exists(full):
+        return
+    for line in open(full, encoding="utf-8"):
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_dotenv()
+
+from teamos import create_app  # noqa: E402  (after .env so the app sees the settings)
+from teamos.db import migrate, open_standalone  # noqa: E402
+from teamos.security import hash_password, validate_password_strength  # noqa: E402
+from teamos.timeutil import now_iso  # noqa: E402
 
 
 def main():

@@ -12,7 +12,7 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-06 | Approval authority | Listing approval = Super Admin; can be granted to a team lead via `listing.approve` grant | Founder | Proposed |
 | D-07 | Role matrix | PRD §3.2 defaults in `permissions.py` (team members cannot reassign others' work; can create tasks for colleagues) | Founder | Proposed |
 | D-08 | Qualification scores | Seller readiness rubric §7.4 (20/15/25/20/10/10), bands 80/60 | Founder / PM | Proposed |
-| D-09 | Match scoring | Families A–J weights §8.2 as starting hypothesis | Founder / PM | Proposed (M5) |
+| D-09 | Match scoring | Families A–J weights §8.2 as starting hypothesis | Founder / PM | **Approved 23 Nov 2026** (see M5 section) |
 | D-10 | SLAs | First contact due 15 min after creation (business hours not yet modelled) | Founder / team lead | Proposed |
 | D-11 | Consent & disclosure | Consent ledger built; teaser field list not yet defined | Founder / legal | **Open** |
 | D-12 | Restricted seller fields | Private sale-reason note, exact address, franchise brand, lowest acceptable price | Founder | Proposed |
@@ -65,9 +65,9 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 
 | ID | Decision | Current implementation / proposal | Owner | Status |
 |---|---|---|---|---|
-| D-09 | Match scoring | Implemented as `match-rules v0.1`: PRD §8.2 family weights; 23 criteria (see `teamos/domain/matching.py`). Calibrate after the first real outcomes. | Founder / PM | Proposed (built) |
-| D-34 | Near-match budget gap | A salon over the buyer's all-in ceiling is a *near match* only if the seller said the price is negotiable and the gap is ≤ ₹3 L or ≤ 10% of the ceiling — or it fits within the seller's volunteered lowest price. Otherwise it is blocked. | Founder | Proposed |
+| D-09 | Match scoring | Implemented as `match-rules v0.1`: PRD §8.2 family weights; 23 criteria (see `teamos/domain/matching.py`). Calibrate after the first real outcomes. | Founder | **Approved 23 Nov 2026** |
+| D-34 | Near-match budget gap | A salon over the buyer's all-in ceiling is a *near match* only if the seller said the price is negotiable and the gap is ≤ ₹3 L or ≤ 10% of the ceiling — or it fits within the seller's volunteered lowest price. Otherwise it is blocked. Founder guidance: show the *nearest* chances so the team is never stuck, but never assume a concession. | Founder | **Approved 23 Nov 2026** |
 | D-35 | Who approves "approach" | Team lead / admin (`evidence.review`), only when: eligible, listing approved, criteria confirmed, funding reviewed, contact + sharing consent from both sides. | Founder | Proposed |
 | D-36 | Suppression | Declined / not suitable needs a reason; resurfaces only on changed facts or a revisit date. | Team lead | Proposed |
 | D-37 | Strong-match alert | One internal alert to the buyer and salon owners when a match first reaches fit ≥ 70 with ≥ 60% known (ready or near). Never sent to customers. | Team lead | Proposed |
-| D-38 | City mismatch | Different city is a hard conflict unless the buyer said they would relocate (then a partial fit). | Founder | Proposed |
+| D-38 | City mismatch | Different city is a hard conflict unless the buyer said they would relocate (then a partial fit). | Founder | **Approved 23 Nov 2026** |
