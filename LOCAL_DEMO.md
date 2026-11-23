@@ -22,6 +22,14 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 5 — Match Desk
+* **Match Desk** (left menu): queues of buyer↔salon matches; open one for the side-by-side comparison.
+* Try BY-00009 Arjun ↔ SL-00001 Glow Studio Unisex: fit 99, fully known — but *awaiting consent* (the seller has not
+  agreed to share details), so it cannot be approved to approach yet.
+* Lakshmi ↔ Glow Studio is a near match (₹2.8 L over) with buyer- and seller-side tasks already split.
+* Every seller/buyer page has a *Biggest unlock* card and a *Matches* tab.
+* My Day shows matching tiles; the Team Command Center shows matches needing attention.
+
 ## Milestone 4 — forms & requests
 * **Forms & Requests** (left menu): review inbox, open links, mock message log, public form links.
 * Public quick forms (no login): http://localhost:8000/f/seller and http://localhost:8000/f/buyer

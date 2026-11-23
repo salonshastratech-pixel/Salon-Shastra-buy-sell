@@ -127,6 +127,11 @@ def detail(opp_id):
     )
     from .forms import record_context
     ctx.update(record_context(db, g.user, opp))
+    if tab in ("overview", "matches"):
+        from ..domain import matching as MM
+        from .matches import record_matches
+        ctx.update(record_matches(db, opp))  # incremental: only re-scores pairs whose facts changed
+        ctx["unblock"] = MM.unblock_suggestions(db, opp)
     return render_template("sellers/detail.html", **ctx)
 
 

@@ -37,6 +37,7 @@
 {% if tab == 'overview' %}
 <div class="split">
   <div>
+    {% include "matches/_unblock_card.html" %}
     <div class="card">
       <div class="card-h"><h2>Next action</h2></div>
       {% if tasks %}
@@ -239,11 +240,7 @@
 </div>
 
 {% elif tab == 'matches' %}
-<div class="card">
-  <h2>Matches</h2>
-  <p>No match history yet. Ranked salon recommendations for this buyer arrive with the <strong>Match Desk in Milestone 5</strong>. Nothing here is simulated.</p>
-  <p class="small muted">The requirements captured on this record — all-in ceiling, ranked localities and exclusions, Must/Prefer/Avoid preferences — are the inputs it will use. Only buyers with confirmed criteria and reviewed funding can be qualified to shortlist.</p>
-</div>
+{% include "matches/_record_list.html" %}
 
 {% elif tab == 'history' %}
 <div class="split"><div>

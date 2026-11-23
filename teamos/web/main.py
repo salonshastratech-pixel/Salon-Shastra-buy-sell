@@ -52,9 +52,14 @@ def my_day():
                      "AND t.status = 'open')", (g.user["id"],))
     notes = db.all("SELECT * FROM notifications WHERE user_id = ? AND read_at IS NULL ORDER BY created_at DESC LIMIT 8",
                    (g.user["id"],))
+    from ..domain import matching as MM
+    forms_waiting = db.scalar("SELECT COUNT(*) FROM form_submissions s JOIN opportunities o ON o.id = s.opportunity_id "
+                              "WHERE s.status = 'submitted' AND o.primary_owner_id = ?", (g.user["id"],))
     return render_template("my_day.html", overdue=overdue, today=today, upcoming=upcoming, done_today=done_today,
                            calls_today=calls_today, conversations=conversations, no_next=no_next,
-                           notifications=notes, STAGE_LABELS=STAGE_LABELS)
+                           notifications=notes, STAGE_LABELS=STAGE_LABELS,
+                           match_tiles=MM.my_tiles(db, g.user["id"]) if g.user["role"] != "finance" else [],
+                           forms_waiting=forms_waiting)
 
 
 @bp.route("/team")
@@ -99,8 +104,15 @@ def team_board():
                          "(m.criteria_reviewed_version IS NOT NULL AND m.criteria_reviewed_version <> m.data_version) "
                          "OR o.stage IN ('form_received','funding_review')) ORDER BY o.updated_at")
     dup_open = db.scalar("SELECT COUNT(*) FROM duplicate_reviews WHERE status = 'open'")
+    from ..domain import matching as MM
+    match_counts = {k: db.scalar("SELECT COUNT(*) FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
+                                 "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + MM.ACTIVE_WHERE +
+                                 f" AND ({MM.QUEUES[k][1]})") for k in ("new", "info", "near", "consent", "ready", "stale")}
+    top_matches = db.all(MM.CAND_SELECT + "WHERE " + MM.ACTIVE_WHERE + " AND mc.suppressed = 0 AND mc.outcome IN "
+                         "('ready','near') ORDER BY mc.rank_score DESC LIMIT 5")
     return render_template("team.html", users=users, overdue=overdue, due_today=due_today, later=later,
                            exceptions=exceptions, unowned=unowned, review_queue=review_queue, buyer_queue=buyer_queue, dup_open=dup_open,
+                           match_counts=match_counts, top_matches=top_matches, MQ=MM.QUEUES,
                            who=who, STAGE_LABELS=STAGE_LABELS)
 
 
@@ -146,8 +158,9 @@ def dictionary():
 @bp.route("/planned/<module>")
 @login_required
 def planned(module):
-    if module in ("buyers", "forms"):  # shipped in Milestones 3 and 4
-        return redirect(url_for("buyers.index" if module == "buyers" else "forms.inbox"))
+    shipped = {"buyers": "buyers.index", "forms": "forms.inbox", "match": "matches.desk"}  # M3, M4, M5
+    if module in shipped:
+        return redirect(url_for(shipped[module]))
     names = {"match": ("Match Desk", "Milestone 5"),
              "forms": ("Forms & Data Requests", "Milestone 4"), "inbox": ("WhatsApp Team Inbox", "Milestone 7"),
              "deals": ("Deals / Workrooms", "Milestone 6"), "reports": ("Reports", "Milestone 7")}

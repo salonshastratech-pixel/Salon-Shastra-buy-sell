@@ -1,0 +1,18 @@
+{# "What unblocks the most matches" — the single most productive thing to ask this customer next. #}
+{% from "macros.html" import csrf %}
+{% if unblock %}
+<div class="card unblock">
+  <div class="card-h"><h2>Biggest unlock</h2><a class="small" href="{{ url_for(opp.kind ~ 's.detail', opp_id=opp.id, tab='matches') }}">Matches →</a></div>
+  <ul class="qlist">{% for u in unblock %}<li><strong>{{ u.text }}</strong> <span class="badge {{ 'warn' if u.blocking else 'info' }}">holds up {{ u.count }} match{{ 'es' if u.count > 1 }}</span></li>{% endfor %}</ul>
+  {% set fields = [] %}{% for u in unblock %}{% for k in u.fields %}{% if k not in fields %}{% set _ = fields.append(k) %}{% endif %}{% endfor %}{% endfor %}
+  {% if fields and not form_blockers %}
+  <form method="post" action="{{ url_for('forms.send', opp_id=opp.id) }}" class="inline">{{ csrf() }}
+    <input type="hidden" name="template_key" value="targeted">
+    {% for k in fields %}<input type="hidden" name="fields" value="{{ k }}">{% endfor %}
+    <input type="hidden" name="purpose" value="A few quick details so we can check the best options for you.">
+    <select name="channel"><option value="copy_link">Form link</option><option value="whatsapp_mock">WhatsApp (mock)</option></select>
+    <button class="btn sm primary">Ask all of these in one short form</button></form>
+  {% elif fields %}<p class="small unknown">Cannot send a form: {{ form_blockers|join('; ') }}.</p>{% endif %}
+  <p class="small muted">Ranked by how many possible matches each answer would move forward.</p>
+</div>
+{% endif %}

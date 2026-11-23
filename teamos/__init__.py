@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.4.0-m4"
+__version__ = "0.5.0-m5"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -119,8 +119,9 @@ def create_app(overrides: dict | None = None) -> Flask:
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL", (g.user["id"],))
         return ctx
 
-    from .web import admin, auth, buyers, forms, imports, main, public, sellers, tasks
-    for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp):
+    from .web import admin, auth, buyers, forms, imports, main, matches, public, sellers, tasks
+    for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
+               matches.bp):
         app.register_blueprint(bp)
     return app
 

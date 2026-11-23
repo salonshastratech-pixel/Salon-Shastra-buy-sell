@@ -1,0 +1,31 @@
+{% macro outcome_badge(c) -%}
+{%- set cls = {'ready': 'ok', 'near': 'info', 'blocked': 'bad', 'insufficient': 'grey'} -%}
+<span class="badge {{ cls.get(c.outcome, 'grey') }}">{{ M.OUTCOMES[c.outcome] }}</span>
+{%- endmacro %}
+
+{% macro gate_badge(c) -%}
+{%- if c.gate == 'pass' %}<span class="badge ok" title="Eligibility">Eligible</span>{% elif c.gate == 'review' %}<span class="badge warn" title="Eligibility">Needs a look</span>{% elif c.outcome != 'blocked' %}<span class="badge bad" title="Eligibility">Blocked</span>{% endif -%}
+{%- endmacro %}
+
+{% macro meter(pct, label) -%}
+<div class="mini-meter" title="{{ label }} {{ pct if pct is not none else '—' }}%"><span class="w{{ ((pct or 0) // 5) * 5 }}"></span></div>
+{%- endmacro %}
+
+{% macro scores(c) -%}
+<div class="scores">
+  <div><span class="score-n">{{ c.fit_score if c.fit_score is not none else '—' }}</span><span class="score-l">fit</span></div>
+  <div><span class="score-n">{{ c.coverage_pct }}%</span><span class="score-l">known</span></div>
+  <div><span class="badge {{ 'ok' if c.confidence == 'high' else 'warn' if c.confidence == 'medium' else 'grey' }}">{{ c.confidence }} confidence</span></div>
+</div>
+{%- endmacro %}
+
+{% macro money_line(c) -%}
+{%- if c.all_in_total is not none %}{{ c.all_in_total|inr }}{% if not c.all_in_complete %}+{% endif %}{% else %}?{% endif %} all-in
+vs {{ c.buyer_ceiling|inr if c.buyer_ceiling is not none else '?' }} ceiling
+{%- if c.all_in_total is not none and c.buyer_ceiling is not none -%}
+  {%- set gap = c.all_in_total - c.buyer_ceiling -%}
+  {% if gap > 0 %} <span class="unknown">({{ gap|inr }} over{{ ' already' if not c.all_in_complete }})</span>
+  {%- elif not c.all_in_complete %} <span class="muted">(total incomplete)</span>
+  {%- else %} <span class="ok-text">({{ (0 - gap)|inr }} headroom)</span>{% endif %}
+{%- endif -%}
+{%- endmacro %}

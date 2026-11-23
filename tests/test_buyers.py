@@ -138,7 +138,7 @@ def test_uat31_seller_executive_sees_buyer_record_including_funding_proof_but_no
     qual = seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
     assert b"Staff-reviewed" in qual and b"Seriousness" in qual and evidence.encode() in qual
     assert b"Must have" in seller_exec.get(f"/buyers/{opp_id}?tab=requirements").data
-    assert b"No match history yet" in seller_exec.get(f"/buyers/{opp_id}?tab=matches").data
+    assert b"Salons for this buyer" in seller_exec.get(f"/buyers/{opp_id}?tab=matches").data  # real Matches tab (M5)
     assert seller_exec.get("/admin/finance").status_code == 403  # Salon Shastra's own finance stays admin-only
     fin = login("fin@t.test")
     assert fin.get("/buyers/").status_code == 403 and fin.get(f"/buyers/{opp_id}").status_code == 403

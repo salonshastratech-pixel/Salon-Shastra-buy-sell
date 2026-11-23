@@ -16,13 +16,14 @@
 </div>
 
 <nav class="tabs">
-  {% for k, l in [('overview','Overview'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('history','History')] %}
+  {% for k, l in [('overview','Overview'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('matches','Matches'),('history','History')] %}
   <a href="{{ url_for('sellers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
 </nav>
 
 {% if tab == 'overview' %}
 <div class="split">
   <div>
+    {% include "matches/_unblock_card.html" %}
     <div class="card">
       <div class="card-h"><h2>Next action</h2></div>
       {% if tasks %}
@@ -242,6 +243,9 @@
   <div class="card"><h2>Decision history</h2>
     {% for a in approvals %}<div class="small"><strong>{{ a.decision|replace('_',' ')|capitalize }}</strong> at v{{ a.data_version }} by {{ a.actor_name }} · {{ a.at|ist }}{% if a.conditions %}<div class="muted">{{ a.conditions }}</div>{% endif %}</div>{% else %}<p class="muted small">No decisions yet.</p>{% endfor %}</div>
 </div></div>
+
+{% elif tab == 'matches' %}
+{% include "matches/_record_list.html" %}
 
 {% elif tab == 'history' %}
 <div class="grid g2">

@@ -141,6 +141,25 @@ def complete_task(db, actor: dict, task_id: int, outcome: str, next_title: str |
                                      "completed_by": actor["id"], "updated_at": now})
         _task_event(db, task_id, "completed", actor["id"], outcome[:200])
         refresh_next_action(db, task["entity_type"], task["entity_id"])
+        _close_parent_if_done(db, actor, task)
+
+
+def _close_parent_if_done(db, actor, task) -> None:
+    """A shared parent (e.g. a match task with buyer- and seller-side subtasks, UAT-35) closes itself when the
+    last open subtask is done, so nobody has to remember to tidy it up."""
+    pid = task.get("parent_task_id")
+    if not pid:
+        return
+    if db.scalar("SELECT COUNT(*) FROM tasks WHERE parent_task_id = ? AND status = 'open'", (pid,)):
+        return
+    parent = db.one("SELECT * FROM tasks WHERE id = ? AND status = 'open'", (pid,))
+    if not parent:
+        return
+    now = now_iso()
+    db.update("tasks", pid, {"status": "done", "outcome": "All subtasks completed", "completed_at": now,
+                             "completed_by": actor["id"], "updated_at": now})
+    _task_event(db, pid, "completed", actor["id"], "All subtasks completed")
+    refresh_next_action(db, parent["entity_type"], parent["entity_id"])
 
 
 def reassign_task(db, actor: dict, task_id: int, new_assignee_id: int, reason: str) -> None:

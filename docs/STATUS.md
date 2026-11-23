@@ -1,4 +1,34 @@
-# Feature status — Milestone 4 (23 Nov 2026, v0.4.0)
+# Feature status — Milestone 5 (23 Nov 2026, v0.5.0)
+
+Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
+
+## Milestone 5 — matching engine + Match Desk (awaiting founder review)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Rules catalogue v0.1 | **Built** | 23 criteria in the PRD's 10 factor families (A–J, weights 20/15/10/10/10/10/8/8/5/4 = 100). Deterministic; version stored with every result. Weights are proposals (D-09). |
+| Four separate outputs (§8.3) | **Built** | Eligibility gate (pass / needs a look / blocked), compatibility 0–100 over facts known on both sides, coverage % + confidence, operational readiness. Never collapsed into one number. |
+| Price = all-in vs all-in | **Built** | Seller's itemised all-in requirement vs buyer's hard ceiling. Unknown deposit = incomplete, never ₹0; incomplete totals never show "headroom" (regression test). Lowest acceptable price is used internally for near-matches but never displayed. |
+| Hard gates | **Built** | Must-have mismatches, budget over ceiling, excluded area, different city (unless buyer relocates), no authority, lease not transferable / too short with no renewal, do-not-contact. |
+| Near matches (§8.4) | **Built** | Flexible shortfalls (e.g. 4 chairs vs 6 preferred), adjacent areas, small budget gaps where the seller is negotiable — each with the condition needed. No concession is assumed. |
+| Next questions | **Built** | Every unknown or partial produces a concrete question for the buyer or seller side; blocked matches only show questions that could actually resolve the blocker. |
+| Readiness & approval | **Built** | Information required → awaiting verification (listing approved, criteria confirmed, funding reviewed) → awaiting consent (both sides' contact + sharing consent) → ready to approach. "Approve to approach" is reviewer-only and re-checks everything (UAT-13). |
+| Stale & incremental re-scoring (UAT-14/36) | **Built** | Input fingerprints per side; changed facts mark matches stale; only changed pairs are re-scored (record pages, Match Desk button, 15-minute worker job). Each changed result is kept as a snapshot. |
+| Suppression (UAT-49) | **Built** | Not suitable / buyer declined / seller declined need a reason; the match stays out of queues until either side's facts change or a revisit date passes, then resurfaces with an explanation. |
+| Match subtasks (UAT-35) | **Built** | One shared match task + independent buyer-side and seller-side tasks for each owner; duplicates reused; parent closes itself when both are done. |
+| Match Desk (§8.5) | **Built** | 14 queues incl. new, need information, near matches, awaiting verification/consent, ready, stale, blocked, not suitable; start from a buyer or a salon; min fit; "only mine". 360° comparison with per-family scores, decision timeline and scoring history. |
+| One-click actions | **Built** | Ask the buyer/owner the missing questions by targeted form (M4), split tasks, shortlist, approve, record interest, not suitable, hold, reopen, co-ordinator, notes with @mentions, re-score. |
+| Ranked lists per record (UAT-37/38) | **Built** | Matches tab on every buyer (salons) and salon (buyers), same rules, blocked last, confidentiality respected; finance has no access. |
+| Productivity layer | **Built** | *Biggest unlock* card on each record (the questions holding up the most matches, asked in one form); My Day matching tiles; Team Command Center match panel; one alert to both owners for a strong new match; `/` jumps to search. |
+| Introductions, visits, offers | **Planned (M6)** | Stages after "interest confirmed" are shown as coming in Deals. |
+| Geo distance / commute radius | **Planned** | Needs geocoded addresses; until then locality ranking + exclusions are used and no distance is claimed. |
+| PostgreSQL replay for the new SQL | **Not run** | No PostgreSQL here; SQL kept portable. |
+
+Tests: 124 automated tests pass (102 from M1–M4, 22 new for M5 covering PRD §8.7 examples 1–10 and UAT-10–14, 35–39, 49). Walked through in a real browser.
+
+---
+
+# Milestone 4 status (23 Nov 2026, v0.4.0)
 
 Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
 

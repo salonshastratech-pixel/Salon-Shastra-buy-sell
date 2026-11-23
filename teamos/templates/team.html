@@ -25,6 +25,9 @@
   <div>
     <div class="card"><div class="card-h"><h2>Exceptions: no next action</h2><span class="badge {{ 'bad' if exceptions else 'ok' }}">{{ exceptions|length }}</span></div>
       <ul class="tasks">{% for o in exceptions %}<li class="task"><div><div class="t small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }} · {{ o.salon_name or o.contact_name }}</a></div><div class="meta">{{ o.owner_name or 'Unowned' }} · {{ STAGE_LABELS.get(o.stage) }}</div></div></li>{% else %}<li class="empty">Every active record has a next action.</li>{% endfor %}</ul></div>
+    <div class="card"><div class="card-h"><h2>Matches needing attention</h2><a class="small" href="{{ url_for('matches.desk') }}">Match Desk →</a></div>
+      <div class="tiles">{% for k, n in match_counts.items() %}<a class="tile {{ 'hot' if n and k in ('new','ready') }}" href="{{ url_for('matches.desk', queue=k) }}"><span class="n">{{ n }}</span><span class="l">{{ MQ[k][0] }}</span></a>{% endfor %}</div>
+      <ul class="tasks">{% for c in top_matches %}<li class="task"><div><div class="t small"><a href="{{ url_for('matches.detail', cid=c.id) }}">{{ c.buyer_ref }} {{ c.buyer_name }} ↔ {{ c.seller_ref }} {{ c.salon_name }}</a></div><div class="meta">fit {{ c.fit_score }} · {{ c.coverage_pct }}% known · {{ c.headline }}</div></div></li>{% endfor %}</ul></div>
     <div class="card"><div class="card-h"><h2>Approval queue</h2><span class="badge">{{ review_queue|length }}</span></div>
       <ul class="tasks">{% for r in review_queue %}<li class="task"><div><div class="t small"><a href="{{ url_for('sellers.detail', opp_id=r.id, tab='approval') }}">{{ r.ref_code }} · {{ r.salon_name }}</a></div><div class="meta">{{ r.approval_state|replace('_',' ') }}</div></div></li>{% else %}<li class="empty">No listings awaiting review.</li>{% endfor %}</ul></div>
     <div class="card"><h2>Buyer review queue</h2>

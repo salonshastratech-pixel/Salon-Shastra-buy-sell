@@ -1,0 +1,24 @@
+{# Matches tab for a buyer (ranked salons, UAT-38) or a seller (ranked buyers, UAT-37). Expects match_rows, M, opp. #}
+{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line with context %}
+<div class="card">
+  <div class="card-h"><h2>{{ 'Salons for this buyer' if opp.kind == 'buyer' else 'Buyers for this salon' }}</h2>
+    <form method="post" action="{{ url_for('matches.recompute') }}">{{ csrf() }}<input type="hidden" name="{{ opp.kind }}" value="{{ opp.id }}"><input type="hidden" name="force" value="1"><button class="btn sm">Re-score</button></form></div>
+  {% if opp.kind == 'buyer' and mandate is defined and mandate.need_type not in BF.RESALE_NEEDS %}
+  <p class="flash warn small">{% if mandate.need_type == 'new_salon' %}This buyer wants to open a new salon, so they are not matched with salons for sale. Change the need type only if they confirm they would buy an existing salon.{% elif mandate.need_type == 'exploring' %}This buyer is only exploring, so they are not matched until a real need is confirmed.{% else %}Record what the buyer wants (need type) to start matching.{% endif %}</p>
+  {% elif opp.status != 'active' %}<p class="small muted">Only active records are matched.</p>{% endif %}
+  <p class="small muted">Ranked by fit weighted by how much is known. Blocked and not-suitable matches are listed last, with the reason.</p>
+</div>
+{% for c in match_rows %}
+<a class="match-card {{ 'is-blocked' if c.gate == 'blocked' or c.suppressed }} {{ 'is-stale' if c.stale }}" href="{{ url_for('matches.detail', cid=c.id) }}">
+  <div class="mc-head">
+    <div class="mc-pair"><strong>{% if opp.kind == 'buyer' %}{{ c.seller_ref }} {{ c.salon_name }}{% else %}{{ c.buyer_ref }} {{ c.buyer_name }}{% endif %}</strong>
+      <div class="small muted">{% if opp.kind == 'buyer' %}{{ c.salon_locality }}, {{ c.salon_city }} · {% endif %}{{ money_line(c) }}</div></div>
+    {{ scores(c) }}
+  </div>
+  <div class="mc-badges">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span>
+    {% if c.stage != 'suggested' %}<span class="badge info">{{ M.STAGES[c.stage] }}</span>{% endif %}</div>
+  <div class="mc-why">{{ c.headline }}</div>
+  {% if c.next_question and not c.suppressed %}<div class="mc-next">Next: {{ c.next_question }}</div>{% endif %}
+  <div class="small muted">{% if opp.kind == 'buyer' %}Salon side: {{ c.seller_owner or 'unowned' }}{% else %}Buyer side: {{ c.buyer_owner or 'unowned' }}{% endif %}{% if c.open_tasks %} · {{ c.open_tasks }} open task{{ 's' if c.open_tasks > 1 }}{% endif %}</div>
+</a>
+{% else %}<div class="card empty">No matches yet.</div>{% endfor %}

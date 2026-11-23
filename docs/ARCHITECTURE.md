@@ -53,7 +53,7 @@ teamos/
     seller_fields.py field dictionary (single source for forms, privacy, matching inputs)
     sellers.py       lead creation, dedupe, provenance, all-in cost, financials, readiness, stages, approval
     tasks.py         tasks, next-action rule, activities, notifications
-    buyers.py (M3 ✓)   forms.py + form_templates.py (M4 ✓)   (M5) matching/   (M6) deals.py, finance.py   (M7) messaging/
+    buyers.py (M3 ✓)   forms.py + form_templates.py (M4 ✓)   matching.py (M5 ✓)   (M5) matching/   (M6) deals.py, finance.py   (M7) messaging/
   web/               thin HTTP handlers per area (auth, main, sellers, tasks, admin)
   templates/, static/
 migrations/          0001_foundation.sql, …

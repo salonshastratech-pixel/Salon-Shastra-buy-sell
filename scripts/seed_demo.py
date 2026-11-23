@@ -39,6 +39,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM form_invitations"):
             seed_forms(db)  # demo database created before Milestone 4
             added.append("forms & requests (M4)")
+        if not db.scalar("SELECT COUNT(*) FROM match_candidates"):
+            seed_matches(db)  # demo database created before Milestone 5
+            added.append("scored matches (M5)")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -177,6 +180,7 @@ def seed(db):
                       entity_type="opportunity", entity_id=o2, is_synthetic=1)
     seed_buyers(db)
     seed_forms(db)
+    seed_matches(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -356,3 +360,29 @@ def seed_forms(db):
         "full_name": "Nisha Verma (demo)", "phone": "9000000302", "city": "Hyderabad", "locality": "Madhapur",
         "need_type": "franchise", "decision_maker": "shared", "all_in_max": "45L", "purchase_window": "90d",
         "consent_contact": "1"}, F.hash_ip("seed", "seed"), "seed", is_synthetic=1)
+
+
+def seed_matches(db):
+    """Milestone 5: score every synthetic buyer against every synthetic salon and stage a few realistic decisions."""
+    from teamos.domain import matching as MT
+    u = {r["email"].split("@")[0]: r for r in db.all("SELECT * FROM users WHERE is_synthetic = 1")}
+    MT.refresh(db)
+
+    def find(buyer_phone, salon):
+        return db.scalar("SELECT mc.id FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
+                         "JOIN contacts c ON c.id = bo.contact_id JOIN opportunities so ON so.id = mc.seller_opp_id "
+                         "JOIN salon_businesses b ON b.id = so.business_id WHERE c.phone_normalized = ? AND b.name = ?",
+                         (buyer_phone, salon))
+
+    best = find("+919000000201", "Glow Studio Unisex")       # Arjun: strong fit, waiting for seller consent
+    if best:
+        MT.change_stage(db, u["harika"], best, "shortlisted", note="Strong fit; ask Kavya for teaser consent")
+        MT.set_owner(db, u["harika"], best, u["lead"]["id"])
+    over = find("+919000000102", "Glow Studio Unisex")       # Imran: ₹30.8 L all-in vs ₹25 L ceiling
+    if over:
+        MT.change_stage(db, u["harika"], over, "buyer_declined", reason="budget",
+                        note="Imran confirmed he cannot go above 25 L")
+    near = find("+919000000204", "Glow Studio Unisex")       # Lakshmi: near match, ₹2.8 L over
+    if near:
+        MT.create_subtasks(db, u["harika"], near, "Ask Lakshmi if she can stretch the all-in budget by 2.8 L",
+                           "Ask Kavya whether there is any flexibility on the 22 L asking price", None)

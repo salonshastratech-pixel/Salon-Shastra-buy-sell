@@ -5,7 +5,8 @@
   <div><h1>Good to see you, {{ current_user.full_name.split()[0] }}</h1>
   <div class="sub">{{ now_iso()|ist('%A, %d %B %Y') }} · ordered by what needs you first</div></div>
   <div class="actions">
-    {% if can('crm.create') %}<a class="btn primary" href="{{ url_for('sellers.new') }}">+ New seller lead</a>{% endif %}
+    {% if can('crm.create') %}<a class="btn primary" href="{{ url_for('sellers.new') }}">+ Seller lead</a>
+    <a class="btn primary" href="{{ url_for('buyers.new') }}">+ Buyer lead</a>{% endif %}
     <a class="btn" href="{{ url_for('tasks.index') }}">All my tasks</a>
   </div>
 </div>
@@ -41,6 +42,12 @@
     </div>
   </div>
   <div>
+<div class="card">
+      <div class="card-h"><h2>Matching</h2><a class="small" href="{{ url_for('matches.desk', mine='1') }}">My matches →</a></div>
+      <div class="tiles">{% for t in match_tiles %}<a class="tile {{ 'hot' if t.count and t.key in ('new','ready') }}" href="{{ url_for('matches.desk', queue=t.key, mine='1') }}"><span class="n">{{ t.count }}</span><span class="l">{{ t.label }}</span></a>{% endfor %}</div>
+      {% if forms_waiting %}<p><a class="btn sm" href="{{ url_for('forms.inbox') }}">{{ forms_waiting }} customer form{{ 's' if forms_waiting > 1 }} waiting for your review →</a></p>{% endif %}
+      <p class="small muted">Customer WhatsApp replies (M7) and visits/offers (M6) will appear here when those modules ship.</p>
+    </div>
     <div class="card" id="notifications">
       <div class="card-h"><h2>Alerts &amp; mentions</h2>
         {% if notifications %}<form method="post" action="{{ url_for('main.notifications_read') }}">{{ csrf() }}<button class="btn link small">Mark all read</button></form>{% endif %}</div>
@@ -50,10 +57,7 @@
       <div class="card-h"><h2>Completed today</h2></div>
       <ul class="tasks">{% for t in done_today %}<li class="task"><div><div class="t small">{{ t.title }}</div><div class="meta">{{ t.outcome }}</div></div></li>{% else %}<li class="empty">Nothing completed yet today.</li>{% endfor %}</ul>
     </div>
-    <div class="card">
-      <h3>Coming in later milestones</h3>
-      <p class="small muted">Customer WhatsApp replies (M7), forms received for review (M4), match candidates to review (M5) and visits (M6) will appear here as those modules ship. They are not simulated.</p>
-    </div>
+    
   </div>
 </div>
 {% endblock %}

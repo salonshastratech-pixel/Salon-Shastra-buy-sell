@@ -1,0 +1,120 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line with context %}
+{% block title %}Match {{ c.buyer_ref }} ↔ {{ c.seller_ref }}{% endblock %}
+{% block content %}
+{% set back = request.path %}
+<div class="ph"><div>
+  <div class="small muted"><a href="{{ url_for('matches.desk') }}">Match Desk</a> / {{ c.buyer_ref }} ↔ {{ c.seller_ref }}</div>
+  <h1><a href="{{ url_for('buyers.detail', opp_id=c.buyer_opp_id) }}">{{ c.buyer_name }}</a> <span class="muted">↔</span> <a href="{{ url_for('sellers.detail', opp_id=c.seller_opp_id) }}">{{ c.salon_name }}</a></h1>
+  <div class="inline sub">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span> <span class="badge info">{{ M.STAGES[c.stage] }}</span>
+    {% if c.stale %}<span class="badge warn">Facts changed since scoring</span>{% endif %}
+    <span class="small muted">{{ c.salon_locality }}, {{ c.salon_city }} · scored {{ c.computed_at|rel }}</span></div>
+</div>
+<div class="actions"><form method="post" action="{{ url_for('matches.recompute_one', cid=c.id) }}">{{ csrf() }}<button class="btn {{ 'primary' if c.stale }}">Re-score</button></form></div></div>
+
+<div class="four">
+  <div class="stat"><div class="l">1 · Eligibility</div><div class="n small-n">{{ {'pass': 'Eligible', 'review': 'Needs a look', 'blocked': 'Blocked'}[c.gate] }}</div>
+    <div class="l">{{ r.gates|length }} gate note{{ 's' if r.gates|length != 1 }}</div></div>
+  <div class="stat"><div class="l">2 · Compatibility</div><div class="n">{{ c.fit_score if c.fit_score is not none else '—' }}<span class="small muted">/100</span></div><div class="l">over facts known on both sides</div></div>
+  <div class="stat"><div class="l">3 · Coverage</div><div class="n">{{ c.coverage_pct }}%</div><div class="l">{{ c.confidence }} confidence{% if r.uncertain_economics %} · economics uncertain{% endif %}</div></div>
+  <div class="stat"><div class="l">4 · Readiness</div><div class="n small-n">{{ M.readiness_label(c) }}</div><div class="l">what the team may do next</div></div>
+</div>
+
+<div class="split"><div>
+  <div class="card">
+    <div class="card-h"><h2>Why</h2><span class="small">{{ money_line(c) }}</span></div>
+    {% for gt in r.gates %}<div class="flash {{ 'error' if gt.severity == 'blocked' else 'warn' }} small">{{ gt.text }}</div>{% else %}<p><strong>{{ c.headline }}</strong></p>{% endfor %}
+    {% if c.readiness == 'awaiting_verification' and r.verification_missing %}<p class="small">Before approaching: {{ r.verification_missing|join('; ') }}.</p>{% endif %}
+    {% if c.readiness == 'awaiting_consent' and r.consent_missing %}<p class="small">Consent still needed: {{ r.consent_missing|join('; ') }}. A perfect score never overrides consent.</p>{% endif %}
+    <p class="small muted">Compatibility is a weighted fit, not the chance of a deal. Seller figures are declared unless marked reviewed; this page never estimates returns or payback.</p>
+  </div>
+
+  <div class="card flush">
+    <div class="card-h"><h2>&nbsp;&nbsp;Buyer wants vs salon has</h2><span class="small muted">{{ r.rules_version }}</span></div>
+    <div class="table-wrap"><table class="cmp">
+      <tr><th>Criterion</th><th>Buyer wants</th><th>Salon has</th><th>Result</th></tr>
+      {% for fam in families %}
+      <tr class="fam"><td colspan="4"><strong>{{ fam.key }} · {{ fam.label }}</strong> <span class="muted small">weight {{ fam.weight }}{% if fam.possible %} · {{ fam.earned }}/{{ fam.possible }} on known facts{% endif %}</span></td></tr>
+      {% for f in fam.factors if f.result != 'na' %}
+      <tr class="res-{{ f.result }}"><td>{{ f.label }}{% if f.hard %} <span class="badge bad">hard</span>{% endif %}</td>
+        <td>{{ f.buyer or '—' }}</td><td>{{ f.seller if f.seller is not none else '' }}{% if f.seller is none %}<span class="missing">Unknown</span>{% endif %}</td>
+        <td><span class="badge {{ {'match': 'ok', 'partial': 'info', 'miss': 'bad', 'unknown': 'grey'}[f.result] }}">{{ {'match': 'Fits', 'partial': 'Partly', 'miss': 'Conflict', 'unknown': 'Unknown'}[f.result] }}</span>
+          {% if f.note %}<div class="small muted">{{ f.note }}</div>{% endif %}</td></tr>
+      {% endfor %}
+      {% set na = fam.factors|selectattr('result', 'equalto', 'na')|list %}{% if na %}<tr class="res-na"><td colspan="4" class="small muted">Not applicable for this buyer: {{ na|map(attribute='label')|join(', ') }}</td></tr>{% endif %}
+      {% endfor %}
+    </table></div>
+  </div>
+
+  <div class="card"><h2>Decision timeline</h2>
+    <ul class="timeline">{% for e in events %}<li><div>{% if e.event == 'stage' %}<strong>{{ M.STAGES.get(e.from_stage, e.from_stage) }} → {{ M.STAGES.get(e.to_stage, e.to_stage) }}</strong>{% if e.reason %} — {{ e.reason }}{% endif %}{% if e.body %}: {{ e.body }}{% endif %}
+      {% elif e.event == 'note' %}<strong>Note:</strong> {{ e.body }}{% else %}{{ e.body or e.event }}{% endif %}</div>
+      <div class="who">{{ e.actor_name or 'System' }} · {{ e.at|ist }}</div></li>{% endfor %}</ul>
+    <details class="disclose"><summary>Scoring history ({{ snaps|length }})</summary>
+      <table class="small">{% for s in snaps %}<tr><td>{{ s.computed_at|ist }}</td><td>{{ s.trigger|replace('_',' ') }}</td><td>buyer v{{ s.buyer_version }} · salon v{{ s.seller_version }}</td></tr>{% endfor %}</table>
+      <p class="small muted">Every result that changed is kept with the data versions and rules version it was based on.</p></details>
+  </div>
+</div><div>
+  <div class="card">
+    <h2>Next steps</h2>
+    {% if not buyer_q and not seller_q %}<p class="small muted">{% if c.gate == 'blocked' %}No question resolves this conflict — consider marking it not suitable.{% else %}Nothing missing for scoring.{% endif %}</p>{% endif %}
+    {% for side, qs, owner in [('buyer', buyer_q, c.buyer_owner), ('seller', seller_q, c.seller_owner)] if qs %}
+    <h3>From the {{ 'buyer' if side == 'buyer' else 'salon owner' }} <span class="small muted">({{ owner or 'unowned' }})</span></h3>
+    <ul class="qlist">{% for q in qs %}<li>{% if q.blocking %}<span class="badge warn">key</span> {% endif %}{{ q.text }}</li>{% endfor %}</ul>
+    {% set fieldq = qs|selectattr('fields')|list %}
+    {% if fieldq %}<form method="post" action="{{ url_for('matches.ask', cid=c.id, side=side) }}" class="inline">{{ csrf() }}
+      <select name="channel"><option value="copy_link">Form link</option><option value="whatsapp_mock">WhatsApp (mock)</option></select>
+      <button class="btn sm primary">Ask the {{ 'buyer' if side == 'buyer' else 'owner' }} these by form</button></form>{% endif %}
+    {% endfor %}
+    <details class="disclose" {{ 'open' if buyer_q or seller_q }}><summary>Split the work: one task per side</summary>
+      <form method="post" action="{{ url_for('matches.tasks', cid=c.id) }}">{{ csrf() }}
+        <div class="field"><label>Buyer side → {{ c.buyer_owner or 'buyer owner' }}</label><input name="buyer_task" value="{{ buyer_q[0].text if buyer_q else '' }}"></div>
+        <div class="field"><label>Salon side → {{ c.seller_owner or 'seller owner' }}</label><input name="seller_task" value="{{ seller_q[0].text if seller_q else '' }}"></div>
+        <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at"></div>
+        <button class="btn">Create linked tasks</button>
+        <p class="small muted">Each owner sees their task on My Day; the shared match task closes itself when both are done. Existing identical tasks are reused, so nobody calls twice.</p>
+      </form></details>
+    {% for p in tasks %}<div class="task-group"><div class="small"><strong>{{ p.title }}</strong> — {{ p.done }}/{{ p.children|length }} done{% if p.status == 'done' %} <span class="badge ok">closed</span>{% endif %}</div>
+      {% for ch in p.children %}<div class="small">{{ '✓' if ch.status == 'done' else '○' }} <a href="{{ url_for('tasks.detail', task_id=ch.id) }}">{{ ch.title }}</a> · {{ ch.assignee_name }}</div>{% endfor %}</div>{% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>Move this match</h2>
+    <div class="stage-buttons">
+      {% if c.stage in ('suggested', 'on_hold') %}<form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}<input type="hidden" name="to" value="shortlisted"><button class="btn">Shortlist</button></form>{% endif %}
+      {% if c.stage in ('suggested', 'shortlisted') %}<form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}<input type="hidden" name="to" value="approved_to_approach">
+        {% set why_not = 'Reviewer (team lead / admin) only' if not can_approve else ('Not yet: ' ~ M.readiness_label(c)|lower) if c.readiness != 'ready_to_approach' or c.gate != 'pass' else '' %}
+        <button class="btn {{ 'primary' if not why_not }}" {{ 'disabled' if why_not }} title="{{ why_not }}">Approve to approach</button></form>
+        {% if why_not and can_approve %}<span class="small muted">{{ why_not }}</span>{% endif %}{% endif %}
+      {% if c.stage == 'approved_to_approach' %}<form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}<input type="hidden" name="to" value="interest_confirmed">
+        <input name="note" placeholder="Who confirmed interest?" required><button class="btn primary">Record interest</button></form>{% endif %}
+      {% if c.suppressed or c.stage == 'on_hold' %}<form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}<input type="hidden" name="to" value="suggested"><button class="btn">Reopen</button></form>{% endif %}
+    </div>
+    {% if c.stage in ('approved_to_approach', 'interest_confirmed') %}<p class="small muted">{{ M.FUTURE_STAGES }}.</p>{% endif %}
+    {% if not c.suppressed %}
+    <details class="disclose"><summary>Not suitable / declined</summary>
+      <form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}
+        <div class="field"><label>Outcome</label><select name="to"><option value="not_suitable">Not suitable</option><option value="buyer_declined">Buyer declined</option><option value="seller_declined">Seller declined</option></select></div>
+        <div class="field"><label>Main reason</label><select name="reason" required><option value="">Choose…</option>{% for v, l in M.REJECT_REASONS %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Note</label><input name="note" placeholder="e.g. Buyer felt the rent was too high"></div>
+        <div class="field"><label>Look again on (optional)</label><input type="datetime-local" name="revisit_on"></div>
+        <button class="btn">Save</button>
+        <p class="small muted">It won't come back for the same facts. It returns automatically if either side's details change, or on the date you set.</p>
+      </form></details>
+    <details class="disclose"><summary>Put on hold</summary>
+      <form method="post" action="{{ url_for('matches.stage', cid=c.id) }}">{{ csrf() }}<input type="hidden" name="to" value="on_hold">
+        <div class="field"><input name="note" placeholder="Why?"></div><div class="field"><label>Revisit on</label><input type="datetime-local" name="revisit_on"></div><button class="btn">Hold</button></form></details>
+    {% else %}<p class="small">Marked <strong>{{ M.STAGES[c.stage]|lower }}</strong>{% if c.suppressed_reason %} ({{ dict(M.REJECT_REASONS).get(c.suppressed_reason) }}){% endif %}{% if c.suppressed_note %}: {{ c.suppressed_note }}{% endif %}.{% if c.revisit_on %} Revisit {{ c.revisit_on|ist('%d %b %Y') }}.{% endif %}</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Team</h2>
+    <p class="small">Buyer side: <strong>{{ c.buyer_owner or 'unowned' }}</strong>{% if c.buyer_last_contact %} · last contact {{ c.buyer_last_contact|rel }}{% endif %}<br>
+    Salon side: <strong>{{ c.seller_owner or 'unowned' }}</strong>{% if c.seller_last_contact %} · last contact {{ c.seller_last_contact|rel }}{% endif %}</p>
+    <form method="post" action="{{ url_for('matches.owner', cid=c.id) }}" class="inline">{{ csrf() }}
+      <select name="owner_id"><option value="">No co-ordinator</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == c.match_owner_id }}>{{ u.full_name }}</option>{% endfor %}</select>
+      <button class="btn sm">Set co-ordinator</button></form>
+    <form method="post" action="{{ url_for('matches.note', cid=c.id) }}">{{ csrf() }}
+      <div class="field"><textarea name="body" placeholder="Internal note. Use @firstname to bring a colleague in." required></textarea></div><button class="btn">Add note</button></form>
+  </div>
+</div></div>
+{% endblock %}

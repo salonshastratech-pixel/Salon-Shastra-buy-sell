@@ -38,4 +38,12 @@
     };
     stageSel.addEventListener('change', upd); upd();
   }
+  // Press "/" anywhere (outside a text box) to jump to the global search.
+  document.addEventListener('keydown', function (e) {
+    var t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var q = document.querySelector('header input[type="search"], .top input[type="search"], input[name="q"]');
+      if (q) { e.preventDefault(); q.focus(); q.select(); }
+    }
+  });
 })();

@@ -45,6 +45,7 @@ def schedule_periodic(db) -> None:
     bucket = n.replace(minute=(n.minute // 15) * 15, second=0)
     enqueue(db, "sla_sweep", dedupe_key="sla_sweep:" + bucket.strftime("%Y%m%d%H%M"))
     enqueue(db, "form_chase", dedupe_key="form_chase:" + n.strftime("%Y%m%d%H"))  # hourly
+    enqueue(db, "match_refresh", dedupe_key="match_refresh:" + bucket.strftime("%Y%m%d%H%M"))  # every 15 min
 
 
 def run_once(db, limit: int = 20) -> int:
@@ -122,6 +123,14 @@ def form_chase(db, payload) -> str:
     """Chase personal form links not completed after 48 h (one task each) and expire old links (PRD §10.4)."""
     from .domain import forms
     return forms.chase_and_expire(db)
+
+
+@handler("match_refresh")
+def match_refresh(db, payload) -> str:
+    """Incremental re-evaluation: only buyer/salon pairs whose inputs changed are recomputed (PRD §8.6)."""
+    from .domain import matching
+    st = matching.refresh(db)
+    return f"evaluated {st['evaluated']} ({st['new']} new), unchanged {st['unchanged']}"
 
 
 @handler("noop")

@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line with context %}
+{% block title %}Match Desk{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Match Desk</h1>
+  <div class="sub">Every active buyer against every active salon — ranked, explained, and with the next step. Scores are recommendations, never permission to introduce.</div></div>
+  <div class="actions"><form method="post" action="{{ url_for('matches.recompute') }}">{{ csrf() }}<button class="btn">Refresh matches</button></form></div></div>
+
+{% if stale %}<div class="flash warn">{{ stale }} match(es) have new buyer or salon information since they were scored.
+  <form method="post" action="{{ url_for('matches.recompute') }}" class="inline-form">{{ csrf() }}<button class="btn sm primary">Re-score now</button></form></div>{% endif %}
+
+<div class="desk">
+  <aside class="desk-side">
+    <div class="card">
+      <h3>Queues</h3>
+      <ul class="queue-list">{% for k, (label, _c) in M.QUEUES.items() %}
+        <li class="{{ 'on' if k == queue }}"><a href="{{ url_for('matches.desk', queue=k, buyer=buyer, seller=seller, mine='1' if mine else None, min_fit=min_fit) }}">{{ label }}</a><span class="badge {{ 'warn' if counts[k] and k in ('new','ready','near') else 'grey' }}">{{ counts[k] }}</span></li>{% endfor %}</ul>
+    </div>
+    <form class="card" method="get">
+      <h3>Start from</h3>
+      <input type="hidden" name="queue" value="{{ queue }}">
+      <div class="field"><label>A buyer</label><select name="buyer"><option value="">Any buyer</option>{% for b in buyers %}<option value="{{ b.id }}" {{ 'selected' if buyer == b.id|string }}>{{ b.ref_code }} · {{ b.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>A salon</label><select name="seller"><option value="">Any salon</option>{% for s in sellers %}<option value="{{ s.id }}" {{ 'selected' if seller == s.id|string }}>{{ s.ref_code }} · {{ s.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Minimum fit</label><select name="min_fit"><option value="">Any</option>{% for v in [50, 60, 70, 80, 90] %}<option value="{{ v }}" {{ 'selected' if min_fit == v|string }}>{{ v }}+</option>{% endfor %}</select></div>
+      <label class="check small"><input type="checkbox" name="mine" value="1" {{ 'checked' if mine }}> Only my buyers / salons</label>
+      <button class="btn">Apply</button>
+      <p class="small muted">Last scored {{ last|rel if last else 'never' }}. Re-scored automatically every 15 minutes when the worker runs, and whenever you open a buyer's or salon's Matches tab.</p>
+    </form>
+  </aside>
+
+  <div class="desk-main">
+    <h2 class="desk-title">{{ M.QUEUES[queue][0] }} <span class="muted small">· {{ rows|length }}</span></h2>
+    {% for c in rows %}
+    <a class="match-card {{ 'is-blocked' if c.gate == 'blocked' }} {{ 'is-stale' if c.stale }}" href="{{ url_for('matches.detail', cid=c.id) }}">
+      <div class="mc-head">
+        <div class="mc-pair"><strong>{{ c.buyer_ref }} {{ c.buyer_name }}</strong> <span class="muted">↔</span> <strong>{{ c.seller_ref }} {{ c.salon_name }}</strong>
+          <div class="small muted">{{ c.salon_locality }}, {{ c.salon_city }} · {{ money_line(c) }}</div></div>
+        {{ scores(c) }}
+      </div>
+      <div class="mc-badges">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span>
+        {% if c.stage != 'suggested' %}<span class="badge info">{{ M.STAGES[c.stage] }}</span>{% endif %}
+        {% if c.red_flags %}<span class="badge bad">{{ c.red_flags }} red flag{{ 's' if c.red_flags > 1 }}</span>{% endif %}
+        {% if c.stale %}<span class="badge warn">stale — re-score</span>{% endif %}
+        {% if c.open_tasks %}<span class="badge info">{{ c.open_tasks }} open task{{ 's' if c.open_tasks > 1 }}</span>{% endif %}</div>
+      <div class="mc-why">{{ c.headline }}</div>
+      {% if c.next_question %}<div class="mc-next">Next: {{ c.next_question }}</div>{% endif %}
+      <div class="small muted">Buyer side: {{ c.buyer_owner or 'unowned' }}{% if c.buyer_last_contact %} (last contact {{ c.buyer_last_contact|rel }}){% endif %} · Salon side: {{ c.seller_owner or 'unowned' }}{% if c.seller_last_contact %} (last contact {{ c.seller_last_contact|rel }}){% endif %}{% if c.match_owner %} · Co-ordinator: {{ c.match_owner }}{% endif %}</div>
+    </a>
+    {% else %}
+    <div class="card empty">Nothing in this queue{% if buyer or seller or mine or min_fit %} with these filters{% endif %}. {% if queue == 'new' %}Try <a href="{{ url_for('matches.desk', queue='all') }}">All active</a>.{% endif %}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -60,3 +60,14 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-31 | Public form abuse limits | Signed 2-hour form token, honeypot, max 5 submissions per IP per hour. | PM | Proposed |
 | D-32 | Documents | PDF/PNG/JPG up to 5 MB, encrypted at rest. Seller documents: owner, approvers, grants. Buyer documents: whole team (D-22), finance by grant. Retention period not set (D-16). | Founder / legal | Proposed |
 | D-33 | Prefilling personal forms | Detailed forms show the record's current answers so the customer corrects rather than retypes — except confidential seller fields (address, lowest price, private reason). | Founder | Proposed |
+
+## Added in Milestone 5 (proposals — configurable, pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-09 | Match scoring | Implemented as `match-rules v0.1`: PRD §8.2 family weights; 23 criteria (see `teamos/domain/matching.py`). Calibrate after the first real outcomes. | Founder / PM | Proposed (built) |
+| D-34 | Near-match budget gap | A salon over the buyer's all-in ceiling is a *near match* only if the seller said the price is negotiable and the gap is ≤ ₹3 L or ≤ 10% of the ceiling — or it fits within the seller's volunteered lowest price. Otherwise it is blocked. | Founder | Proposed |
+| D-35 | Who approves "approach" | Team lead / admin (`evidence.review`), only when: eligible, listing approved, criteria confirmed, funding reviewed, contact + sharing consent from both sides. | Founder | Proposed |
+| D-36 | Suppression | Declined / not suitable needs a reason; resurfaces only on changed facts or a revisit date. | Team lead | Proposed |
+| D-37 | Strong-match alert | One internal alert to the buyer and salon owners when a match first reaches fit ≥ 70 with ≥ 60% known (ready or near). Never sent to customers. | Team lead | Proposed |
+| D-38 | City mismatch | Different city is a hard conflict unless the buyer said they would relocate (then a partial fit). | Founder | Proposed |
