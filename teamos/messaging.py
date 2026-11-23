@@ -53,6 +53,34 @@ TEMPLATES = {
     "inactive_followup": ("Polite follow-up", "service",
                           "Hello {name}, this is {sender} from Salon Shastra checking in. Are you still exploring your "
                           "salon plans? Reply STOP to opt out."),
+    "call_thanks_seller": ("After call — seller thank-you", "service",
+                           "Hello {name}, this is {sender} from Salon Shastra. Thank you for speaking with me today. As "
+                           "discussed, we handle your salon sale confidentially: your salon's name is never shared without "
+                           "your approval. Save this number to reach me directly. Reply STOP to opt out."),
+    "call_thanks_buyer": ("After call — buyer thank-you", "service",
+                          "Hello {name}, this is {sender} from Salon Shastra. Thank you for your time today. I will "
+                          "shortlist salons that fit your budget and preferred areas and share confidential summaries "
+                          "with you. Save this number to reach me directly. Reply STOP to opt out."),
+    "callback_confirm": ("Call-back confirmation", "service",
+                         "Hello {name}, this is {sender} from Salon Shastra. As requested, I will call you back on "
+                         "{when}. Reply here if another time suits you better. Reply STOP to opt out."),
+    "docs_checklist": ("Seller documents checklist", "service",
+                       "Hello {name}, this is {sender} from Salon Shastra. Thank you for the details. To verify your "
+                       "salon and move ahead, please keep these ready: rent agreement, last 6 months' sales summary and "
+                       "the equipment list. Reply STOP to opt out."),
+    "funds_proof": ("Buyer proof-of-funds request", "service",
+                    "Hello {name}, this is {sender} from Salon Shastra. To show you serious options first, please keep "
+                    "proof of funds ready (bank statement or loan sanction letter). I will share a secure link to upload "
+                    "it. Reply STOP to opt out."),
+    "listing_live": ("Listing is live (seller)", "service",
+                     "Hello {name}, this is {sender} from Salon Shastra. Your salon is now listed confidentially with us. "
+                     "We will speak to you before any detail is shared with a buyer. Reply STOP to opt out."),
+    "shortlist_update": ("Shortlist in progress (buyer)", "service",
+                         "Hello {name}, this is {sender} from Salon Shastra. I am shortlisting salons in {area} within "
+                         "your budget and will send confidential summaries soon. Reply STOP to opt out."),
+    "next_steps": ("After call — next steps", "service",
+                   "Hello {name}, this is {sender} from Salon Shastra. Thank you for your time today. I will follow up "
+                   "with the next steps as discussed. Reply STOP to opt out."),
     "optout_confirm": ("Opt-out confirmation", "service",
                        "You will not receive further messages from Salon Shastra. Reply START if you change your mind."),
     "market_update": ("Market update (marketing)", "marketing",
@@ -64,6 +92,11 @@ PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
 
 def placeholders(body: str) -> list[str]:
     return sorted(set(PLACEHOLDER.findall(body or "")))
+
+
+def ordered_placeholders(body: str) -> list[str]:
+    """Placeholders in order of first appearance = Meta's {{1}}, {{2}} … parameter order for the approved template."""
+    return list(dict.fromkeys(PLACEHOLDER.findall(body or "")))
 
 
 def render(body_or_key: str, variables: dict) -> str:
@@ -80,7 +113,7 @@ class MockWhatsAppProvider:
     label = PROVIDER_LABEL
     is_live = False
 
-    def send(self, to_phone: str, body: str, template: str | None = None) -> dict:
+    def send(self, to_phone: str, body: str, template: str | None = None, **_live_only) -> dict:
         if not to_phone:
             return {"status": "failed", "detail": "No phone number"}
         return {"status": "provider_accepted", "provider_message_id": f"mock-{uuid.uuid4().hex[:16]}",
@@ -104,7 +137,7 @@ class MetaCloudProvider:
         self.label = f"Meta WhatsApp Cloud API (number id …{phone_number_id[-4:]})"
 
     def send(self, to_phone: str, body: str, template: str | None = None, template_name: str | None = None,
-             language: str = "en", params: list[str] | None = None) -> dict:
+             language: str = "en", params: list[str] | None = None, from_number_id: str | None = None) -> dict:
         import socket
         import urllib.error
         import urllib.request
@@ -117,7 +150,7 @@ class MetaCloudProvider:
             payload = {"messaging_product": "whatsapp", "to": to_phone.lstrip("+"), "type": "text",
                        "text": {"body": body}}
         req = urllib.request.Request(
-            f"https://graph.facebook.com/{GRAPH_VERSION}/{self.phone_number_id}/messages",
+            f"https://graph.facebook.com/{GRAPH_VERSION}/{from_number_id or self.phone_number_id}/messages",
             data=json.dumps(payload).encode(), method="POST",
             headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"})
         try:

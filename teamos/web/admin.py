@@ -235,12 +235,22 @@ def integrations():
     if request.method == "POST" and request.form.get("action") == "retry":
         flash(I.retry_failed_events(db), "ok")
         return redirect(url_for("admin.integrations"))
+    if request.method == "POST" and request.form.get("action") == "team_number":
+        f = request.form
+        try:
+            I.set_team_number(db, g.user, int(f.get("user_id") or 0), f.get("wa_number"), f.get("number_id"))
+            flash("WhatsApp number saved.", "ok")
+        except ValidationError as e:
+            flash(" ".join(str(v) for v in e.errors.values()), "error")
+        return redirect(url_for("admin.integrations") + "#numbers")
     cfg = current_app.config
     events = db.all("SELECT * FROM webhook_events ORDER BY id DESC LIMIT 30")
     return render_template("admin/integrations.html", wa=messaging.whatsapp_status(cfg),
                            email=messaging.email_provider(cfg), files_ok=bool(cfg.get("FILES_KEY")),
                            public_url=cfg.get("PUBLIC_BASE_URL") or "", events=events,
-                           failed=sum(1 for e in events if e["status"] == "failed"), WA_SETTINGS=messaging.WA_SETTINGS)
+                           failed=sum(1 for e in events if e["status"] == "failed"), WA_SETTINGS=messaging.WA_SETTINGS,
+                           team=db.all("SELECT id, full_name, role, wa_number, wa_phone_number_id FROM users WHERE "
+                                       "is_active = 1 AND role <> 'finance' ORDER BY full_name"))
 
 
 @bp.route("/templates", methods=["GET", "POST"])
@@ -253,7 +263,8 @@ def templates():
     if request.method == "POST":
         f = request.form
         try:
-            I.save_template(db, g.user, f.get("key"), f.get("name"), f.get("category"), f.get("body"), f.get("status"))
+            I.save_template(db, g.user, f.get("key"), f.get("name"), f.get("category"), f.get("body"), f.get("status"),
+                            f.get("provider_name"))
             flash("Template saved.", "ok")
         except ValidationError as e:
             flash(" ".join(str(v) for v in e.errors.values()), "error")

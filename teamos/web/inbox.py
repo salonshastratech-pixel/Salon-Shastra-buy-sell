@@ -47,7 +47,10 @@ def index():
     uncertain = db.all("SELECT m.*, v.phone, c.full_name AS contact_name FROM messages m JOIN conversations v ON v.id = "
                        "m.conversation_id LEFT JOIN contacts c ON c.id = v.contact_id WHERE m.status = 'uncertain' "
                        "ORDER BY m.id DESC")
+    team_numbers = db.all("SELECT full_name, wa_phone_number_id FROM users WHERE wa_phone_number_id IS NOT NULL AND "
+                          "is_active = 1 ORDER BY full_name")
     return render_template("inbox/index.html", rows=rows, q=q, counts=counts, QUEUES=QUEUES, uncertain=uncertain,
+                           team_numbers=team_numbers,
                            wa=messaging.whatsapp_status(current_app.config))
 
 
@@ -85,7 +88,10 @@ def thread(conv_id):
         found = db.all("SELECT o.id, o.ref_code, o.kind, c.full_name, c.phone_normalized FROM opportunities o JOIN contacts c "
                        "ON c.id = o.contact_id WHERE lower(c.full_name) LIKE ? OR lower(o.ref_code) LIKE ? OR "
                        "c.phone_normalized LIKE ? LIMIT 10", (like, like, like))
-    return render_template("inbox/thread.html", conv=conv, msgs=msgs, links=links, other=other, templates=templates,
+    reply_from = I.number_label(db, I.sender_number(db, g.user, conv, free_text=True))
+    template_from = I.number_label(db, I.sender_number(db, g.user))
+    return render_template("inbox/thread.html", reply_from=reply_from, template_from=template_from,
+                           conv=conv, msgs=msgs, links=links, other=other, templates=templates,
                            blocks=blocks, warns=warns, window_open=window_open, users=_active_users(db), found=found,
                            search=search, STATUS=I.STATUS_LABELS, wa=messaging.whatsapp_status(current_app.config))
 
@@ -100,7 +106,7 @@ def _opp_for(db, conv):
 
 
 @bp.route("/<int:conv_id>/send", methods=["POST"])
-@login_required
+@require("crm.log_activity")
 def send(conv_id):
     db = get_db()
     conv = db.one("SELECT * FROM conversations WHERE id = ?", (conv_id,))
@@ -203,7 +209,8 @@ def simulate():
     if not phone or not text:
         flash("Enter a phone number and a message.", "error")
         return redirect(url_for("inbox.index"))
-    m = I.record_inbound(db, phone, text, f"sim-{uuid.uuid4().hex[:16]}", provider="mock-whatsapp")
+    m = I.record_inbound(db, phone, text, f"sim-{uuid.uuid4().hex[:16]}", provider="mock-whatsapp",
+                         business_number_id=request.form.get("to_number") or None)
     flash("Simulated inbound message recorded (test only).", "ok")
     return _back(m["conversation_id"]) if m else redirect(url_for("inbox.index"))
 
@@ -299,3 +306,40 @@ def index():
         return Response(R.to_csv(r), mimetype="text/csv",
                         headers={"Content-Disposition": f"attachment; filename=teamos-report-{p['start_date']}_{p['end_date']}.csv"})
     return render_template("reports/index.html", r=r, p=p, PERIODS=R.PERIODS)
+
+
+# -- One-click follow-ups on a record (after a call, or any time) --------------------------------
+@bp.app_context_processor
+def _quick_messages_helper():
+    def quick_messages(opp_id, outcome=None):
+        from ..domain import quick_messages as Q
+        if not g.get("user") or not user_can(get_db(), g.user, "crm.log_activity"):
+            return {"items": [], "sending_from": ""}
+        db = get_db()
+        return {"items": Q.suggest(db, g.user, opp_id, outcome),
+                "sending_from": I.number_label(db, I.sender_number(db, g.user)),
+                "test_only": not messaging.whatsapp_status(current_app.config)["live"]}
+    return {"quick_messages": quick_messages}
+
+
+@bp.route("/quick/<int:opp_id>", methods=["POST"])
+@require("crm.log_activity")
+def quick_send(opp_id):
+    from ..domain import quick_messages as Q
+    db = get_db()
+    kind = db.scalar("SELECT kind FROM opportunities WHERE id = ?", (opp_id,))
+    if not kind:
+        abort(404)
+    f = request.form
+    outcome = f.get("outcome") or None
+    try:
+        r = Q.send(db, g.user, opp_id, f.get("sid"), outcome, acknowledge=f.get("acknowledge") == "1",
+                   link_base=current_app.config.get("PUBLIC_BASE_URL") or request.host_url)
+        flash(f"WhatsApp sent: {r['label']} — {I.STATUS_LABELS.get(r['status'], r['status']).lower()}.", "ok")
+        outcome = None  # done: show the normal record page again
+    except I.CollisionWarning as w:
+        flash(w.message + " Tick 'send anyway' to confirm.", "error")
+    except ValidationError as e:
+        flash(_msg(e), "error")
+    ep = "sellers.detail" if kind == "seller" else "buyers.detail"
+    return redirect(url_for(ep, opp_id=opp_id, after_call=outcome) + "#quick")

@@ -44,11 +44,14 @@ def _config():
 
 # -- Templates --------------------------------------------------------------------------------
 def ensure_templates(db) -> None:
-    if db.scalar("SELECT COUNT(*) FROM message_templates"):
+    """Add any built-in template that is not in the database yet (edits made by an admin are kept)."""
+    have = {r["key"] for r in db.all("SELECT key FROM message_templates")}
+    missing = {k: v for k, v in messaging.TEMPLATES.items() if k not in have}
+    if not missing:
         return
     now = now_iso()
     with db:
-        for key, (name, cat, body) in messaging.TEMPLATES.items():
+        for key, (name, cat, body) in missing.items():
             db.insert("message_templates", {"key": key, "name": name, "category": cat, "body": body,
                                             "status": "approved_local", "created_at": now, "updated_at": now,
                                             "notes": "Internal wording approved for testing; needs Meta approval "
@@ -69,34 +72,89 @@ def template_problems(t: dict | None, variables: dict, live: bool) -> list[str]:
         out.append(f"Template '{t['name']}' is {t['status']} — it must be approved before use")
     if live and t["status"] != "provider_approved":
         out.append(f"Template '{t['name']}' is not approved by Meta yet")
+    elif live and not (t.get("provider_name") or "").strip():
+        out.append(f"Template '{t['name']}' has no Meta template name recorded")
     missing = [p for p in messaging.placeholders(t["body"]) if not str(variables.get(p) or "").strip()]
     if missing:
         out.append("Missing values for: " + ", ".join("{" + m + "}" for m in missing))
     return out
 
 
-def save_template(db, actor, key: str, name: str, category: str, body: str, status: str) -> None:
+def save_template(db, actor, key: str, name: str, category: str, body: str, status: str,
+                  provider_name: str | None = None) -> None:
     if not user_can(db, actor, "settings.manage"):
         raise PermissionDenied("settings.manage")
     key = (key or "").strip().lower()
     if not key.replace("_", "").isalnum() or not (name or "").strip() or not (body or "").strip():
         raise ValidationError({"template": "Key (letters, digits, _), name and text are required."})
-    if category not in ("service", "marketing") or status not in ("draft", "approved_local", "paused"):
+    if category not in ("service", "marketing") or status not in ("draft", "approved_local", "provider_approved", "paused"):
         raise ValidationError({"template": "Choose a valid category and status."})
     if "stop" not in body.lower():
         raise ValidationError({"body": "Every customer template must tell people how to opt out (e.g. 'Reply STOP')."})
+    provider_name = (provider_name or "").strip() or None
+    if status == "provider_approved" and not provider_name:
+        raise ValidationError({"provider_name": "Enter the template's name exactly as approved in Meta."})
     now = now_iso()
     with db:
         ex = db.one("SELECT * FROM message_templates WHERE key = ?", (key,))
         if ex:
             db.update("message_templates", ex["id"], {"name": name.strip(), "category": category, "body": body.strip(),
                                                       "status": status, "version": ex["version"] + (ex["body"] != body.strip()),
-                                                      "updated_at": now})
+                                                      "provider_name": provider_name, "updated_at": now})
         else:
             db.insert("message_templates", {"key": key, "name": name.strip(), "category": category, "body": body.strip(),
-                                            "status": status, "created_by": actor["id"], "created_at": now,
+                                            "status": status, "provider_name": provider_name,
+                                            "created_by": actor["id"], "created_at": now,
                                             "updated_at": now})
         audit.record(db, actor["id"], "template.saved", None, None, {"key": key, "status": status})
+
+
+# -- Which number a message goes from ------------------------------------------------------------
+def sender_number(db, actor, conv: dict | None = None, free_text: bool = False) -> str | None:
+    """Replies go from the number the customer wrote to (WhatsApp's 24-hour window belongs to that number).
+    New template messages go from the sender's own WhatsApp number if they have one, else the company number (None)."""
+    if free_text and conv and conv.get("business_number_id"):
+        return conv["business_number_id"]
+    if actor:
+        return db.scalar("SELECT wa_phone_number_id FROM users WHERE id = ?", (actor["id"],)) or None
+    return None
+
+
+def number_label(db, number_id: str | None) -> str:
+    if not number_id:
+        return "the company WhatsApp number"
+    u = db.one("SELECT full_name, wa_number FROM users WHERE wa_phone_number_id = ?", (number_id,))
+    if u:
+        return f"{u['full_name'].split()[0]}'s WhatsApp ({u['wa_number'] or 'number id …' + number_id[-4:]})"
+    return f"WhatsApp number id …{number_id[-4:]}"
+
+
+def set_team_number(db, actor, user_id: int, wa_number: str | None, number_id: str | None) -> None:
+    """Admin: connect a team member's WhatsApp Business number (registered in Salon Shastra's Meta account)."""
+    if not user_can(db, actor, "settings.manage"):
+        raise PermissionDenied("settings.manage")
+    u = db.one("SELECT * FROM users WHERE id = ? AND role <> 'finance'", (user_id,))
+    if not u:
+        raise ValidationError({"user": "Choose a team member."})
+    wa_number = (wa_number or "").strip()
+    number_id = (number_id or "").strip()
+    if not wa_number and not number_id:
+        norm, nid = None, None  # disconnect: this person's messages go from the company number again
+    else:
+        norm, err = normalize_indian_mobile(wa_number)
+        if err or not norm:
+            raise ValidationError({"wa_number": "Enter the WhatsApp number as a 10-digit Indian mobile."})
+        if not number_id.isdigit() or len(number_id) < 6:
+            raise ValidationError({"number_id": "Enter Meta's phone number ID (digits only, from WhatsApp Manager / API setup)."})
+        nid = number_id
+        clash = db.scalar("SELECT full_name FROM users WHERE id <> ? AND (wa_phone_number_id = ? OR wa_number = ?)",
+                          (user_id, nid, norm))
+        if clash:
+            raise ValidationError({"number_id": f"That number is already connected to {clash}."})
+    with db:
+        db.update("users", user_id, {"wa_number": norm, "wa_phone_number_id": nid})
+        audit.record(db, actor["id"], "whatsapp.team_number", "user", user_id,
+                     {"number": norm, "number_id": nid, "previous": u.get("wa_phone_number_id")})
 
 
 # -- Conversations ----------------------------------------------------------------------------
@@ -173,6 +231,8 @@ def send(db, actor, *, contact_id: int, opportunity_id: int | None = None, templ
 
     `variables` go to the provider; `stored_variables` (if given) replace them in the stored copy, so secret links
     are never kept in the message log."""
+    if actor and not user_can(db, actor, "crm.log_activity"):
+        raise PermissionDenied("crm.log_activity")  # e.g. Finance can never message customers
     cfg = _config()
     status = messaging.whatsapp_status(cfg)
     contact = db.one("SELECT * FROM contacts WHERE id = ?", (contact_id,))
@@ -180,6 +240,7 @@ def send(db, actor, *, contact_id: int, opportunity_id: int | None = None, templ
         raise ValidationError({"send": "This contact has no mobile number."})
     conv = conversation_for(db, contact["phone_normalized"], contact_id)
     variables = dict(variables or {})
+    t = None
     if text is not None:  # free text: only as a reply inside the customer-service window
         if not text.strip():
             raise ValidationError({"text": "Write a message."})
@@ -207,8 +268,11 @@ def send(db, actor, *, contact_id: int, opportunity_id: int | None = None, templ
         raise CollisionWarning("Heads-up: " + "; ".join(warns) + ". Send anyway?")
     prov = messaging.provider(cfg)
     now = now_iso()
+    nid = sender_number(db, actor, conv, free_text=text is not None)
     try:
-        res = prov.send(contact["phone_normalized"], body, template_key)
+        res = prov.send(contact["phone_normalized"], body, template_key, from_number_id=nid,
+                        template_name=t["provider_name"] if t else None, language=t["language"] if t else "en",
+                        params=[str(variables.get(p, "")) for p in messaging.ordered_placeholders(t["body"])] if t else None)
     except messaging.ProviderTimeout as e:
         res = {"status": "uncertain", "detail": f"No answer from the provider ({e}). It may or may not have been sent — "
                                                 "check before sending again."}
@@ -218,10 +282,11 @@ def send(db, actor, *, contact_id: int, opportunity_id: int | None = None, templ
             "template_key": template_key, "body": stored, "status": res["status"], "provider": prov.name,
             "provider_message_id": res.get("provider_message_id"), "error": None if res["status"] != "failed"
             else res.get("detail"), "sent_by": actor["id"] if actor else None, "opportunity_id": opportunity_id,
-            "invitation_id": invitation_id, "batch_id": batch_id, "created_at": now, "status_at": now})
+            "invitation_id": invitation_id, "batch_id": batch_id, "created_at": now, "status_at": now,
+            "from_number_id": nid})
         db.update("conversations", conv["id"], {"last_message_at": now, "last_outbound_at": now,
                                                 "last_outbound_by": actor["id"] if actor else None, "updated_at": now,
-                                                "status": "open", "unread": 0})
+                                                "status": "open", "unread": 0, "business_number_id": nid})
         if opportunity_id:
             db.execute("INSERT INTO conversation_links (conversation_id, opportunity_id, linked_by, linked_at) "
                        "SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM conversation_links WHERE conversation_id = ? "
@@ -261,8 +326,9 @@ def reply_unmatched(db, actor, conv_id: int, text: str) -> dict:
         raise ValidationError({"text": f"Not sent: already messaged {n} times in the last 24 hours (limit {DAILY_CAP})."})
     body = text.strip()[:2000]
     prov = messaging.provider(_config())
+    nid = conv.get("business_number_id")
     try:
-        res = prov.send(conv["phone"], body, None)
+        res = prov.send(conv["phone"], body, None, from_number_id=nid)
     except messaging.ProviderTimeout as e:
         res = {"status": "uncertain", "detail": f"No answer from the provider ({e}). Check before sending again."}
     now = now_iso()
@@ -271,7 +337,7 @@ def reply_unmatched(db, actor, conv_id: int, text: str) -> dict:
             "conversation_id": conv_id, "direction": "out", "kind": "text", "template_key": None, "body": body,
             "status": res["status"], "provider": prov.name, "provider_message_id": res.get("provider_message_id"),
             "error": res.get("detail") if res["status"] == "failed" else None, "sent_by": actor["id"],
-            "created_at": now, "status_at": now})
+            "created_at": now, "status_at": now, "from_number_id": nid})
         db.update("conversations", conv_id, {"last_message_at": now, "last_outbound_at": now, "last_outbound_by": actor["id"],
                                              "updated_at": now, "status": "open", "unread": 0,
                                              "assigned_to": conv["assigned_to"] or actor["id"]})
@@ -301,7 +367,7 @@ def _contact_for_phone(db, phone):
 
 
 def record_inbound(db, phone_raw: str, text: str, provider_message_id: str, at: str | None = None,
-                   provider: str = messaging.PROVIDER_NAME) -> dict | None:
+                   provider: str = messaging.PROVIDER_NAME, business_number_id: str | None = None) -> dict | None:
     phone, err = normalize_indian_mobile(phone_raw if str(phone_raw).startswith("+") else "+" + str(phone_raw))
     phone = phone or ("+" + str(phone_raw).lstrip("+"))
     if provider_message_id and db.scalar("SELECT id FROM messages WHERE provider_message_id = ?", (provider_message_id,)):
@@ -313,8 +379,15 @@ def record_inbound(db, phone_raw: str, text: str, provider_message_id: str, at: 
         mid = db.insert("messages", {"conversation_id": conv["id"], "direction": "in", "kind": "text",
                                      "body": (text or "")[:4000], "status": "received", "provider": provider,
                                      "provider_message_id": provider_message_id, "created_at": now, "status_at": now})
-        db.update("conversations", conv["id"], {"last_message_at": now, "last_inbound_at": now, "status": "open",
-                                                "unread": conv["unread"] + 1, "updated_at": now})
+        upd = {"last_message_at": now, "last_inbound_at": now, "status": "open", "unread": conv["unread"] + 1,
+               "updated_at": now}
+        if business_number_id:
+            upd["business_number_id"] = business_number_id
+            owner = db.scalar("SELECT id FROM users WHERE wa_phone_number_id = ? AND is_active = 1", (business_number_id,))
+            if owner and not conv["assigned_to"]:
+                upd["assigned_to"] = owner  # a customer who writes to Harika's number lands with Harika
+                conv["assigned_to"] = owner
+        db.update("conversations", conv["id"], upd)
         word = (text or "").strip().lower().rstrip(".!")
         if conv["contact_id"] and word in OPT_OUT_WORDS:
             opt_out(db, conv["contact_id"], conv, provider)
@@ -379,8 +452,9 @@ def ingest_webhook(db, payload: dict, provider: str = "meta-cloud") -> dict:
     for entry in payload.get("entry", []):
         for change in entry.get("changes", []):
             v = change.get("value", {})
+            to_number = (v.get("metadata") or {}).get("phone_number_id")
             for msg in v.get("messages", []):
-                events.append((msg.get("id"), "message", msg))
+                events.append((msg.get("id"), "message", {**msg, "_to_number_id": to_number}))
             for st in v.get("statuses", []):
                 events.append((f"{st.get('id')}:{st.get('status')}", "status", st))
     for event_id, kind, body in events:
@@ -408,7 +482,7 @@ def process_event(db, ev: dict) -> None:
             ts = body.get("timestamp")
             at = to_iso(datetime.fromtimestamp(int(ts), tz=timezone.utc)) if ts else None
             record_inbound(db, body.get("from", ""), (body.get("text") or {}).get("body", "[non-text message]"),
-                           body.get("id"), at, provider=ev["provider"])
+                           body.get("id"), at, provider=ev["provider"], business_number_id=body.get("_to_number_id"))
             outcome = "processed"
         else:
             err = (body.get("errors") or [{}])[0].get("title") if body.get("errors") else None

@@ -25,6 +25,7 @@
   {% if conv.contact_id %}
   <div class="card">
     <h2>Reply</h2>
+    <p class="small muted">Replies go from {{ reply_from }}; new template messages from {{ template_from }}.</p>
     {% if blocks %}<p class="flash error small">Sending is blocked: {{ blocks|join('; ') }}.</p>{% endif %}
     {% if warns %}<p class="flash warn small">Heads-up: {{ warns|join('; ') }}.</p>{% endif %}
     {% if window_open %}

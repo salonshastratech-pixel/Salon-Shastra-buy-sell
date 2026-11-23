@@ -30,4 +30,22 @@
     <p class="small muted">Each provider event is stored once; repeats are ignored. Failures stay here with their error until processed.</p>
     <table class="small">{% for e in events %}<tr><td class="mono">{{ e.event_id[:24] }}</td><td>{{ e.kind }}</td><td><span class="badge {{ 'ok' if e.status == 'processed' else 'bad' if e.status == 'failed' else 'grey' }}">{{ e.status }}</span>{% if e.error %}<div class="unknown">{{ e.error }}</div>{% endif %}</td><td>{{ e.received_at|rel }}</td></tr>{% else %}<tr><td class="empty">No events received.</td></tr>{% endfor %}</table></div>
 </div></div>
+
+<div class="card" id="numbers"><div class="card-h"><h2>Team WhatsApp numbers</h2><span class="small muted">Optional — without one, a person sends from the company number</span></div>
+  <p class="small">Each person's WhatsApp Business number must first be added to <strong>Salon Shastra's own Meta WhatsApp
+  Business account</strong> (WhatsApp Manager → Phone numbers). Copy its <em>phone number ID</em> here. Messages they send
+  from TeamOS then go from their number, and customers who write to their number land in their inbox queue.</p>
+  <div class="table-wrap"><table class="small">
+    <tr><th>Team member</th><th>WhatsApp number</th><th>Meta phone number ID</th><th></th></tr>
+    {% for u in team %}<tr><td>{{ u.full_name }}<div class="muted">{{ u.role|replace('_',' ') }}</div></td>
+      <td colspan="3"><form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="team_number"><input type="hidden" name="user_id" value="{{ u.id }}">
+        <input name="wa_number" value="{{ (u.wa_number or '')[-10:] }}" placeholder="98xxxxxxxx" inputmode="tel" aria-label="WhatsApp number for {{ u.full_name }}">
+        <input name="number_id" value="{{ u.wa_phone_number_id or '' }}" placeholder="e.g. 1098765432101" inputmode="numeric" aria-label="Meta phone number ID for {{ u.full_name }}">
+        <button class="btn sm">Save</button>{% if u.wa_phone_number_id %} <span class="badge ok">connected</span>{% endif %}</form></td></tr>{% endfor %}
+  </table></div>
+  <p class="small muted">To disconnect someone, clear both boxes and save. Templates still need Meta's approval once for the
+  whole business account (Admin → Message templates → "Approved by Meta" + its Meta name); they then work from every number.
+  A number that is in use in the WhatsApp Business <em>app</em> on a phone may first need to be moved to the API (or added
+  through Meta's coexistence onboarding where Meta offers it) — check this with Meta or your WhatsApp partner before adding it.</p>
+</div>
 {% endblock %}

@@ -57,6 +57,8 @@
         </form></details>{% endif %}
     </div>
 
+    {% include "inbox/_quick_messages.html" %}
+
     <div class="card">
       <div class="card-h"><h2>Log a call</h2>{% if opp.last_contact_at %}<span class="small muted">Last contact {{ opp.last_contact_at|rel }}</span>{% endif %}</div>
       {% if opp.do_not_contact %}<p class="muted">This contact asked not to be contacted. Calls cannot be logged as outreach.</p>{% else %}

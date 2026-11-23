@@ -22,6 +22,14 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 7.1 — one-click messages after a call
+* Sign in as `shaheen@`, open **SL-00004 Urban Trim**, log a call with outcome *No answer*: the page jumps to a ready
+  call-back message. Press **Send on WhatsApp**. Try *Connected* on another new lead: a thank-you and the personal
+  detailed form are ready.
+* As `founder@`, **Admin → Integrations → Team WhatsApp numbers**: Shaheen has a synthetic test number, so his
+  messages show "From Shaheen's WhatsApp". In the inbox simulator, choose *Written to: Shaheen's number* to see a
+  new customer land in his queue.
+
 ## Milestone 7 — WhatsApp inbox & reports (everything is a labelled TEST-ONLY simulation)
 * **WhatsApp Inbox** (left menu, as `harika@`): Arjun's thread. Reply to him (allowed because he wrote in the last
   24 h). The *Unknown numbers* queue has an enquiry from a number not in the CRM: reply, then press

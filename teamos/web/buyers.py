@@ -245,11 +245,16 @@ def call(opp_id):
     opp = _opp_or_404(db, opp_id)
     f = request.form
 
-    def go():
+    try:
         B.log_call(db, g.user, opp, f.get("outcome"), f.get("note"),
                    int(f["complete_task_id"]) if f.get("complete_task_id") else None,
                    f.get("next_title"), parse_local_input(f.get("next_due")))
-    return _run(opp_id, go, "Call logged.")
+    except ValidationError as e:
+        flash(" ".join(e.errors.values()), "error")
+        return _back(opp_id)
+    flash("Call logged.", "ok")
+    # straight to the ready-to-send WhatsApp follow-ups for this stage and outcome
+    return redirect(url_for("buyers.detail", opp_id=opp_id, after_call=f.get("outcome")) + "#quick")
 
 
 @bp.route("/<int:opp_id>/note", methods=["POST"])

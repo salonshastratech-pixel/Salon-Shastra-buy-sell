@@ -1,0 +1,26 @@
+{% from "macros.html" import csrf as _csrf %}
+{% set _after = request.args.get('after_call') %}
+{% set qm = quick_messages(opp.id, _after) %}
+{% if qm['items'] %}
+<div class="card quick {{ 'after-call' if _after }}" id="quick">
+  {% if not _after %}<details class="disclose"><summary><strong>Quick WhatsApp messages</strong> <span class="small muted">— {{ qm['items']|length }} ready for this stage</span></summary>{% endif %}
+  <div class="card-h">{% if _after %}<h2>Call logged — send a WhatsApp follow-up</h2>{% endif %}
+    <span class="small muted">From {{ qm.sending_from }}{% if qm.test_only %} · <span class="badge grey">test-only</span>{% endif %}</span></div>
+  {% for q in qm['items'] %}
+  <div class="quick-item">
+    <div class="quick-head"><strong>{{ q.label }}</strong> <span class="small muted">{{ q.why }}</span></div>
+    <div class="quick-preview">{{ q.preview }}</div>
+    {% if q.blocks %}
+      <p class="small unknown">Can't send: {{ q.blocks|join('; ') }}.</p>
+    {% else %}
+      <form method="post" action="{{ url_for('inbox.quick_send', opp_id=opp.id) }}" class="inline">{{ _csrf() }}
+        <input type="hidden" name="sid" value="{{ q.id }}">{% if _after %}<input type="hidden" name="outcome" value="{{ _after }}">{% endif %}
+        {% if q.warns %}<label class="check small"><input type="checkbox" name="acknowledge" value="1" required> {{ q.warns|join('; ') }} — send anyway</label>{% endif %}
+        <button class="btn {{ 'primary' if loop.first }}">Send on WhatsApp</button>
+      </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if _after %}<p class="small muted"><a href="{{ request.path }}">Skip — no message needed</a></p>{% else %}</details>{% endif %}
+</div>
+{% endif %}

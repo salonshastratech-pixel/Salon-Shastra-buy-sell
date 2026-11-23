@@ -1,3 +1,19 @@
+# Milestone 7.1 — team WhatsApp numbers + one-click messages after a call (23 Nov 2026, v0.7.1)
+
+| Area | Status | Evidence |
+|---|---|---|
+| Ready message after every call | **Built** | Saving a call jumps to "Call logged — send a WhatsApp follow-up" with up to 3 messages already filled in (name, sender, area, call-back time, visit time) for that stage and outcome. One click sends. No answer → call-back request; call-back requested → confirms the agreed time; connected first call → thank-you + personal detailed form; later stages → documents checklist, proof of funds, listing live, shortlist update, visit confirmation, next steps. Not interested / wrong number / do-not-contact → nothing offered. |
+| Same on every record | **Built** | A collapsed "Quick WhatsApp messages" card on every seller and buyer shows what is ready for the current stage. A record nobody has spoken to yet gets an enquiry acknowledgement or call-back request, never "thank you for speaking with me". |
+| Safety | **Built** | Every one-click message goes through the same gate as any message (consent, opt-out, caps, approved template, colleague warning). The server rebuilds the message on send, so nothing in the browser can change what goes out. |
+| Each person's own WhatsApp number | **Built (test-only)** | Admin → Integrations → *Team WhatsApp numbers*: number + Meta phone number ID per person. Their messages go from their number; replies go from the number the customer wrote to; a new customer writing to Harika's number lands in Harika's queue. Without a number, the company number is used. |
+| Meta template sending | **Built, not run against Meta** | Live sends now use the template's Meta name and send the values as Meta's {{1}}, {{2}} … parameters in order; a template without a recorded Meta name is refused in live mode. Before this, live template sends would have gone out as plain text and been rejected by WhatsApp outside the 24-hour window. |
+
+Found and fixed while building this: **the core send function did not check the sender's role**, so a Finance user
+could have sent a WhatsApp message through a route without its own check (the security probe had only passed because
+that customer had hit the daily cap). Sending now requires CRM rights at the core; regression test added.
+
+---
+
 # Feature status — Milestone 7 (23 Nov 2026, v0.7.0)
 
 Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**

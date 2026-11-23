@@ -24,7 +24,8 @@
   <h2>Test: simulate an incoming WhatsApp message</h2>
   <p class="small muted">Only available while WhatsApp is in test mode. Try an unknown number, a known customer's number, or the word STOP.</p>
   <div class="form-grid"><div class="field"><label>From (mobile)</label><input name="phone" placeholder="e.g. 9000000201" required></div>
-    <div class="field"><label>Message</label><input name="text" placeholder="e.g. Is the Kondapur salon still available?" required></div></div>
+    <div class="field"><label>Message</label><input name="text" placeholder="e.g. Is the Kondapur salon still available?" required></div>
+    {% if team_numbers %}<div class="field"><label>Written to</label><select name="to_number"><option value="">Company number</option>{% for u in team_numbers %}<option value="{{ u.wa_phone_number_id }}">{{ u.full_name }}'s number</option>{% endfor %}</select></div>{% endif %}</div>
   <button class="btn">Simulate incoming message</button></form>
 {% endif %}
 {% endblock %}
