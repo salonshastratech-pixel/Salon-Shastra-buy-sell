@@ -1,7 +1,7 @@
 # Handover — Salon Shastra TeamOS
 
 Internal platform for Salon Shastra's salon buy–sell team: sellers, buyers/investors, customer forms, and the
-Match Desk. Current version: **v0.5.0 (Milestone 5)**. Next: Milestone 6 — Deals, teasers & admin finance.
+Match Desk. Current version: **v0.7.0 (Milestone 7)**. Next: Milestone 8 — measured improvements (after founder review).
 
 Read in this order: this file → `README.md` → `docs/STATUS.md` (what is built, with evidence) → `docs/ROADMAP.md`
 → `docs/DECISIONS.md` (founder decisions — do not change an approved rule without the founder) →

@@ -207,16 +207,11 @@ def share_with_buyer(db, actor, match_id: int, channel: str, link_base: str = ""
                                           "token_hash": _hash(token), "channel": channel, "shared_by": actor["id"],
                                           "created_at": now, "expires_at": expires})
         if channel == "whatsapp_mock":
+            from . import inbox as I
             variables = {"name": bopp["contact_name"].split()[0], "sender": actor["full_name"].split()[0],
-                         "expires": fmt_ist(expires, "%d %b %Y")}
-            res = messaging.provider().send_template(bopp.get("phone_normalized"), "teaser_share",
-                                                     {**variables, "link": link})
-            body = messaging.render("teaser_share", {**variables, "link": "[teaser link]"})  # token never stored
-            comm = db.insert("communications", {
-                "contact_id": bopp["contact_id"], "opportunity_id": bopp["id"], "channel": "whatsapp",
-                "provider": messaging.PROVIDER_NAME, "template_key": "teaser_share", "body": body,
-                "status": res["status"], "provider_message_id": res.get("provider_message_id"), "detail": res.get("detail"),
-                "sent_by": actor["id"], "created_at": now})
+                         "expires": fmt_ist(expires, "%d %b %Y"), "link": link}
+            comm = I.send(db, actor, contact_id=bopp["contact_id"], opportunity_id=bopp["id"], template_key="teaser_share",
+                          variables=variables, stored_variables={"link": "[teaser link]"}, system=True)["id"]
         M._event(db, match_id, "teaser_shared", actor["id"], body=f"Teaser v{t['version']} shared with the buyer"
                  + (" via WhatsApp (MOCK — not actually sent)" if channel == "whatsapp_mock" else " as a link"))
         T.add_activity(db, actor["id"], "opportunity", c["buyer_opp_id"], "system",

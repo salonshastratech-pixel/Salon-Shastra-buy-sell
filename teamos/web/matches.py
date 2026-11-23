@@ -179,7 +179,8 @@ def ask(cid, side):
     M._event(db, cid, "form_sent", g.user["id"], body=f"Asked the {side} for: " + ", ".join(fields))
     opp = F.load_opportunity(db, opp_id)
     inv = db.one("SELECT * FROM form_invitations WHERE id = ?", (res["invitation_id"],))
-    comm = db.one("SELECT * FROM communications WHERE id = ?", (res["communication"]["id"],)) if res["communication"] else None
+    comm = db.one("SELECT * FROM messages WHERE id = ?", (res["communication"]["id"],)) \
+        if res["communication"] and res["communication"].get("id") else None
     return render_template("forms/sent.html", opp=opp, inv=inv, link=res["link"], comm=comm,
                            back=url_for("matches.detail", cid=cid), MOCK_LABEL=messaging.PROVIDER_LABEL)
 

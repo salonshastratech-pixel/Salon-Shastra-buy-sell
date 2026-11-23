@@ -59,7 +59,10 @@ def my_day():
                            calls_today=calls_today, conversations=conversations, no_next=no_next,
                            notifications=notes, STAGE_LABELS=STAGE_LABELS,
                            match_tiles=MM.my_tiles(db, g.user["id"]) if g.user["role"] != "finance" else [],
-                           forms_waiting=forms_waiting)
+                           forms_waiting=forms_waiting,
+                           unread_convs=db.scalar("SELECT COUNT(*) FROM conversations WHERE unread > 0 AND status = 'open' "
+                                                  "AND (assigned_to = ? OR (assigned_to IS NULL AND ? = 1))",
+                                                  (g.user["id"], 1 if g.user["role"] in ("super_admin", "team_lead") else 0)))
 
 
 @bp.route("/team")
@@ -158,7 +161,8 @@ def dictionary():
 @bp.route("/planned/<module>")
 @login_required
 def planned(module):
-    shipped = {"buyers": "buyers.index", "forms": "forms.inbox", "match": "matches.desk", "deals": "deals.index"}
+    shipped = {"buyers": "buyers.index", "forms": "forms.inbox", "match": "matches.desk", "deals": "deals.index",
+               "inbox": "inbox.index", "reports": "reports.index"}
     if module in shipped:
         return redirect(url_for(shipped[module]))
     names = {"match": ("Match Desk", "Milestone 5"),
@@ -185,3 +189,21 @@ def healthz():
     ok = stale == 0
     return jsonify({"status": "ok" if ok else "degraded", "db": "ok", "schema": version,
                     "jobs_dead": dead, "jobs_backlog_30m": stale}), (200 if ok else 503)
+
+
+@bp.route("/me/digest", methods=["POST"])
+@login_required
+def digest_toggle():
+    on = 1 if request.form.get("on") == "1" else 0
+    get_db().execute("UPDATE users SET digest_opt_in = ? WHERE id = ?", (on, g.user["id"]))
+    from flask import flash
+    flash("Morning e-mail summary " + ("on." if on else "off."), "ok")
+    return redirect(url_for("main.my_day"))
+
+
+@bp.route("/me/digest/preview")
+@login_required
+def digest_preview():
+    from ..domain import digests
+    subject, body = digests.build(get_db(), g.user)
+    return render_template("digest_preview.html", subject=subject, body=body)

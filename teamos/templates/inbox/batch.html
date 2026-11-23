@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}{{ b.name }} · batch{% endblock %}
+{% block content %}
+<div class="ph"><div><div class="small muted"><a href="{{ url_for('inbox.batches') }}">Message batches</a> / {{ b.name }}</div>
+  <h1>{{ b.name }}</h1><div class="inline sub"><span class="badge {{ 'ok' if b.status == 'sent' else 'info' if b.status == 'approved' else 'grey' }}">{{ b.status }}</span>
+  {{ AUDIENCES[aud.key][0] }} · template "{{ t.name }}" ({{ t.category }})</div></div></div>
+<div class="flash {{ 'ok' if wa.live else 'warn' }} small"><strong>{{ wa.label }}.</strong> {{ wa.note }}</div>
+
+{% set eligible = rows|selectattr('eligible')|list %}
+<div class="split"><div>
+  <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Recipients — {% if b.status in ('draft', 'approved') %}{{ eligible|length }} of {{ rows|length }} eligible right now{% else %}{{ rows|length }}{% endif %}</h2></div>
+    <div class="table-wrap"><table class="small">
+      <tr><th>Contact</th><th>Status</th><th>Note</th></tr>
+      {% for r in rows %}<tr><td>{{ r.full_name }}</td><td>{% if r.status != 'pending' %}<span class="badge {{ 'ok' if r.status == 'sent' else 'grey' }}">{{ r.status }}</span>{% elif r.eligible %}<span class="badge ok">eligible</span>{% else %}<span class="badge bad">excluded</span>{% endif %}</td><td>{{ r.why if r.why and r.why != r.status else '' }}</td></tr>{% endfor %}
+    </table></div></div>
+</div><div>
+  <div class="card"><h2>Message</h2><div class="link-box">{{ t.body }}</div>
+    <p class="small muted">{name} and {sender} are filled per person. Other values: {{ aud.variables or 'none' }}.</p></div>
+  <div class="card"><h2>Next step</h2>
+    {% if b.status == 'draft' %}
+      {% if can_approve %}<form method="post">{{ csrf() }}<input type="hidden" name="action" value="approve"><button class="btn primary">Approve batch</button></form>
+      <p class="small muted">Someone other than the person who drafted it approves.</p>{% else %}<p class="small">Waiting for a team lead or admin to approve.</p>{% endif %}
+    {% elif b.status == 'approved' %}
+      {% if can_approve %}<form method="post">{{ csrf() }}<input type="hidden" name="action" value="send"><button class="btn primary">Send now</button></form>{% endif %}
+      <p class="small muted">Approved by a reviewer. When sent, every person is checked again — anyone who opted out since is skipped.</p>
+    {% elif b.status == 'sent' and counts %}<p>{{ counts.sent }} sent · {{ counts.suppressed }} suppressed · {{ counts.failed }} failed</p>{% endif %}
+    {% if b.status in ('draft', 'approved') %}<form method="post">{{ csrf() }}<input type="hidden" name="action" value="cancel"><button class="btn sm">Cancel batch</button></form>{% endif %}
+  </div>
+</div></div>
+{% endblock %}

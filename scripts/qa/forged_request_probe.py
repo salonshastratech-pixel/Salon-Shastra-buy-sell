@@ -21,6 +21,12 @@ db = sqlite3.connect(copy)
 q = lambda sql, *a: db.execute(sql, a).fetchone()  # noqa: E731
 
 intro = q("SELECT id FROM introductions LIMIT 1")
+# M7: a fresh draft batch drafted by Harika, to probe approval rights
+db.execute("INSERT INTO batches (name, template_key, audience, status, created_by, created_at, updated_at) VALUES "
+           "('QA probe', 'inactive_followup', '{\"key\": \"buyers_active\", \"variables\": {}}', 'draft', "
+           "(SELECT id FROM users WHERE email LIKE 'harika@%'), '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')")
+db.commit()
+qa_batch = q("SELECT MAX(id) FROM batches")[0]
 seller_doc = q("SELECT d.id FROM documents d JOIN opportunities o ON o.id = d.opportunity_id WHERE o.kind='seller'")
 buyer_doc = q("SELECT d.id FROM documents d JOIN opportunities o ON o.id = d.opportunity_id WHERE o.kind='buyer'")
 PROBES = [  # (label, method, url, data, privileged roles that MAY do it, state check sql)
@@ -42,13 +48,27 @@ PROBES = [  # (label, method, url, data, privileged roles that MAY do it, state 
      {"user_id": "2", "capability": "finance.view", "reason": "forged"}, {"founder"},
      "SELECT COUNT(*) FROM user_grants"),
     ("approve teaser", "POST", "/deals/teasers/1/approve", {}, {"founder"}, "SELECT status FROM teasers WHERE id = 1"),
+    # Milestone 7
+    ("approve message batch", "POST", f"/inbox/batches/{qa_batch}", {"action": "approve"}, {"founder", "lead"},
+     f"SELECT status FROM batches WHERE id = {qa_batch}"),
+    ("send WhatsApp reply", "POST", "/inbox/1/send", {"mode": "text", "text": "forged"},
+     {"founder", "lead", "shaheen", "harika"}, "SELECT COUNT(*) FROM messages"),
+    ("reassign conversation", "POST", "/inbox/1/action", {"action": "assign", "user_id": "1"},
+     {"founder", "lead", "shaheen", "harika"}, "SELECT assigned_to FROM conversations WHERE id = 1"),
+    ("edit message template", "POST", "/admin/templates",
+     {"key": "inactive_followup", "name": "x", "category": "marketing", "status": "approved_local",
+      "body": "Buy now! Reply STOP to opt out."}, {"founder"},
+     "SELECT body || category FROM message_templates WHERE key = 'inactive_followup'"),
 ]
 if intro:
     PROBES.append(("approve introduction", "POST", f"/deals/introductions/{intro[0]}", {"decision": "approved"},
                    {"founder"}, f"SELECT status FROM introductions WHERE id = {intro[0]}"))
 GETS = [("open Admin Finance", "/admin/finance", {"founder", "accounts"}),
         ("open audit log", "/admin/audit", {"founder"}),
-        ("open user admin", "/admin/users", {"founder"})]
+        ("open user admin", "/admin/users", {"founder"}),
+        ("open WhatsApp inbox", "/inbox/", {"founder", "lead", "shaheen", "harika"}),
+        ("open integrations", "/admin/integrations", {"founder"}),
+        ("open e-mail outbox", "/admin/outbox", {"founder"})]
 if seller_doc:
     GETS.append(("download seller document", f"/forms/documents/{seller_doc[0]}", {"founder", "shaheen"}))
 if buyer_doc:

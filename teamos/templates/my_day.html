@@ -45,6 +45,7 @@
 <div class="card">
       <div class="card-h"><h2>Matching</h2><a class="small" href="{{ url_for('matches.desk', mine='1') }}">My matches →</a></div>
       <div class="tiles">{% for t in match_tiles %}<a class="tile {{ 'hot' if t.count and t.key in ('new','ready') }}" href="{{ url_for('matches.desk', queue=t.key, mine='1') }}"><span class="n">{{ t.count }}</span><span class="l">{{ t.label }}</span></a>{% endfor %}</div>
+      {% if unread_convs %}<p><a class="btn sm primary" href="{{ url_for('inbox.index') }}">{{ unread_convs }} unread WhatsApp conversation{{ 's' if unread_convs > 1 }} →</a></p>{% endif %}
       {% if forms_waiting %}<p><a class="btn sm" href="{{ url_for('forms.inbox') }}">{{ forms_waiting }} customer form{{ 's' if forms_waiting > 1 }} waiting for your review →</a></p>{% endif %}
       <p class="small muted">Customer WhatsApp replies (M7) and visits/offers (M6) will appear here when those modules ship.</p>
     </div>
@@ -60,4 +61,9 @@
     
   </div>
 </div>
+<form method="post" action="{{ url_for('main.digest_toggle') }}" class="card small inline">{{ csrf() }}
+  <span>Morning e-mail summary of your day:</span>
+  {% if current_user.digest_opt_in %}<input type="hidden" name="on" value="0"><button class="btn sm">Turn off</button>{% else %}<input type="hidden" name="on" value="1"><button class="btn sm">Turn on</button>{% endif %}
+  <a class="small" href="{{ url_for('main.digest_preview') }}">Preview</a>
+</form>
 {% endblock %}

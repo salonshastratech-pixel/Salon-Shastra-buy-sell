@@ -45,6 +45,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM teasers"):
             seed_deals(db)  # demo database created before Milestone 6
             added.append("teaser, introduction, deal & fee ledger (M6)")
+        if not db.scalar("SELECT COUNT(*) FROM conversations WHERE phone = '+919000000999'"):
+            seed_inbox(db)  # demo database created before Milestone 7
+            added.append("WhatsApp inbox conversations & a draft batch (M7)")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -185,6 +188,7 @@ def seed(db):
     seed_forms(db)
     seed_matches(db)
     seed_deals(db)
+    seed_inbox(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -436,3 +440,33 @@ def seed_deals(db):
                                         "note": "Illustration only - not Salon Shastra's fee policy"})
     FN.add_expense(db, u["founder"], {"category": "Marketing", "amount": "15000", "spent_on": _ago(days=10)[:10],
                                       "note": "Synthetic: Meta lead campaign (demo)"})
+
+
+def seed_inbox(db):
+    """Milestone 7: a few simulated WhatsApp conversations (TEST-ONLY mock provider) and a draft batch."""
+    import uuid
+    from teamos.domain import inbox as IB
+    u = {r["email"].split("@")[0]: r for r in db.all("SELECT * FROM users WHERE is_synthetic = 1")}
+    IB.ensure_templates(db)
+    # 1. Arjun asks about the visit; Harika replies inside the 24-hour window
+    IB.record_inbound(db, "919000000201", "Hi Harika, can we see the Kondapur salon again on Saturday?",
+                      f"sim-{uuid.uuid4().hex[:12]}")
+    arjun = db.one("SELECT o.id, o.contact_id FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
+                   "WHERE c.phone_normalized = '+919000000201' AND o.kind = 'buyer'")
+    if arjun:
+        conv = db.one("SELECT * FROM conversations WHERE phone = '+919000000201'")
+        IB.assign(db, u["harika"], conv["id"], u["harika"]["id"], "My buyer")
+        IB.link(db, u["harika"], conv["id"], arjun["id"])
+        IB.send(db, u["harika"], contact_id=arjun["contact_id"], opportunity_id=arjun["id"],
+                text="Yes Arjun, Saturday 11 am works. I'll confirm with the owner and message you.", system=True)
+    # 2. A message from a number that is not in the CRM — lands in "Unknown numbers"
+    IB.record_inbound(db, "919000000999", "Hello, I saw your ad. I want to sell my salon in Ameerpet.",
+                      f"sim-{uuid.uuid4().hex[:12]}")
+    # 3. Nisha (public-form buyer) gets a call-back request template
+    nisha = db.one("SELECT o.id, o.contact_id FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
+                   "WHERE c.phone_normalized = '+919000000302'")
+    if nisha:
+        IB.send(db, u["harika"], contact_id=nisha["contact_id"], opportunity_id=nisha["id"], template_key="callback_request",
+                variables={"name": "Nisha", "sender": "Harika"}, system=True)
+    # 4. A draft batch waiting for a reviewer
+    IB.create_batch(db, u["harika"], "Buyers — gentle follow-up (demo)", "inactive_followup", "buyers_active", {})

@@ -285,3 +285,19 @@ table.cmp tr.res-unknown td:first-child { box-shadow: inset 3px 0 #c9c3bb; }
 .mc-pair { min-width: 0; overflow-wrap: anywhere; }
 .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .link-box, .mono { overflow-wrap: anywhere; }
+
+/* Milestone 7 — inbox */
+.thread { display: flex; flex-direction: column; gap: 8px; }
+.bubble { max-width: 85%; padding: 8px 12px; border-radius: 14px; font-size: 14px; overflow-wrap: anywhere; }
+.bubble.in { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
+.bubble.out { align-self: flex-end; background: var(--brand-soft, #ffe3d5); }
+.bubble.sys { align-self: center; font-size: 12px; color: var(--muted); background: transparent; }
+.bubble-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.conv-list li.unread .t a { font-weight: 700; }
+.report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.report-grid table td:last-child { text-align: right; font-weight: 600; }
+pre.digest { white-space: pre-wrap; font-family: inherit; background: #faf6f2; padding: 12px; border-radius: 12px; }
+
+/* inbox: the whole row opens the conversation */
+.conv-list .task { position: relative; }
+.conv-list .task .t a::after { content: ""; position: absolute; inset: 0; }

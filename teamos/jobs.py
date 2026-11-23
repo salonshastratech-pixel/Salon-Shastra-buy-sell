@@ -46,6 +46,8 @@ def schedule_periodic(db) -> None:
     enqueue(db, "sla_sweep", dedupe_key="sla_sweep:" + bucket.strftime("%Y%m%d%H%M"))
     enqueue(db, "form_chase", dedupe_key="form_chase:" + n.strftime("%Y%m%d%H"))  # hourly
     enqueue(db, "match_refresh", dedupe_key="match_refresh:" + bucket.strftime("%Y%m%d%H%M"))  # every 15 min
+    enqueue(db, "webhook_retry", dedupe_key="webhook_retry:" + bucket.strftime("%Y%m%d%H%M"))  # every 15 min
+    enqueue(db, "daily_digest", dedupe_key="daily_digest:" + n.strftime("%Y%m%d%H"))  # hourly; sends once/user/day
 
 
 def run_once(db, limit: int = 20) -> int:
@@ -131,6 +133,20 @@ def match_refresh(db, payload) -> str:
     from .domain import matching
     st = matching.refresh(db)
     return f"evaluated {st['evaluated']} ({st['new']} new), unchanged {st['unchanged']}"
+
+
+@handler("webhook_retry")
+def webhook_retry(db, payload) -> str:
+    from .domain import inbox
+    return inbox.retry_failed_events(db)
+
+
+@handler("daily_digest")
+def daily_digest(db, payload) -> str:
+    from .domain import digests
+    if not digests.due_now():
+        return "not yet 08:00 IST"
+    return digests.send_all(db)
 
 
 @handler("noop")

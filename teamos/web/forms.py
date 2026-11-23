@@ -23,7 +23,7 @@ SUB_SELECT = ("SELECT s.*, o.ref_code, o.kind AS opp_kind, c.full_name AS contac
 def record_context(db, user, opp: dict) -> dict:
     """Context for the 'Forms & documents' card on seller and buyer pages."""
     kind = opp["kind"]
-    invitations = db.all("SELECT i.*, u.full_name AS sender_name, (SELECT m.provider_message_id FROM communications m "
+    invitations = db.all("SELECT i.*, u.full_name AS sender_name, (SELECT m.provider_message_id FROM messages m "
                          "WHERE m.invitation_id = i.id ORDER BY m.id DESC LIMIT 1) AS provider_message_id "
                          "FROM form_invitations i LEFT JOIN users u ON u.id = i.created_by WHERE i.opportunity_id = ? "
                          "ORDER BY i.id DESC LIMIT 10", (opp["id"],))
@@ -66,9 +66,10 @@ def inbox():
                         "JOIN contacts c ON c.id = i.contact_id LEFT JOIN users u ON u.id = i.created_by "
                         "WHERE i.status IN ('sent','opened','started') ORDER BY i.created_at")
     reviewed = db.all(SUB_SELECT + "WHERE s.status = 'reviewed' ORDER BY s.reviewed_at DESC LIMIT 25")
-    comms = db.all("SELECT m.*, o.ref_code, o.kind AS opp_kind, c.full_name AS contact_name, u.full_name AS sender_name "
-                   "FROM communications m JOIN contacts c ON c.id = m.contact_id "
-                   "LEFT JOIN opportunities o ON o.id = m.opportunity_id LEFT JOIN users u ON u.id = m.sent_by "
+    comms = db.all("SELECT m.*, o.ref_code, o.kind AS opp_kind, COALESCE(c.full_name, v.phone) AS contact_name, "
+                   "u.full_name AS sender_name FROM messages m JOIN conversations v ON v.id = m.conversation_id "
+                   "LEFT JOIN contacts c ON c.id = v.contact_id LEFT JOIN opportunities o ON o.id = m.opportunity_id "
+                   "LEFT JOIN users u ON u.id = m.sent_by WHERE m.direction = 'out' AND m.kind = 'template' "
                    "ORDER BY m.id DESC LIMIT 15")
     base = current_app.config.get("PUBLIC_BASE_URL") or request.host_url.rstrip("/")
     return render_template("forms/inbox.html", pending=pending, open_links=open_links, reviewed=reviewed, comms=comms,
@@ -122,7 +123,8 @@ def send(opp_id):
         flash(" ".join(str(v) for v in e.errors.values()), "error")
         return redirect(F.opp_path(opp))
     inv = db.one("SELECT * FROM form_invitations WHERE id = ?", (r["invitation_id"],))
-    comm = db.one("SELECT * FROM communications WHERE id = ?", (r["communication"]["id"],)) if r["communication"] else None
+    comm = db.one("SELECT * FROM messages WHERE id = ?", (r["communication"]["id"],)) \
+        if r["communication"] and r["communication"].get("id") else None
     return render_template("forms/sent.html", opp=opp, inv=inv, link=r["link"], comm=comm,
                            back=F.opp_path(opp), MOCK_LABEL=messaging.PROVIDER_LABEL)
 

@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Message templates{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Message templates</h1><div class="sub">Approved wording for WhatsApp. Placeholders like {name} are filled at send time; a message with an empty placeholder is never sent.</div></div></div>
+<div class="card flush"><div class="table-wrap"><table class="small">
+  <tr><th>Template</th><th>Type</th><th>Text</th><th>Values needed</th><th>Status</th><th></th></tr>
+  {% for t in rows %}<tr><td><strong>{{ t.name }}</strong><div class="mono muted">{{ t.key }} · v{{ t.version }}</div></td><td>{{ t.category }}</td><td>{{ t.body }}</td>
+    <td>{{ t.fields|join(', ') }}</td><td><span class="badge {{ 'ok' if t.status in ('approved_local','provider_approved') else 'grey' }}">{{ t.status|replace('_',' ') }}</span></td>
+    <td><a class="btn sm" href="{{ url_for('admin.templates', edit=t.key) }}#edit">Edit</a></td></tr>{% endfor %}
+</table></div></div>
+{% set e = (rows|selectattr('key', 'equalto', edit)|first) if edit else None %}
+<form method="post" class="card" id="edit">{{ csrf() }}<h2>{{ 'Edit ' ~ e.name if e else 'New template' }}</h2>
+  <div class="form-grid">
+    <div class="field"><label>Key</label><input name="key" value="{{ e.key if e else '' }}" {{ 'readonly' if e }} required placeholder="e.g. price_update"></div>
+    <div class="field"><label>Name</label><input name="name" value="{{ e.name if e else '' }}" required></div>
+    <div class="field"><label>Type</label><select name="category"><option value="service" {{ 'selected' if e and e.category == 'service' }}>Service (follow-up the customer asked for)</option><option value="marketing" {{ 'selected' if e and e.category == 'marketing' }}>Marketing (needs marketing consent)</option></select></div>
+    <div class="field"><label>Status</label><select name="status"><option value="draft">Draft</option><option value="approved_local" {{ 'selected' if e and e.status == 'approved_local' }}>Approved internally (test use)</option><option value="paused" {{ 'selected' if e and e.status == 'paused' }}>Paused</option></select></div>
+    <div class="field full"><label>Text</label><textarea name="body" required>{{ e.body if e else '' }}</textarea>
+      <div class="help">Must include how to opt out ("Reply STOP to opt out"). Never promise a deal, a return or that buyers are available.</div></div>
+  </div><button class="btn primary">Save</button></form>
+<p class="small muted">Going live: each template also needs Meta's approval ("provider approved"), recorded when the live account is connected.</p>
+{% endblock %}

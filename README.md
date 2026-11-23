@@ -1,7 +1,7 @@
 # Salon Shastra TeamOS — Business Exchange, Match Desk & Team Command Center
 
 Internal operating platform for Salon Shastra's salon buy–sell team. Milestone 1: foundation, access control and
-seller management; Milestone 2: production hardening; Milestone 3: buyer / investor management; Milestone 4: forms & data requests; Milestone 5: matching engine + Match Desk; **Milestone 6: teasers, introductions, deals & admin finance**. See `docs/` for
+seller management; Milestone 2: production hardening; Milestone 3: buyer / investor management; Milestone 4: forms & data requests; Milestone 5: matching engine + Match Desk; Milestone 6: teasers, introductions, deals & admin finance; **Milestone 7: WhatsApp inbox (test-only), consent-guarded messaging, reviewed batches, morning digest & leadership reports**. See `docs/` for
 architecture, roadmap, decisions and feature status.
 
 ## Run locally (5 minutes)

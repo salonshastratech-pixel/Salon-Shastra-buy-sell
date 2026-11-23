@@ -26,12 +26,15 @@
       <a href="{{ url_for('forms.inbox') }}" class="{{ 'on' if ep.startswith('forms.') }}">Forms &amp; Requests</a>
       <a href="{{ url_for('matches.desk') }}" class="{{ 'on' if ep.startswith('matches.') }}">Match Desk</a>
       <a href="{{ url_for('deals.index') }}" class="{{ 'on' if ep.startswith('deals.') }}">Deals</a>
-      <a href="{{ url_for('main.planned', module='inbox') }}" class="planned">WhatsApp Inbox <span class="tag">M7</span></a>
+      <a href="{{ url_for('inbox.index') }}" class="{{ 'on' if ep.startswith('inbox.') and ep != 'inbox.batches' and ep != 'inbox.batch' }}">WhatsApp Inbox</a>
+      <a href="{{ url_for('inbox.batches') }}" class="{{ 'on' if ep in ('inbox.batches', 'inbox.batch') }}">Message batches</a>
+      <a href="{{ url_for('reports.index') }}" class="{{ 'on' if ep.startswith('reports.') }}">Reports</a>
       {% if can('crm.import') %}<a href="{{ url_for('imports.index') }}" class="{{ 'on' if ep.startswith('imports.') }}">Spreadsheet import</a>{% endif %}
       <a href="{{ url_for('main.dictionary') }}" class="{{ 'on' if ep == 'main.dictionary' }}">Field dictionary</a>
       {% endif %}
       {% if can('users.manage') or can('audit.view') or can('finance.view') or can('duplicates.resolve') or can('settings.manage') %}
       <div class="group">Admin</div>
+      {% if can('settings.manage') %}<a href="{{ url_for('admin.integrations') }}" class="{{ 'on' if ep == 'admin.integrations' }}">Integrations</a><a href="{{ url_for('admin.templates') }}" class="{{ 'on' if ep == 'admin.templates' }}">Message templates</a><a href="{{ url_for('admin.outbox') }}" class="{{ 'on' if ep == 'admin.outbox' }}">E-mail outbox</a>{% endif %}
       {% if can('users.manage') %}<a href="{{ url_for('admin.users') }}" class="{{ 'on' if ep == 'admin.users' }}">Users &amp; access</a>{% endif %}
       {% if can('duplicates.resolve') %}<a href="{{ url_for('admin.duplicates') }}" class="{{ 'on' if ep == 'admin.duplicates' }}">Duplicate review</a>{% endif %}
       {% if can('settings.manage') %}<a href="{{ url_for('admin.jobs') }}" class="{{ 'on' if ep == 'admin.jobs' }}">Background jobs</a>{% endif %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}WhatsApp Inbox{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>WhatsApp Inbox</h1><div class="sub">One shared inbox. Every conversation is linked to the right buyer or seller, with an owner.</div></div></div>
+<div class="flash {{ 'ok' if wa.live else 'warn' }}"><strong>{{ wa.label }}.</strong> {{ wa.note }}</div>
+
+<div class="inline small queue-tabs">{% for k, (label, _c) in QUEUES.items() %}
+  <a class="btn sm {{ 'primary' if k == q }}" href="{{ url_for('inbox.index', q=k) }}">{{ label }} <span class="badge {{ 'warn' if counts[k] and k in ('unassigned','unmatched') else 'grey' }}">{{ counts[k] }}</span></a>{% endfor %}</div>
+
+{% if uncertain %}<div class="card"><div class="card-h"><h2>Messages needing a check</h2><span class="badge bad">{{ uncertain|length }}</span></div>
+  <p class="small muted">The provider did not answer in time, so these may or may not have reached the customer. They are never resent automatically — open the conversation and confirm.</p>
+  <ul class="tasks">{% for m in uncertain %}<li class="task"><div><div class="t small"><a href="{{ url_for('inbox.thread', conv_id=m.conversation_id) }}">{{ m.contact_name or m.phone }}</a></div><div class="meta">{{ m.body[:90] }} · {{ m.created_at|rel }}</div></div></li>{% endfor %}</ul></div>{% endif %}
+
+<div class="card flush"><ul class="tasks conv-list">
+{% for c in rows %}<li class="task {{ 'unread' if c.unread }}"><div>
+  <div class="t"><a href="{{ url_for('inbox.thread', conv_id=c.id) }}">{{ c.contact_name or c.phone }}</a>
+    {% if not c.contact_id %}<span class="badge warn">unknown number</span>{% endif %}{% if c.unread %} <span class="badge bad">{{ c.unread }} new</span>{% endif %}</div>
+  <div class="meta">{{ (c.last_body or '')[:110] }}</div>
+  <div class="meta">{{ c.last_message_at|rel if c.last_message_at else 'no messages yet' }} · {{ 'Assigned to ' ~ c.assignee_name if c.assignee_name else 'Unassigned' }}</div></div></li>
+{% else %}<li class="empty">Nothing here.</li>{% endfor %}</ul></div>
+
+{% if not wa.live %}
+<form method="post" action="{{ url_for('inbox.simulate') }}" class="card">{{ csrf() }}
+  <h2>Test: simulate an incoming WhatsApp message</h2>
+  <p class="small muted">Only available while WhatsApp is in test mode. Try an unknown number, a known customer's number, or the word STOP.</p>
+  <div class="form-grid"><div class="field"><label>From (mobile)</label><input name="phone" placeholder="e.g. 9000000201" required></div>
+    <div class="field"><label>Message</label><input name="text" placeholder="e.g. Is the Kondapur salon still available?" required></div></div>
+  <button class="btn">Simulate incoming message</button></form>
+{% endif %}
+{% endblock %}

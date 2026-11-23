@@ -1,4 +1,44 @@
-# Feature status — Milestone 6 (23 Nov 2026, v0.6.0)
+# Feature status — Milestone 7 (23 Nov 2026, v0.7.0)
+
+Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
+
+## Milestone 7 — WhatsApp inbox, consent, batches, digests & reports (awaiting founder review)
+
+| Area | Status | Evidence |
+|---|---|---|
+| WhatsApp provider | **Built (test-only)** | Labelled mock provider is active. A Meta Cloud API adapter is written but switches on only with all four `WHATSAPP_*` values **and** `WHATSAPP_LIVE_APPROVED=1`; it has never been run against Meta (UAT-48). Every screen says "Test-only". |
+| Shared team inbox | **Built** | Queues: assigned to me, unassigned, unknown numbers, all open, closed. Each conversation has one owner (hand-over with a note), links to buyer/seller records, close/reopen, unread counts on My Day. "WhatsApp conversation" button on every seller and buyer contact card. |
+| Unknown numbers (UAT-43) | **Built** | A number not in the CRM (or matching two contacts) is never guessed onto a record. The team can reply inside the 24-hour window the customer opened, then press **+ New seller lead / + New buyer**: the mobile is prefilled and the chat links itself to the new record. |
+| One gate for every send (UAT-23, 29, 30) | **Built** | Template must be approved and every placeholder filled; contact reachable, not do-not-contact, not opted out; service consent for service messages, separate marketing consent for marketing; max 3 messages per person per 24 h and 1 marketing message per 7 days (D-43). Free text only within 24 h of the customer's last message. |
+| Opt-out | **Built** | "STOP" (and variants) records the opt-out, sends one confirmation, cancels pending batch messages, creates a task for the owner. "START" opts back in. |
+| Collision guard (UAT-44) | **Built** | If a colleague messaged the same person in the last 30 minutes you see "Harika messaged this person 12 min ago" and must tick "send anyway". |
+| Delivery statuses & webhooks (UAT-24, 25) | **Built** | Signature-checked webhook; each provider event stored once (repeats ignored); statuses only move forward (accepted, sent, delivered, read); failures visible. A provider timeout becomes "Uncertain — needs review" and is never resent automatically; a person marks it arrived / failed. |
+| Message templates | **Built** | 10 approved-wording templates (Admin → Message templates), service vs marketing, versioned, opt-out line required. Templates with a personal link (forms, teasers) can only be sent one person at a time. |
+| Reviewed batches (UAT-45) | **Built** | Anyone drafts (audience + template); a team lead / admin who did not draft it approves; eligibility is re-checked for every person at the moment of sending, so anyone who opted out after approval is suppressed. Personal-link and system templates are refused for batches. |
+| Morning e-mail digest (FR-028) | **Built (held)** | Opt-in per person on My Day; one per IST day with only that person's overdue/today tasks, waiting forms and matches; preview page. No mail server is configured, so digests are kept in Admin → E-mail outbox ("held"). SMTP adapter ready. |
+| Leadership reports | **Built** | Today / yesterday / week / month / custom with IST boundaries (UAT-22): leads by source, reach and time to first conversation, forms, matching & deal funnel, rejection reasons, WhatsApp volumes, inventory & demand, and a team table that values real conversations, reviewed forms and on-time follow-ups over call counts. CSV export matches the screen. |
+| Integrations page | **Built** | Admin → Integrations shows exactly what is connected (all test-only now), the go-live checklist and stored webhook events. |
+| Real WhatsApp / e-mail delivery | **Not run** | Needs Salon Shastra's verified Meta Business account, approved templates, a public HTTPS address and SMTP details. Not connected, by instruction. |
+| PostgreSQL replay for the new SQL | **Not run** | No PostgreSQL here; SQL kept portable. |
+
+Found and fixed during the M7 browser walkthrough and QA:
+* A message from an unknown number could not be answered at all, so a new enquiry would sit until someone created the
+  lead by hand and retyped the number. Now: reply within 24 h, then one-click lead creation that links the chat.
+* A batch could have used the "Detailed form link" or "Confidential salon summary" template, which would have sent
+  **one person's private link to everyone** in the group. Those templates are now refused for batches (test added).
+* My Day's browser-tab title contained the raw HTML of the morning-summary toggle (the toggle sat inside the title
+  block and was missing from the page). Fixed, plus a test that page titles are plain text.
+* Any team member could cancel another person's approved batch; now only its author or a lead/admin.
+* Inbox rows are clickable across the whole row (before, only the name was a link); the batch page no longer says
+  "0 of 6 eligible" after sending.
+
+Tests: 151 automated tests pass (all M1–M6 plus 17 for M7 covering UAT-22, 23, 24, 25, 29, 30, 43, 44, 45, 48).
+Crawler: 1,339 pages across 5 roles, 0 errors. Forged-request probe: 74 attempts, all refused. Walked through in a real
+browser as Harika (team member), Ravi (team lead) and the founder, including phone width.
+
+---
+
+# Milestone 6 status (23 Nov 2026, v0.6.0)
 
 Legend: **Built** = implemented, database-backed and covered by automated tests · **Partial** · **Not run** · **Planned**
 

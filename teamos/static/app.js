@@ -46,4 +46,17 @@
       if (q) { e.preventDefault(); q.focus(); q.select(); }
     }
   });
+  // Message templates: show only the value boxes the chosen template needs.
+  var tpl = document.querySelector('#tpl');
+  if (tpl) {
+    var showVars = function () {
+      var need = (tpl.options[tpl.selectedIndex].dataset.fields || '').split(',');
+      document.querySelectorAll('.tplvar').forEach(function (el) {
+        var on = need.indexOf(el.dataset.var) !== -1;
+        el.classList.toggle('hide', !on);
+        el.querySelector('input').disabled = !on;
+      });
+    };
+    tpl.addEventListener('change', showVars); showVars();
+  }
 })();

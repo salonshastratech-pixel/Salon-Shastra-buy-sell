@@ -72,6 +72,8 @@ def index():
 def new():
     db = get_db()
     form, errors, duplicates = {}, {}, None
+    if request.method == "GET":  # prefill, e.g. "+ New lead" from a WhatsApp chat with an unknown number
+        form = {k: request.args[k] for k in ("phone", "source", "from_conv") if request.args.get(k)}
     if request.method == "POST":
         form = request.form.to_dict()
         try:
@@ -79,6 +81,7 @@ def new():
             if "duplicates" in result:
                 duplicates = result["duplicates"]
             else:
+                _link_chat(db, form.get("from_conv"), result["opportunity_id"])
                 flash("Seller lead created. A first-contact task is on the owner's My Day.", "ok")
                 return redirect(url_for("sellers.detail", opp_id=result["opportunity_id"]))
         except ValidationError as e:
@@ -280,3 +283,15 @@ def decision(opp_id):
     opp = _opp_or_404(db, opp_id)
     return _run(opp_id, lambda: S.decide_listing(db, g.user, opp, request.form.get("decision"),
                                                  request.form.get("conditions")), "Decision recorded.", "approval")
+
+
+def _link_chat(db, conv_id, opp_id):
+    """After creating a lead from the WhatsApp inbox, link that conversation to the new record."""
+    if not (conv_id and str(conv_id).isdigit()):
+        return
+    from ..domain import inbox as I
+    try:
+        I.link(db, g.user, int(conv_id), opp_id)
+        flash("The WhatsApp conversation is now linked to this record.", "ok")
+    except Exception:  # never block lead creation because of the chat link
+        flash("Lead created, but the WhatsApp conversation could not be linked — link it from the inbox.", "error")

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Morning summary preview{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Your morning e-mail</h1><div class="sub">This is what you would receive today at 08:00 IST.</div></div></div>
+<div class="card"><p><strong>{{ subject }}</strong></p><pre class="digest">{{ body }}</pre></div>
+<p><a class="btn" href="{{ url_for('main.my_day') }}">Back to My Day</a></p>
+{% endblock %}

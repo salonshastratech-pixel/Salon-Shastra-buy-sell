@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.6.0-m6"
+__version__ = "0.7.0-m7"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -36,6 +36,12 @@ def create_app(overrides: dict | None = None) -> Flask:
         # Fernet key for encrypting uploaded documents at rest. Without it, uploads are refused.
         FILES_KEY=os.environ.get("FILES_KEY"),
         PUBLIC_BASE_URL=os.environ.get("PUBLIC_BASE_URL", ""),
+        # WhatsApp Cloud API — all four + WHATSAPP_LIVE_APPROVED=1 are needed before anything goes to real customers.
+        WHATSAPP_PHONE_NUMBER_ID=os.environ.get("WHATSAPP_PHONE_NUMBER_ID"),
+        WHATSAPP_ACCESS_TOKEN=os.environ.get("WHATSAPP_ACCESS_TOKEN"),
+        WHATSAPP_APP_SECRET=os.environ.get("WHATSAPP_APP_SECRET"),
+        WHATSAPP_VERIFY_TOKEN=os.environ.get("WHATSAPP_VERIFY_TOKEN"),
+        WHATSAPP_LIVE_APPROVED=os.environ.get("WHATSAPP_LIVE_APPROVED"),
         # Roles that must use an authenticator app. Anyone may opt in; disabling for a role needs an env change.
         MFA_REQUIRED_ROLES=os.environ.get("MFA_REQUIRED_ROLES", "super_admin,finance"),
         # Brand: logo self-hosted at static/brand/logo.png when present, else the official website file.
@@ -119,9 +125,9 @@ def create_app(overrides: dict | None = None) -> Flask:
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL", (g.user["id"],))
         return ctx
 
-    from .web import admin, auth, buyers, deals, forms, imports, main, matches, public, sellers, tasks
+    from .web import admin, auth, buyers, deals, forms, imports, inbox, main, matches, public, sellers, tasks
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
-               matches.bp, deals.bp, deals.teaser_public):
+               matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp):
         app.register_blueprint(bp)
     return app
 

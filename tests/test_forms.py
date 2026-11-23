@@ -44,7 +44,8 @@ def test_uat41_form_link_via_mock_whatsapp_records_source_invitation_and_provide
     c, opp_id = new_seller(login, db)
     token, html = send(c, opp_id, "seller_deep", "whatsapp_mock")
     inv = db.one("SELECT * FROM form_invitations")
-    comm = db.one("SELECT * FROM communications")
+    comm = db.one("SELECT m.*, v.contact_id FROM messages m JOIN conversations v ON v.id = m.conversation_id "
+                  "WHERE m.direction = 'out'")
     contact_id = db.scalar("SELECT contact_id FROM opportunities WHERE id = ?", (opp_id,))
     # exact source record and invitation
     assert inv["opportunity_id"] == opp_id and inv["contact_id"] == contact_id and inv["template_version"] == "seller-deep v1"
@@ -145,7 +146,7 @@ def test_cannot_send_without_consent_or_to_do_not_contact(db, login):
                follow_redirects=True)
     assert b"no recorded consent" in r.data
     assert db.scalar("SELECT COUNT(*) FROM form_invitations") == 0
-    assert db.scalar("SELECT COUNT(*) FROM communications") == 0
+    assert db.scalar("SELECT COUNT(*) FROM messages") == 0
     assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE action = 'form.send_blocked'") == 1
 
 

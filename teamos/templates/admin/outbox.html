@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}E-mail outbox{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>E-mail outbox</h1><div class="sub">{{ provider.label }}.</div></div></div>
+<div class="card flush"><div class="table-wrap"><table class="small">
+  <tr><th>Created</th><th>To</th><th>Subject</th><th>Status</th></tr>
+  {% for e in rows %}<tr><td>{{ e.created_at|ist }}</td><td>{{ e.full_name or e.to_addr }}</td><td><details><summary>{{ e.subject }}</summary><pre class="digest">{{ e.body }}</pre></details></td>
+    <td><span class="badge {{ 'ok' if e.status == 'sent' else 'bad' if e.status == 'failed' else 'grey' }}">{{ e.status }}</span>{% if e.error %}<div class="unknown">{{ e.error }}</div>{% endif %}</td></tr>
+  {% else %}<tr><td class="empty" colspan="4">Nothing yet. Morning digests are prepared from 08:00 IST when the background worker runs.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

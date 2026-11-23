@@ -1,3 +1,19 @@
+# QA report — after Milestone 7 (23 Nov 2026, v0.7.0)
+
+Re-run of every check below on the Milestone 7 build, with the new WhatsApp, batch, report and admin pages added.
+* **Crawler:** 1,339 page loads (founder 335, lead 320, Shaheen 319, Harika 319, accounts 46); **0 server errors,
+  0 broken links.** Refusals are the intended ones (team members to admin pages; Finance to CRM and inbox).
+* **Forged requests:** now 74 attempts. Adds approving a message batch (team members), sending a WhatsApp reply and
+  re-assigning a conversation (Finance), editing a message template (everyone but the founder), and opening the inbox,
+  integrations and e-mail outbox. **All refused, database unchanged.**
+* **Browser walkthrough:** reply in a buyer thread; unknown number, reply, then one-click seller lead with the chat
+  linked; batch drafted by Harika, approved and sent by Ravi (6 simulated sends, consent re-checked); reports;
+  integrations; every new page at phone width (375 px) without sideways scrolling.
+* Findings fixed in M7: see `docs/STATUS.md` (private link in batches, unanswerable unknown numbers, My Day title,
+  batch cancel rights, clickable inbox rows).
+
+---
+
 # QA report — after Milestone 6 (23 Nov 2026, v0.6.0)
 
 Scope: everything built in Milestones 1–6, tested beyond the automated suite. All findings below are fixed and covered

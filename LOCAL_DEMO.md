@@ -22,6 +22,18 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 7 — WhatsApp inbox & reports (everything is a labelled TEST-ONLY simulation)
+* **WhatsApp Inbox** (left menu, as `harika@`): Arjun's thread. Reply to him (allowed because he wrote in the last
+  24 h). The *Unknown numbers* queue has an enquiry from a number not in the CRM: reply, then press
+  **+ New seller lead**. The mobile is filled in and the chat links itself.
+* At the bottom of the inbox, *Simulate an incoming message*: try a known number, a new number, or the word STOP
+  (then try to message that person: it is blocked).
+* **Message batches**: a draft "gentle follow-up" batch. Sign in as `lead@` to approve and send it; Harika cannot
+  approve her own.
+* **Reports** (left menu): today / week / month with CSV export. **My Day**, bottom: turn on the morning e-mail and
+  preview it. As `founder@`, **Admin → E-mail outbox** shows it held (no mail server) and **Admin → Integrations**
+  shows what is connected (nothing live) and the go-live checklist.
+
 ## Milestone 6 — deals & finance
 * **Deals → DL-00001** (Arjun ↔ Glow Studio Unisex): visit done, buyer offered ₹19 L, seller countered ₹21 L. Try
   accepting the counter, ticking the diligence list, adding a handover date and closing (as `founder@`).

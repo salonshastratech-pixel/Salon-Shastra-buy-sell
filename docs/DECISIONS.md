@@ -81,3 +81,14 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-40 | Finance specialist rights | View and edit fee agreements, invoices, receipts and expenses; no access to the CRM deal room (sees deal references only). | Founder | Proposed |
 | D-41 | Closing a deal as won | Approver only; accepted offer, all diligence items reviewed / not applicable, handover date recorded. | Founder | Proposed |
 | D-42 | Fee earning | Each agreement states when it is earned (signing / agreement / handover / closing / manual). The demo's "5% seller success fee on closing" is an illustration only, not a policy (D-03, D-04 still open). | Founder / accountant | Proposed |
+
+## Added in Milestone 7 (proposals — configurable, pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-43 | Message frequency caps | Max 3 WhatsApp messages per person per 24 h; max 1 marketing message per person per 7 days. Constants in `teamos/domain/inbox.py`. | Founder | Proposed |
+| D-44 | Collision guard | Warn (not block) if a colleague messaged the same person in the last 30 minutes; the sender must tick "send anyway". | Team lead | Proposed |
+| D-45 | Batch approval | Anyone may draft; a team lead / admin who did not draft it approves and sends; consent re-checked per person at send time. Personal-link templates never go in batches. | Founder | Proposed |
+| D-46 | Replying to unknown numbers | Free-text reply allowed within the 24-hour window the person opened (never after STOP); templates need a linked record with consent. | Founder | Proposed |
+| D-47 | Morning digest | Opt-in per person, 08:00 IST, only the recipient's own work; no phone numbers or documents in e-mail. | Founder | Proposed |
+| D-48 | Going live on WhatsApp | Requires a Salon Shastra-owned verified Meta Business account, each template approved by Meta, a public HTTPS webhook, and `WHATSAPP_LIVE_APPROVED=1` set after a staff-phone test. | Founder | **Needs decision** (not connected) |

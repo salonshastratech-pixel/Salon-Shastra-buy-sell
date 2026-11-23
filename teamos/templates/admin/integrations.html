@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Integrations{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Integrations</h1><div class="sub">What is really connected. Nothing is shown as live unless it is.</div></div></div>
+
+<div class="split"><div>
+  <div class="card"><div class="card-h"><h2>WhatsApp</h2><span class="badge {{ 'ok' if wa.live else 'warn' }}">{{ 'LIVE' if wa.live else 'TEST-ONLY' }}</span></div>
+    <p><strong>{{ wa.label }}</strong></p><p class="small">{{ wa.note }}</p>
+    <table class="small">{% for k in WA_SETTINGS %}<tr><td class="mono">{{ k }}</td><td>{% if k in wa.missing %}<span class="badge grey">not set</span>{% else %}<span class="badge ok">set</span>{% endif %}</td></tr>{% endfor %}
+      <tr><td class="mono">WHATSAPP_LIVE_APPROVED</td><td>{% if wa.approved_flag %}<span class="badge ok">1</span>{% else %}<span class="badge grey">not set</span>{% endif %}</td></tr></table>
+    <h3>Before going live (checklist)</h3>
+    <ol class="small">
+      <li>Salon Shastra-owned Meta Business account, verified, with the WhatsApp number registered to it.</li>
+      <li>Each template submitted and approved by Meta; record its Meta name on the Message templates page.</li>
+      <li>Webhook URL <span class="mono">{{ public_url or '(PUBLIC_BASE_URL)' }}/webhooks/whatsapp</span> subscribed, with the verify token; signature checking uses the app secret.</li>
+      <li>Set the four values above on the server (never in the code), then <span class="mono">WHATSAPP_LIVE_APPROVED=1</span>.</li>
+      <li>Send one message to a staff phone and confirm the delivered/read ticks arrive here before any customer use.</li>
+    </ol>
+    <p class="small muted">The live adapter (Meta Cloud API) is built but has not yet been run against Meta from this system.</p></div>
+
+  <div class="card"><div class="card-h"><h2>E-mail</h2><span class="badge {{ 'ok' if email.is_live else 'warn' }}">{{ 'CONNECTED' if email.is_live else 'TEST-ONLY' }}</span></div>
+    <p class="small">{{ email.label }}. Morning digests are kept in the <a href="{{ url_for('admin.outbox') }}">e-mail outbox</a>{% if not email.is_live %} and are not delivered{% endif %}.</p>
+    <p class="small muted">To connect: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM on the server.</p></div>
+
+  <div class="card"><h2>Other settings</h2><table class="small">
+    <tr><td>Document encryption key (FILES_KEY)</td><td>{% if files_ok %}<span class="badge ok">set</span>{% else %}<span class="badge bad">missing — uploads refused</span>{% endif %}</td></tr>
+    <tr><td>Public address for customer links (PUBLIC_BASE_URL)</td><td>{{ public_url or 'not set — uses the address of each request' }}</td></tr></table></div>
+</div><div>
+  <div class="card"><div class="card-h"><h2>Webhook events</h2>{% if failed %}<form method="post">{{ csrf() }}<input type="hidden" name="action" value="retry"><button class="btn sm">Retry {{ failed }} failed</button></form>{% endif %}</div>
+    <p class="small muted">Each provider event is stored once; repeats are ignored. Failures stay here with their error until processed.</p>
+    <table class="small">{% for e in events %}<tr><td class="mono">{{ e.event_id[:24] }}</td><td>{{ e.kind }}</td><td><span class="badge {{ 'ok' if e.status == 'processed' else 'bad' if e.status == 'failed' else 'grey' }}">{{ e.status }}</span>{% if e.error %}<div class="unknown">{{ e.error }}</div>{% endif %}</td><td>{{ e.received_at|rel }}</td></tr>{% else %}<tr><td class="empty">No events received.</td></tr>{% endfor %}</table></div>
+</div></div>
+{% endblock %}

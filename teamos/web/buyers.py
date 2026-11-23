@@ -9,7 +9,7 @@ from ..domain.errors import ValidationError
 from ..permissions import user_can
 from ..security import can, deny, login_required, require
 from ..timeutil import parse_local_input
-from .sellers import _active_users
+from .sellers import _active_users, _link_chat
 
 bp = Blueprint("buyers", __name__, url_prefix="/buyers")
 
@@ -97,6 +97,8 @@ def index():
 def new():
     db = get_db()
     form, errors, duplicates = {}, {}, None
+    if request.method == "GET":  # prefill, e.g. "+ New lead" from a WhatsApp chat with an unknown number
+        form = {k: request.args[k] for k in ("phone", "source", "from_conv") if request.args.get(k)}
     if request.method == "POST":
         form = request.form.to_dict()
         try:
@@ -104,6 +106,7 @@ def new():
             if "duplicates" in result:
                 duplicates = result["duplicates"]
             else:
+                _link_chat(db, form.get("from_conv"), result["opportunity_id"])
                 flash("Buyer lead created. A first-contact task is on the owner's My Day.", "ok")
                 return redirect(url_for("buyers.detail", opp_id=result["opportunity_id"]))
         except ValidationError as e:

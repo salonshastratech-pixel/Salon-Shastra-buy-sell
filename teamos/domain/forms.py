@@ -133,17 +133,19 @@ def create_invitation(db, actor: dict, opp_id: int, template_key: str, channel: 
 
 
 def _send_mock_whatsapp(db, actor, opp, inv_id, template_key, link, expires) -> dict:
+    """Send the form link through the team inbox (Milestone 7): same consent, cap and status rules as every message."""
+    from . import inbox as I
     mtpl = "deep_form_link" if template_key != "targeted" else "targeted_request"
     variables = {"name": opp["contact_name"].split()[0], "sender": actor["full_name"].split()[0],
-                 "expires": fmt_ist(expires, "%d %b %Y")}
-    result = messaging.provider().send_template(opp.get("phone_normalized"), mtpl, {**variables, "link": link})
-    body = messaging.render(mtpl, {**variables, "link": "[personal link]"})  # the secret token is never stored
-    cid = db.insert("communications", {
-        "contact_id": opp["contact_id"], "opportunity_id": opp["id"], "invitation_id": inv_id, "channel": "whatsapp",
-        "provider": messaging.PROVIDER_NAME, "template_key": mtpl, "body": body, "status": result["status"],
-        "provider_message_id": result.get("provider_message_id"), "detail": result.get("detail"),
-        "sent_by": actor["id"], "created_at": now_iso()})
-    return {"id": cid, **result}
+                 "expires": fmt_ist(expires, "%d %b %Y"), "link": link}
+    try:
+        m = I.send(db, actor, contact_id=opp["contact_id"], opportunity_id=opp["id"], template_key=mtpl,
+                   variables=variables, stored_variables={"link": "[personal link]"},  # the secret token is never stored
+                   invitation_id=inv_id, system=True)
+    except ValidationError as e:
+        return {"id": None, "status": "failed", "detail": " ".join(str(v) for v in e.errors.values())}
+    return {"id": m["id"], "status": m["status"], "provider_message_id": m["provider_message_id"],
+            "detail": m.get("detail")}
 
 
 def revoke(db, actor, inv_id: int) -> None:

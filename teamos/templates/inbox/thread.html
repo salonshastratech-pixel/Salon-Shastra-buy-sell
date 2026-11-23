@@ -1,0 +1,77 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}{{ conv.contact_name or conv.phone }} · Inbox{% endblock %}
+{% block content %}
+<div class="ph"><div>
+  <div class="small muted"><a href="{{ url_for('inbox.index') }}">WhatsApp Inbox</a> / conversation</div>
+  <h1>{{ conv.contact_name or 'Unknown number' }}</h1>
+  <div class="inline sub"><span class="mono">{{ conv.phone }}</span> · {{ 'Assigned to ' ~ conv.assignee_name if conv.assignee_name else 'Unassigned' }} · <span class="badge {{ 'ok' if conv.status == 'open' else 'grey' }}">{{ conv.status }}</span>
+    {% if not wa.live %}<span class="badge warn">test mode — nothing is really sent</span>{% endif %}</div>
+</div></div>
+
+<div class="split"><div>
+  <div class="card thread">
+    {% for m in msgs %}
+      {% if m.kind == 'system' and m.provider == 'internal' %}<div class="bubble sys">{{ m.body }} · {{ m.created_at|ist }}</div>
+      {% else %}<div class="bubble {{ 'in' if m.direction == 'in' else 'out' }}">
+        <div>{{ m.body }}</div>
+        <div class="bubble-meta">{{ m.created_at|ist }}{% if m.direction == 'out' %} · {{ m.by_name or 'System' }}{% if m.template_key %} · template {{ m.template_key }}{% endif %} ·
+          <span class="{{ 'unknown' if m.status in ('failed','uncertain') else '' }}">{{ STATUS[m.status] }}</span>{% if m.error %} — {{ m.error }}{% endif %}{% endif %}</div>
+        {% if m.status == 'uncertain' %}<form method="post" action="{{ url_for('inbox.resolve', mid=m.id) }}" class="inline">{{ csrf() }}
+          <span class="small">Did it reach the customer?</span><button class="btn sm" name="outcome" value="sent">Yes — it arrived</button><button class="btn sm" name="outcome" value="failed">No — mark failed</button></form>{% endif %}
+      </div>{% endif %}
+    {% else %}<p class="empty">No messages yet.</p>{% endfor %}
+  </div>
+
+  {% if conv.contact_id %}
+  <div class="card">
+    <h2>Reply</h2>
+    {% if blocks %}<p class="flash error small">Sending is blocked: {{ blocks|join('; ') }}.</p>{% endif %}
+    {% if warns %}<p class="flash warn small">Heads-up: {{ warns|join('; ') }}.</p>{% endif %}
+    {% if window_open %}
+    <form method="post" action="{{ url_for('inbox.send', conv_id=conv.id) }}">{{ csrf() }}<input type="hidden" name="mode" value="text">
+      <div class="field"><textarea name="text" maxlength="2000" placeholder="Write a reply…" required></textarea></div>
+      {% if warns %}<label class="check small"><input type="checkbox" name="acknowledge" value="1"> Send anyway — I've checked with my colleague</label>{% endif %}
+      <button class="btn primary">Send reply</button> <span class="small muted">Free text is allowed for 24 hours after the customer's last message.</span></form>
+    {% else %}<p class="small muted">The customer hasn't written in the last 24 hours, so WhatsApp only allows an approved template.</p>{% endif %}
+    <details class="disclose" {{ 'open' if not window_open }}><summary>Send an approved template</summary>
+      <form method="post" action="{{ url_for('inbox.send', conv_id=conv.id) }}">{{ csrf() }}<input type="hidden" name="mode" value="template">
+        <div class="field"><select name="template_key" id="tpl">{% for t in templates %}<option value="{{ t.key }}" data-fields="{{ t.fields|join(',') }}">{{ t.name }}{{ ' (marketing)' if t.category == 'marketing' }}</option>{% endfor %}</select></div>
+        {% set allf = [] %}{% for t in templates %}{% for f in t.fields %}{% if f not in allf %}{% set _ = allf.append(f) %}{% endif %}{% endfor %}{% endfor %}
+        {% for f in allf %}<div class="field tplvar" data-var="{{ f }}"><label>{{ f|replace('_',' ')|capitalize }}</label><input name="var_{{ f }}"></div>{% endfor %}
+        {% if warns %}<label class="check small"><input type="checkbox" name="acknowledge" value="1"> Send anyway — I've checked with my colleague</label>{% endif %}
+        <button class="btn">Send template</button>
+        <p class="small muted">Name and sender are filled in for you. A template with an empty value is refused.</p></form></details>
+  </div>
+  {% else %}
+  <div class="card">
+    <h2>Reply</h2>
+    {% if window_open %}
+    <form method="post" action="{{ url_for('inbox.send', conv_id=conv.id) }}">{{ csrf() }}<input type="hidden" name="mode" value="text">
+      <div class="field"><textarea name="text" maxlength="2000" placeholder="e.g. Thank you for writing to Salon Shastra! May I know your name and the salon's area?" required></textarea></div>
+      <button class="btn primary">Send reply</button> <span class="small muted">They wrote to us first, so you can reply for 24 hours. Then add them as a lead (right) so nothing is lost.</span></form>
+    {% else %}<p class="small muted">They last wrote more than 24 hours ago. Add them as a lead (right), then send an approved template.</p>{% endif %}
+  </div>
+  {% endif %}
+</div><div>
+  <div class="card"><h2>Linked records</h2>
+    {% for o in links %}<div class="small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> · {{ o.kind }}{% if o.salon_name %} · {{ o.salon_name }}{% endif %} · {{ o.stage|replace('_',' ') }}</div>{% else %}<p class="small muted">Not linked to a buyer or seller yet.</p>{% endfor %}
+    {% if other %}<form method="post" action="{{ url_for('inbox.action', conv_id=conv.id) }}" class="inline">{{ csrf() }}<input type="hidden" name="action" value="link">
+      <select name="opportunity_id">{% for o in other %}<option value="{{ o.id }}">{{ o.ref_code }} · {{ o.kind }}</option>{% endfor %}</select><button class="btn sm">Link</button></form>{% endif %}
+    {% if not conv.contact_id %}
+      <p class="small">This number isn't in the CRM (or matches more than one contact). Find the right record — nothing is linked automatically.</p>
+      <form method="get" class="inline"><input name="find" value="{{ search }}" placeholder="Name, BY-/SL- ref or phone"><button class="btn sm">Find</button></form>
+      {% for o in found %}<form method="post" action="{{ url_for('inbox.action', conv_id=conv.id) }}" class="inline small">{{ csrf() }}<input type="hidden" name="action" value="link"><input type="hidden" name="opportunity_id" value="{{ o.id }}">
+        {{ o.ref_code }} · {{ o.full_name }} <span class="mono">{{ o.phone_normalized }}</span> <button class="btn sm">Link to this</button></form>{% endfor %}
+      <p class="small muted">New person? Create the lead — the mobile is filled in and this chat is linked automatically.</p>
+      <p><a class="btn sm" href="{{ url_for('sellers.new', phone=conv.phone[-10:], source='whatsapp', from_conv=conv.id) }}">+ New seller lead</a>
+         <a class="btn sm" href="{{ url_for('buyers.new', phone=conv.phone[-10:], source='whatsapp', from_conv=conv.id) }}">+ New buyer</a></p>
+    {% endif %}
+  </div>
+  <div class="card"><h2>Owner</h2>
+    <form method="post" action="{{ url_for('inbox.action', conv_id=conv.id) }}">{{ csrf() }}<input type="hidden" name="action" value="assign">
+      <div class="field"><select name="user_id"><option value="">Unassigned</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == conv.assigned_to }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><input name="note" placeholder="Handover note (optional)"></div><button class="btn sm">Save</button></form>
+    <form method="post" action="{{ url_for('inbox.action', conv_id=conv.id) }}">{{ csrf() }}<input type="hidden" name="action" value="{{ 'close' if conv.status == 'open' else 'reopen' }}"><button class="btn sm">{{ 'Close conversation' if conv.status == 'open' else 'Reopen' }}</button></form>
+  </div>
+</div></div>
+{% endblock %}

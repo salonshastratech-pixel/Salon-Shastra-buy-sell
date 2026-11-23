@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ph"><div><h1>New buyer / investor lead</h1><div class="sub">Quick screen for a first call. Capture the hard all-in ceiling early — the full mandate comes later.</div></div></div>
 
-<form method="post" class="split">{{ csrf() }}
+<form method="post" class="split">{{ csrf() }}{% if form.from_conv %}<input type="hidden" name="from_conv" value="{{ form.from_conv }}">{% endif %}
 <div>
   {% if duplicates %}
   <div class="card">

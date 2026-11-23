@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Message batches{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Message batches</h1><div class="sub">Reviewed outreach to a group. Anyone can draft; a team lead or admin approves; consent is re-checked for every person at the moment of sending.</div></div></div>
+<div class="flash {{ 'ok' if wa.live else 'warn' }} small"><strong>{{ wa.label }}.</strong> {{ wa.note }}</div>
+
+<form method="post" class="card">{{ csrf() }}<h2>Draft a batch</h2>
+  <div class="form-grid">
+    <div class="field"><label>Name</label><input name="name" required placeholder="e.g. West Hyderabad buyers — new listings"></div>
+    <div class="field"><label>Who</label><select name="audience">{% for k, (label, _c) in AUDIENCES.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Template</label><select name="template_key" id="tpl">{% for t in templates %}<option value="{{ t.key }}" data-fields="{{ t.fields|join(',') }}">{{ t.name }}{{ ' — marketing' if t.category == 'marketing' }}</option>{% endfor %}</select></div>
+    <div class="field tplvar" data-var="area"><label>Area (for the market update)</label><input name="var_area"></div>
+    <div class="field tplvar" data-var="when"><label>When</label><input name="var_when"></div>
+    <div class="field tplvar" data-var="link"><label>Link</label><input name="var_link"></div>
+    <div class="field tplvar" data-var="expires"><label>Expires</label><input name="var_expires"></div>
+  </div>
+  <button class="btn primary">Draft batch</button>
+  <p class="small muted">Marketing templates only reach people who gave marketing consent; service templates need contact consent. Opted-out and do-not-contact people are always excluded.</p></form>
+
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Batch</th><th>Template</th><th>Status</th><th>By</th><th>Result</th></tr>
+{% for b in rows %}<tr class="row-link"><td><a href="{{ url_for('inbox.batch', batch_id=b.id) }}">{{ b.name }}</a></td><td>{{ b.template_key }}</td>
+  <td><span class="badge {{ 'ok' if b.status == 'sent' else 'info' if b.status == 'approved' else 'grey' }}">{{ b.status }}</span></td>
+  <td class="small">{{ b.by_name }}{% if b.approver_name %} · approved by {{ b.approver_name }}{% endif %}</td>
+  <td class="small">{% if b.counts_d %}{{ b.counts_d.sent }} sent · {{ b.counts_d.suppressed }} suppressed · {{ b.counts_d.failed }} failed{% else %}—{% endif %}</td></tr>
+{% else %}<tr><td colspan="5" class="empty">No batches yet.</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

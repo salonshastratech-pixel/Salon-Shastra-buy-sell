@@ -222,3 +222,54 @@ def jobs():
     rows = db.all("SELECT * FROM jobs ORDER BY id DESC LIMIT 100")
     counts = {r["status"]: r["n"] for r in db.all("SELECT status, COUNT(*) AS n FROM jobs GROUP BY status")}
     return render_template("admin/jobs.html", rows=rows, counts=counts)
+
+
+@bp.route("/integrations", methods=["GET", "POST"])
+@require("settings.manage")
+def integrations():
+    """Honest integration status (UAT-48): never claims 'live' without verified credentials and approval."""
+    from flask import current_app
+    from .. import messaging
+    from ..domain import inbox as I
+    db = get_db()
+    if request.method == "POST" and request.form.get("action") == "retry":
+        flash(I.retry_failed_events(db), "ok")
+        return redirect(url_for("admin.integrations"))
+    cfg = current_app.config
+    events = db.all("SELECT * FROM webhook_events ORDER BY id DESC LIMIT 30")
+    return render_template("admin/integrations.html", wa=messaging.whatsapp_status(cfg),
+                           email=messaging.email_provider(cfg), files_ok=bool(cfg.get("FILES_KEY")),
+                           public_url=cfg.get("PUBLIC_BASE_URL") or "", events=events,
+                           failed=sum(1 for e in events if e["status"] == "failed"), WA_SETTINGS=messaging.WA_SETTINGS)
+
+
+@bp.route("/templates", methods=["GET", "POST"])
+@require("settings.manage")
+def templates():
+    from .. import messaging
+    from ..domain import inbox as I
+    db = get_db()
+    I.ensure_templates(db)
+    if request.method == "POST":
+        f = request.form
+        try:
+            I.save_template(db, g.user, f.get("key"), f.get("name"), f.get("category"), f.get("body"), f.get("status"))
+            flash("Template saved.", "ok")
+        except ValidationError as e:
+            flash(" ".join(str(v) for v in e.errors.values()), "error")
+        return redirect(url_for("admin.templates"))
+    rows = db.all("SELECT * FROM message_templates ORDER BY category, name")
+    for r in rows:
+        r["fields"] = messaging.placeholders(r["body"])
+    return render_template("admin/templates.html", rows=rows, edit=request.args.get("edit"))
+
+
+@bp.route("/outbox")
+@require("settings.manage")
+def outbox():
+    from flask import current_app
+    from .. import messaging
+    db = get_db()
+    rows = db.all("SELECT e.*, u.full_name FROM email_outbox e LEFT JOIN users u ON u.id = e.user_id "
+                  "ORDER BY e.id DESC LIMIT 50")
+    return render_template("admin/outbox.html", rows=rows, provider=messaging.email_provider(current_app.config))

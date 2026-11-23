@@ -189,7 +189,7 @@ def share_teaser(cid):
     except ValidationError as e:
         flash(_msg(e), "error")
         return redirect(url_for("matches.detail", cid=cid))
-    comm = db.one("SELECT * FROM communications WHERE id = ?", (r["communication"],)) if r["communication"] else None
+    comm = db.one("SELECT * FROM messages WHERE id = ?", (r["communication"],)) if r["communication"] else None
     return render_template("deals/teaser_sent.html", link=r["link"], comm=comm, cid=cid,
                            MOCK_LABEL=messaging.PROVIDER_LABEL)
 

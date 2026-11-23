@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Reports</h1><div class="sub">{{ p.label }} · counted from the records themselves; the export contains exactly these numbers.</div></div>
+  <div class="actions"><a class="btn" href="{{ url_for('reports.index', period=p.key, start=p.start_date, end=p.end_date, format='csv') }}">Export CSV</a></div></div>
+
+<form class="card inline" method="get">
+  {% for k, l in PERIODS if k != 'custom' %}<a class="btn sm {{ 'primary' if p.key == k }}" href="{{ url_for('reports.index', period=k) }}">{{ l }}</a>{% endfor %}
+  <input type="hidden" name="period" value="custom"><input type="date" name="start" value="{{ p.start_date }}"> to <input type="date" name="end" value="{{ p.end_date }}"><button class="btn sm {{ 'primary' if p.key == 'custom' }}">Custom</button>
+</form>
+
+<div class="report-grid">
+  <div class="card"><h2>Leads</h2><table class="small">
+    <tr><td>New buyer + seller opportunities</td><td>{{ r.lead_total }}</td></tr>
+    <tr><td>Reached (real conversation)</td><td>{{ r.reached }}</td></tr>
+    <tr><td>Median time to first conversation</td><td>{{ (r.median_minutes|string ~ ' min') if r.median_minutes is not none else '—' }}</td></tr>
+    {% for l in r.leads %}<tr><td class="muted">{{ l.kind }} · {{ l.source|replace('_',' ') }}</td><td>{{ l.n }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>Customer forms</h2><table class="small">{% for k, v in r.forms.items() %}<tr><td>{{ k|capitalize }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>Matching &amp; deals</h2><table class="small">{% for k, v in r.matching.items() %}<tr><td>{{ k|capitalize }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+    {% if r.rejections %}<p class="small muted">Why matches were turned down: {% for x in r.rejections %}{{ (x.reason or 'unspecified')|replace('_',' ') }} ({{ x.n }}){{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}</div>
+  <div class="card"><h2>WhatsApp</h2><table class="small">{% for k, v in r.messages.items() %}<tr><td>{{ k|capitalize }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>Inventory &amp; demand (now)</h2><table class="small">{% for k, v in r.inventory.items() %}<tr><td>{{ k|capitalize }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
+  {% if r.finance %}<div class="card"><h2>Company fees <span class="badge warn">admin only</span></h2><table class="small">{% for k, v in r.finance.items() %}<tr><td>{{ k|capitalize }}</td><td>{{ v|inr }}</td></tr>{% endfor %}</table>
+    <p class="small muted">Sale prices are never counted as revenue.</p></div>{% endif %}
+</div>
+
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Team</h2></div><div class="table-wrap"><table>
+  <tr><th>Person</th><th class="right">Tasks done</th><th class="right">On time</th><th class="right">Overdue now</th><th class="right">Calls</th><th class="right">Real conversations</th><th class="right">Forms reviewed</th></tr>
+  {% for t in r.team %}<tr><td>{{ t.full_name }}</td><td class="right">{{ t.done }}</td><td class="right">{{ t.on_time }}</td><td class="right {{ 'unknown' if t.overdue_now }}">{{ t.overdue_now }}</td><td class="right">{{ t.calls }}</td><td class="right">{{ t.conversations }}</td><td class="right">{{ t.forms_reviewed }}</td></tr>{% endfor %}
+</table></div></div>
+<p class="small muted">Quality over volume: real conversations, reviewed forms and on-time follow-ups matter more than raw call counts. No targets are set until they are agreed after a pilot.</p>
+{% endblock %}
