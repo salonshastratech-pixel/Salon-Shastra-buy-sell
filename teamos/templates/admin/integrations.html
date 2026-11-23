@@ -1,51 +1,93 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}Integrations{% endblock %}
+{% macro settings_form(c) %}
+<form method="post" class="form-grid">{{ csrf() }}<input type="hidden" name="action" value="settings"><input type="hidden" name="connector" value="{{ c.key }}">
+  {% for k, label, secret, help in c.settings %}
+  <div class="field {{ 'full' if k in ('WHATSAPP_ACCESS_TOKEN', 'PUBLIC_BASE_URL') }}"><label for="s-{{ k }}">{{ label }}
+    {% if k in from_server %}<span class="badge grey">set on the server</span>{% elif saved.get(k) %}<span class="badge ok">set</span>{% endif %}</label>
+    {% if k in from_server %}<input id="s-{{ k }}" disabled placeholder="Managed by the server's environment settings">
+    {% elif secret %}<input id="s-{{ k }}" name="{{ k }}" type="password" autocomplete="new-password" placeholder="{{ 'Saved — leave empty to keep' if saved.get(k) else '' }}">
+    {% else %}<input id="s-{{ k }}" name="{{ k }}" value="{{ saved.get(k, '') }}" autocomplete="off">{% endif %}
+    {% if help %}<div class="help">{{ help }}</div>{% endif %}</div>
+  {% endfor %}
+  <div class="full"><button class="btn primary">Save {{ c.name.split(' (')[0] }} settings</button>
+    <span class="small muted">Secrets are stored encrypted and never shown again. Type a single "-" to clear a value.</span></div>
+</form>
+{% endmacro %}
 {% block content %}
-<div class="ph"><div><h1>Integrations</h1><div class="sub">What is really connected. Nothing is shown as live unless it is.</div></div></div>
+<div class="ph"><div><h1>Integrations</h1><div class="sub">Everything the app connects to, set up here by an admin. Nothing is shown as live unless it is.</div></div></div>
 
-<div class="split"><div>
-  <div class="card"><div class="card-h"><h2>WhatsApp</h2><span class="badge {{ 'ok' if wa.live else 'warn' }}">{{ 'LIVE' if wa.live else 'TEST-ONLY' }}</span></div>
-    <p><strong>{{ wa.label }}</strong></p><p class="small">{{ wa.note }}</p>
-    <table class="small">{% for k in WA_SETTINGS %}<tr><td class="mono">{{ k }}</td><td>{% if k in wa.missing %}<span class="badge grey">not set</span>{% else %}<span class="badge ok">set</span>{% endif %}</td></tr>{% endfor %}
-      <tr><td class="mono">WHATSAPP_LIVE_APPROVED</td><td>{% if wa.approved_flag %}<span class="badge ok">1</span>{% else %}<span class="badge grey">not set</span>{% endif %}</td></tr></table>
-    <h3>Before going live (checklist)</h3>
-    <ol class="small">
-      <li>Salon Shastra-owned Meta Business account, verified, with the WhatsApp number registered to it.</li>
-      <li>Each template submitted and approved by Meta; record its Meta name on the Message templates page.</li>
-      <li>Webhook URL <span class="mono">{{ public_url or '(PUBLIC_BASE_URL)' }}/webhooks/whatsapp</span> subscribed, with the verify token; signature checking uses the app secret.</li>
-      <li>Set the four values above on the server (never in the code), then <span class="mono">WHATSAPP_LIVE_APPROVED=1</span>.</li>
-      <li>Send one message to a staff phone and confirm the delivered/read ticks arrive here before any customer use.</li>
-    </ol>
-    <p class="small muted">The live adapter (Meta Cloud API) is built but has not yet been run against Meta from this system.</p></div>
-
-  <div class="card"><div class="card-h"><h2>E-mail</h2><span class="badge {{ 'ok' if email.is_live else 'warn' }}">{{ 'CONNECTED' if email.is_live else 'TEST-ONLY' }}</span></div>
-    <p class="small">{{ email.label }}. Morning digests are kept in the <a href="{{ url_for('admin.outbox') }}">e-mail outbox</a>{% if not email.is_live %} and are not delivered{% endif %}.</p>
-    <p class="small muted">To connect: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM on the server.</p></div>
-
-  <div class="card"><h2>Other settings</h2><table class="small">
-    <tr><td>Document encryption key (FILES_KEY)</td><td>{% if files_ok %}<span class="badge ok">set</span>{% else %}<span class="badge bad">missing — uploads refused</span>{% endif %}</td></tr>
-    <tr><td>Public address for customer links (PUBLIC_BASE_URL)</td><td>{{ public_url or 'not set — uses the address of each request' }}</td></tr></table></div>
-</div><div>
-  <div class="card"><div class="card-h"><h2>Webhook events</h2>{% if failed %}<form method="post">{{ csrf() }}<input type="hidden" name="action" value="retry"><button class="btn sm">Retry {{ failed }} failed</button></form>{% endif %}</div>
-    <p class="small muted">Each provider event is stored once; repeats are ignored. Failures stay here with their error until processed.</p>
-    <table class="small">{% for e in events %}<tr><td class="mono">{{ e.event_id[:24] }}</td><td>{{ e.kind }}</td><td><span class="badge {{ 'ok' if e.status == 'processed' else 'bad' if e.status == 'failed' else 'grey' }}">{{ e.status }}</span>{% if e.error %}<div class="unknown">{{ e.error }}</div>{% endif %}</td><td>{{ e.received_at|rel }}</td></tr>{% else %}<tr><td class="empty">No events received.</td></tr>{% endfor %}</table></div>
-</div></div>
-
-<div class="card" id="numbers"><div class="card-h"><h2>Team WhatsApp numbers</h2><span class="small muted">Optional — without one, a person sends from the company number</span></div>
-  <p class="small">Each person's WhatsApp Business number must first be added to <strong>Salon Shastra's own Meta WhatsApp
-  Business account</strong> (WhatsApp Manager → Phone numbers). Copy its <em>phone number ID</em> here. Messages they send
-  from TeamOS then go from their number, and customers who write to their number land in their inbox queue.</p>
+{% for c in CONNECTORS if c.status == 'built' %}
+<div class="card" id="{{ c.key }}">
+  <div class="card-h"><h2>{{ c.name }}</h2>
+    {% if c.key == 'whatsapp' %}<span class="badge {{ 'ok' if wa.live else 'warn' }}">{{ 'LIVE' if wa.live else 'TEST-ONLY' }}</span>
+    {% elif c.key == 'email' %}<span class="badge {{ 'ok' if email.is_live else 'warn' }}">{{ 'CONNECTED' if email.is_live else 'TEST-ONLY' }}</span>
+    {% else %}<span class="badge {{ 'ok' if public_url else 'grey' }}">{{ 'SET' if public_url else 'NOT SET' }}</span>{% endif %}</div>
+  <p class="small">{{ c.what }}</p>
+  {% if c.key == 'whatsapp' %}
+    <p class="small"><strong>{{ wa.label }}.</strong> {{ wa.note }}</p>
+    {% if shown_token %}<p class="flash ok small">Webhook verify token (copy it into Meta now; it won't be shown again): <span class="mono">{{ shown_token }}</span></p>{% endif %}
+  {% elif c.key == 'email' %}<p class="small"><strong>{{ email.label }}.</strong></p>{% endif %}
+  {{ settings_form(c) }}
+  {% if c.key == 'whatsapp' %}
+  <div class="split">
+    <div>
+      <h3>Connect in 6 steps</h3>
+      <ol class="small">
+        <li>Use Salon Shastra's own verified Meta Business account (never a personal one).</li>
+        <li>In WhatsApp Manager add the company number (and each team member's number — see below).</li>
+        <li>Create a system-user token and fill in the settings above.</li>
+        <li>In the Meta app, set the webhook to <span class="mono">{{ webhook_url }}</span> with the verify token
+          <form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="verify_token"><button class="btn link small">generate one</button></form>, and subscribe to <em>messages</em>.</li>
+        <li>Submit each message template to Meta; when approved, record its Meta name in <a href="{{ url_for('admin.templates') }}">Message templates</a>.</li>
+        <li>Send a test to your own phone, then switch on live.</li>
+      </ol>
+      <form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="test_whatsapp">
+        <input name="to" placeholder="Your mobile (if not set below)" inputmode="tel" aria-label="Test number"><button class="btn sm">Send me a test message</button></form>
+    </div>
+    <div>
+      <h3>Live switch</h3>
+      {% if wa.live %}
+        <p class="small">Real customers receive messages.</p>
+        <form method="post">{{ csrf() }}<input type="hidden" name="action" value="test_only"><button class="btn danger">Switch back to test-only</button></form>
+      {% else %}
+        {% if wa.missing %}<p class="small muted">Still needed: {{ wa.missing|join(', ') }}.</p>{% endif %}
+        <form method="post">{{ csrf() }}<input type="hidden" name="action" value="go_live">
+          <div class="field"><label for="golive">Type GO LIVE to confirm real customers will receive messages</label><input id="golive" name="confirm" autocomplete="off"></div>
+          <button class="btn" {{ 'disabled' if wa.missing }}>Switch WhatsApp to live</button></form>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% if c.key == 'whatsapp' %}
+<div class="card" id="numbers"><div class="card-h"><h2>Team WhatsApp numbers</h2><span class="small muted">For present and new staff — without one, a person sends from the company number</span></div>
+  <p class="small">Add each person's WhatsApp Business number to <strong>Salon Shastra's Meta WhatsApp Business account</strong> first, then copy its <em>phone number ID</em> here. Their messages then go from their number, and customers who write to it land in their queue. New staff: create the user in <a href="{{ url_for('admin.users') }}">Users</a>, then add their number here.</p>
   <div class="table-wrap"><table class="small">
-    <tr><th>Team member</th><th>WhatsApp number</th><th>Meta phone number ID</th><th></th></tr>
+    <tr><th>Team member</th><th>WhatsApp number · Meta phone number ID</th></tr>
     {% for u in team %}<tr><td>{{ u.full_name }}<div class="muted">{{ u.role|replace('_',' ') }}</div></td>
-      <td colspan="3"><form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="team_number"><input type="hidden" name="user_id" value="{{ u.id }}">
+      <td><form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="team_number"><input type="hidden" name="user_id" value="{{ u.id }}">
         <input name="wa_number" value="{{ (u.wa_number or '')[-10:] }}" placeholder="98xxxxxxxx" inputmode="tel" aria-label="WhatsApp number for {{ u.full_name }}">
         <input name="number_id" value="{{ u.wa_phone_number_id or '' }}" placeholder="e.g. 1098765432101" inputmode="numeric" aria-label="Meta phone number ID for {{ u.full_name }}">
         <button class="btn sm">Save</button>{% if u.wa_phone_number_id %} <span class="badge ok">connected</span>{% endif %}</form></td></tr>{% endfor %}
   </table></div>
-  <p class="small muted">To disconnect someone, clear both boxes and save. Templates still need Meta's approval once for the
-  whole business account (Admin → Message templates → "Approved by Meta" + its Meta name); they then work from every number.
-  A number that is in use in the WhatsApp Business <em>app</em> on a phone may first need to be moved to the API (or added
-  through Meta's coexistence onboarding where Meta offers it) — check this with Meta or your WhatsApp partner before adding it.</p>
+  <p class="small muted">To disconnect someone, clear both boxes and save. Templates are approved once for the whole business account and then work from every number. A number in use in the WhatsApp Business <em>app</em> on a phone may first need moving to the API (or Meta's coexistence onboarding, where offered) — check with Meta or your WhatsApp partner.</p>
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="card"><h2>Coming next — ready to switch on when needed</h2>
+  <div class="connector-grid">{% for c in CONNECTORS if c.status != 'built' %}
+    <div class="connector"><strong>{{ c.name }}</strong> <span class="badge grey">planned</span><p class="small">{{ c.what }}</p></div>{% endfor %}</div>
+  <p class="small muted">Each connector plugs into the same settings screen; tell us which one to build first.</p>
+</div>
+
+<div class="split">
+  <div class="card"><h2>Other settings</h2><table class="small">
+    <tr><td>Document encryption key (FILES_KEY)</td><td>{% if files_ok %}<span class="badge ok">set</span>{% else %}<span class="badge bad">missing — uploads and saved secrets refused</span>{% endif %}</td></tr>
+    <tr><td>Public address for customer links</td><td>{{ public_url or 'not set — uses the address of each request' }}</td></tr></table></div>
+  <div class="card"><div class="card-h"><h2>Webhook events</h2>{% if failed %}<form method="post">{{ csrf() }}<input type="hidden" name="action" value="retry"><button class="btn sm">Retry {{ failed }} failed</button></form>{% endif %}</div>
+    <p class="small muted">Each provider event is stored once; repeats are ignored. Failures stay here with their error until processed.</p>
+    <table class="small">{% for e in events %}<tr><td class="mono">{{ e.event_id[:24] }}</td><td>{{ e.kind }}</td><td><span class="badge {{ 'ok' if e.status == 'processed' else 'bad' if e.status == 'failed' else 'grey' }}">{{ e.status }}</span>{% if e.error %}<div class="unknown">{{ e.error }}</div>{% endif %}</td><td>{{ e.received_at|rel }}</td></tr>{% else %}<tr><td class="empty">No events received.</td></tr>{% endfor %}</table></div>
 </div>
 {% endblock %}

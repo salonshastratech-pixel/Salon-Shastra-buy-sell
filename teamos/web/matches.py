@@ -168,7 +168,7 @@ def ask(cid, side):
     if request.form.getlist("fields"):
         fields = [k for k in request.form.getlist("fields") if k in fields]
     opp_id = c["buyer_opp_id"] if side == "buyer" else c["seller_opp_id"]
-    base = current_app.config.get("PUBLIC_BASE_URL") or request.host_url.rstrip("/")
+    base = __import__("teamos.messaging", fromlist=["public_base"]).public_base(request)
     try:
         res = F.create_invitation(db, g.user, opp_id, "targeted", request.form.get("channel") or "copy_link", fields, [],
                                   request.form.get("purpose") or "A few details so we can check a possible match.",

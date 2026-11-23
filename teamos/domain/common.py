@@ -48,12 +48,12 @@ def parse_inr(value: str | None) -> int | None:
     v = value.strip().lower().replace(",", "").replace("₹", "").replace("rs.", "").replace("rs", "").strip()
     if v == "":
         return None
-    m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*(l|lac|lakh|lakhs|cr|crore|crores|k)?", v)
+    m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*(l|lac|lakh|lakhs|cr|crore|crores|k|thousand|thousands)?", v)
     if not m:
         raise ValueError("Enter an amount like 2500000, 25L or 1.2Cr")
     num = float(m.group(1))
     unit = m.group(2)
-    mult = {"l": 1e5, "lac": 1e5, "lakh": 1e5, "lakhs": 1e5, "cr": 1e7, "crore": 1e7, "crores": 1e7, "k": 1e3}.get(unit, 1)
+    mult = {"l": 1e5, "lac": 1e5, "lakh": 1e5, "lakhs": 1e5, "cr": 1e7, "crore": 1e7, "crores": 1e7, "k": 1e3, "thousand": 1e3, "thousands": 1e3}.get(unit, 1)
     result = int(round(num * mult))
     if result < 0:
         raise ValueError("Amount cannot be negative")

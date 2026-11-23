@@ -1,3 +1,22 @@
+# Milestone 7.2 — easier, richer forms; buyer↔seller sync; admin-configurable integrations (23 Nov 2026, v0.7.2)
+
+| Area | Status | Evidence |
+|---|---|---|
+| New seller facts | **Built** | Year started, Google Maps link (private), floor, type of area, shop-front width, parking, signboard, washrooms, AC, equipment age, monthly maintenance (CAM), GST on rent, electricity, total salaries, main services, Google rating, billing software, trade licence / GST / shop & establishment. In the staff intake (new "Location & premises" and "Licences" sections) and the customer form. |
+| Guided photos & more documents | **Built** | 7 photo slots (shop front, street, reception, chairs, wash area, rooms, washroom) that open the phone camera; big photos are shrunk on the phone before upload. Documents: rent agreement, rent and maintenance receipts, electricity bill, sales report, licence, equipment list. |
+| Easy customer forms | **Built** | One step at a time with a progress bar; plain-language questions; tap-buttons instead of dropdowns; "I don't know / Discuss on a call / Not applicable" as one tap; rupee amounts echoed in words (45k = ₹45,000); every question optional; save and finish later. Seller form: 8 steps + photos + documents; buyer form: 7 steps + areas + salon type. |
+| Same words on both sides | **Built** | Buyers are asked floor, type of area and parking with exactly the seller's options; the buyer's rent limit is "rent + maintenance". |
+| Matching v0.2 | **Built** | Adds type of area, floor and customer parking; rent compared as rent + maintenance (asks the seller for maintenance if missing). A buyer's "must" on any of these blocks a mismatch; unanswered criteria never count against a salon. |
+| "Still to collect" on every record | **Built** | The most important missing answers (in consultant order), photos and documents not yet received, and answers the customer marked "don't know". One button sends just those as a short form (WhatsApp or link); answers come back for review. |
+| Integrations set up in the app | **Built** | Admin → Integrations: WhatsApp (account, company number, token, app secret, verify token with a generate button, webhook address), e-mail (SMTP), public address for customer links. Secrets are encrypted and never shown again; server environment values still win. "Send me a test message" and a GO LIVE switch that needs typing GO LIVE (and can always be switched back). |
+| Present and new staff | **Built** | WhatsApp number per person on the Integrations page and when creating a user; Users list shows who sends from their own number. |
+| Future connectors | **Listed** | Facebook/Instagram lead forms, click-to-call & call logging, Google Calendar, Google Sheets, payment links — shown as "planned"; each plugs into the same settings screen. |
+
+Found while testing: the step Back/Next bar showed on forms that were not in step mode (fixed for every hidden
+element); "Still to collect" showed the customer's wording to staff (now staff labels).
+
+---
+
 # Milestone 7.1 — team WhatsApp numbers + one-click messages after a call (23 Nov 2026, v0.7.1)
 
 | Area | Status | Evidence |

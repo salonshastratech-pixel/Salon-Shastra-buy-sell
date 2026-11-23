@@ -143,9 +143,10 @@ class MetaCloudProvider:
         import urllib.request
         if template_name:
             payload = {"messaging_product": "whatsapp", "to": to_phone.lstrip("+"), "type": "template",
-                       "template": {"name": template_name, "language": {"code": language},
-                                    "components": [{"type": "body", "parameters": [{"type": "text", "text": p}
-                                                                                    for p in (params or [])]}]}}
+                       "template": {"name": template_name, "language": {"code": language}}}
+            if params:
+                payload["template"]["components"] = [{"type": "body", "parameters": [{"type": "text", "text": p}
+                                                                                      for p in params]}]
         else:
             payload = {"messaging_product": "whatsapp", "to": to_phone.lstrip("+"), "type": "text",
                        "text": {"body": body}}
@@ -172,9 +173,38 @@ WA_SETTINGS = ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_AP
 
 
 def _cfg(key, config=None):
-    if config is not None and config.get(key) is not None:
+    """Server config / environment first (operators can always override), then values saved by an admin in
+    Admin → Integrations (secrets decrypted only here)."""
+    if config is not None and config.get(key) not in (None, ""):
         return config.get(key)
-    return os.environ.get(key)
+    if os.environ.get(key):
+        return os.environ.get(key)
+    return _admin_setting(key)
+
+
+def _admin_setting(key):
+    try:
+        from flask import g, has_app_context
+        if not has_app_context():
+            return None
+        if "_integration_overlay" not in g:
+            from .db import get_db
+            from .integrations import overlay
+            g._integration_overlay = overlay(get_db())
+        return g._integration_overlay.get(key) or None
+    except Exception:  # never let settings lookup break a page
+        return None
+
+
+def setting(key):
+    """Current value of an integration setting for this request (app config → env → admin-saved)."""
+    from flask import current_app, has_app_context
+    return _cfg(key, current_app.config if has_app_context() else None)
+
+
+def public_base(request) -> str:
+    """Address used in customer links: the configured public address, else the address of this request."""
+    return (setting("PUBLIC_BASE_URL") or request.host_url).rstrip("/")
 
 
 def whatsapp_status(config=None) -> dict:

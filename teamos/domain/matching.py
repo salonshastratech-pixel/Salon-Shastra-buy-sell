@@ -28,7 +28,7 @@ from .common import format_inr
 from .errors import PermissionDenied, ValidationError
 from .seller_fields import BY_KEY as SF_BY_KEY
 
-RULES_VERSION = "match-rules v0.1 (PRD §8.2 starting weights, pending founder approval D-09)"
+RULES_VERSION = "match-rules v0.2 (v0.1 + floor, type of area, parking, rent incl. maintenance)"
 
 FAMILIES = {  # family: (label, weight)
     "A": ("Affordability & all-in cost", 20), "B": ("Location", 15), "C": ("Format & positioning", 10),
@@ -40,12 +40,13 @@ FAMILIES = {  # family: (label, weight)
 CRITERIA = {
     "all_in": ("A", 14, "All-in cash requirement vs ceiling"), "price_band": ("A", 4, "Asking price vs price band"),
     "cash_timing": ("A", 2, "Money ready vs seller timeline"),
-    "city": ("B", 6, "City"), "locality": ("B", 9, "Locality / micro-market"),
+    "city": ("B", 6, "City"), "locality": ("B", 9, "Locality / micro-market"), "area_type": ("B", 2, "Type of area"),
     "gender_format": ("C", 5, "Salon format"), "positioning": ("C", 3, "Positioning"),
     "business_model": ("C", 2, "Independent / franchise"),
     "sale_structure": ("D", 5, "Deal structure"), "authority": ("D", 5, "Seller's authority to transfer"),
     "sales": ("E", 6, "Monthly sales vs minimum"), "profitability": ("E", 4, "Profitability vs turnaround appetite"),
-    "chairs": ("F", 4, "Chairs / stations"), "rent": ("F", 2, "Monthly rent vs maximum"),
+    "chairs": ("F", 4, "Chairs / stations"), "rent": ("F", 2, "Rent + maintenance vs maximum"),
+    "floor_level": ("F", 1, "Floor"), "parking": ("F", 1, "Customer parking"),
     "lease": ("F", 3, "Lease remaining & transferability"), "area": ("F", 1, "Carpet area"),
     "staff": ("G", 4, "Staff continuity"), "transition": ("G", 4, "Seller transition support"),
     "timing": ("H", 8, "Purchase window vs sale timeline"),
@@ -194,6 +195,30 @@ def _choice(ev: _Eval, dim: str, seller_field: str, label: str):
         ev.ask("buyer", f"Ask whether a {shown.lower()} {label.lower()} would be acceptable", [], 0.5)
 
 
+PARKING_OK = {"car": {"car_and_bike"}, "bike": {"car_and_bike", "bike_only"}}
+
+
+def _parking(ev: _Eval):
+    need = ev.b["m"].get("parking_need")
+    imp = ev.b["prefs"].get(("parking_need", ""))
+    have = ev.s["l"].get("parking")
+    shown = _lbl(SF_BY_KEY, "parking", have) if have else None
+    if need in (None, "not_needed") or imp == "not_important":
+        ev.add("parking", "na", None, shown)
+        return
+    wanted = BFD.option_label("parking_need", need)
+    if have is None:
+        ev.add("parking", "unknown", wanted, None, "Parking not recorded for this salon")
+        ev.ask("seller", "Ask about customer parking", ["parking"], 0.5)
+    elif have in PARKING_OK[need]:
+        ev.add("parking", "match", wanted, shown)
+    elif imp == "must":
+        ev.add("parking", "miss", wanted, shown, "Buyer must have this parking", hard=True)
+        ev.gate("blocked", f"Parking: buyer needs '{wanted}'; salon has {shown.lower()}")
+    else:
+        ev.add("parking", "partial", wanted, shown, "Less parking than the buyer wants", ratio=0.3)
+
+
 def _numeric_min(ev, key, buyer_key, seller_val, seller_label_val, unit_fmt, what, field_for_seller=None):
     """Buyer minimum (with importance) vs a seller figure. Returns nothing; records factor/gate/question."""
     b = ev.b
@@ -333,6 +358,8 @@ def evaluate(b: dict, s: dict) -> dict:
     _choice(ev, "positioning", "positioning", "Positioning")
     _choice(ev, "business_model", "business_model", "Model")
     _choice(ev, "sale_structure", "sale_structure", "Deal structure")
+    _choice(ev, "area_type", "area_type", "Type of area")
+    _choice(ev, "floor_level", "floor_level", "Floor")
     ta = l.get("transfer_authority")
     if ta == "yes":
         ev.add("authority", "match", "Required", "Confirmed")
@@ -375,8 +402,13 @@ def evaluate(b: dict, s: dict) -> dict:
     if chairs is not None and m.get("chairs_max") is not None and chairs > m["chairs_max"]:
         ev.factors[-1].update(result="partial", note=f"Larger than the buyer's maximum of {m['chairs_max']}",
                               earned=round(ev.factors[-1]["weight"] * 0.6, 2))
-    rent, rmax = l.get("monthly_rent"), m.get("max_monthly_rent")
+    # rent is compared as rent + maintenance (CAM) — what the buyer actually pays every month
+    base_rent, maint = l.get("monthly_rent"), l.get("maintenance_monthly")
+    rent = base_rent + maint if base_rent is not None and maint is not None else base_rent
+    rmax = m.get("max_monthly_rent")
     rimp = b["prefs"].get(("max_monthly_rent", ""))
+    if rmax is not None and rimp != "not_important" and base_rent is not None and maint is None:
+        ev.ask("seller", "Ask the monthly maintenance (CAM) charges", ["maintenance_monthly"], 0.5)
     if rmax is None or rimp == "not_important":
         ev.add("rent", "na", None, _lbl(SF, "monthly_rent", rent))
     elif rent is None:
@@ -391,6 +423,7 @@ def evaluate(b: dict, s: dict) -> dict:
     else:
         ev.add("rent", "partial", f"≤ {format_inr(rmax)}", format_inr(rent), "Rent above the buyer's preference",
                ratio=max(0, 1 - (rent - rmax) / rmax))
+    _parking(ev)
     years = _years_left(l.get("lease_expiry"))
     lts, renew = l.get("lease_transfer_status"), l.get("lease_renewal")
     need_years = m.get("min_lease_years_left")

@@ -98,6 +98,9 @@ FIELDS: list[BuyerFieldDef] = [
     B("chairs_min", "Minimum chairs / stations", "salon", "int", matching=True, material=True, importance=True),
     B("chairs_max", "Maximum chairs / stations", "salon", "int", matching=True),
     B("area_min_sqft", "Minimum carpet area", "salon", "int", matching=True, unit="sq ft", importance=True),
+    B("parking_need", "Customer parking needed?", "salon", "enum",
+      [("car", "Car parking needed"), ("bike", "Two-wheeler parking is enough"), ("not_needed", "Not needed")],
+      matching=True, importance=True),
     B("staff_continuity_need", "Existing staff should stay?", "salon", "enum",
       [("yes", "Yes"), ("partial", "Key staff at least"), ("no", "Not needed")], matching=True, importance=True),
     B("clientele_note", "Target clientele / service strengths", "salon", "textarea"),
@@ -106,7 +109,8 @@ FIELDS: list[BuyerFieldDef] = [
     B("min_operating_years", "Minimum years in operation", "business", "int", matching=True, unit="years",
       importance=True),
     B("turnaround_ok", "Open to a turnaround / loss-making salon?", "business", "enum", YES_NO, matching=True),
-    B("max_monthly_rent", "Maximum monthly rent", "business", "inr", matching=True, importance=True),
+    B("max_monthly_rent", "Maximum monthly rent + maintenance", "business", "inr", matching=True, importance=True,
+      help="Compared with the salon's rent plus maintenance (CAM) charges."),
     B("min_lease_years_left", "Minimum lease remaining", "business", "int", matching=True, unit="years",
       importance=True),
     B("renovation_budget", "Budget for renovation / refit", "business", "inr", matching=True),
@@ -141,6 +145,8 @@ CHOICE_DIMENSIONS = [
     ("business_model", "Independent or franchise", SELLER_FIELDS["business_model"].options),
     ("positioning", "Positioning", SELLER_FIELDS["positioning"].options),
     ("sale_structure", "Deal structure", SELLER_FIELDS["sale_structure"].options),
+    ("floor_level", "Floor", SELLER_FIELDS["floor_level"].options),
+    ("area_type", "Type of area", SELLER_FIELDS["area_type"].options),
 ]
 CHOICE_BY_KEY = {k: (label, opts) for k, label, opts in CHOICE_DIMENSIONS}
 

@@ -48,7 +48,7 @@ def test_uat41_form_link_via_mock_whatsapp_records_source_invitation_and_provide
                   "WHERE m.direction = 'out'")
     contact_id = db.scalar("SELECT contact_id FROM opportunities WHERE id = ?", (opp_id,))
     # exact source record and invitation
-    assert inv["opportunity_id"] == opp_id and inv["contact_id"] == contact_id and inv["template_version"] == "seller-deep v1"
+    assert inv["opportunity_id"] == opp_id and inv["contact_id"] == contact_id and inv["template_version"] == "seller-deep v2"
     assert comm["invitation_id"] == inv["id"] and comm["opportunity_id"] == opp_id and comm["contact_id"] == contact_id
     # provider message trace — honestly a mock, and never claimed delivered
     assert comm["provider"] == "mock-whatsapp" and comm["provider_message_id"].startswith("mock-")
@@ -90,7 +90,7 @@ def test_uat42_customer_submits_new_budget_review_task_and_no_auto_verified_fund
     assert m["all_in_max"] == 50_00_000 and m["cash_ready"] is None  # unticked answer not applied
     assert m["funding_status"] == "not_reviewed"
     prov = db.one("SELECT * FROM field_provenance WHERE entity_type = 'buyer_mandate' AND field_key = 'all_in_max'")
-    assert prov["evidence_status"] == "buyer_declared" and prov["source"] == f"form:buyer-deep v1#{sub['id']}"
+    assert prov["evidence_status"] == "buyer_declared" and prov["source"] == f"form:buyer-deep v2#{sub['id']}"
     assert m["criteria_reviewed_version"] != m["data_version"]  # confirmed criteria now marked as changed
     sub = db.one("SELECT * FROM form_submissions WHERE id = ?", (sub["id"],))
     assert sub["review_outcome"] == "partially_applied" and json.loads(sub["applied_fields"]) == ["all_in_max"]

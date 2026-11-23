@@ -1,0 +1,25 @@
+{% from "macros.html" import csrf as _csrf2 %}
+{% set gp = collect_gaps(opp) %}
+{% if gp and gp.total %}
+<div class="card" id="collect">
+  <details class="disclose" {{ 'open' if gp['items']|length >= 5 }}><summary><strong>Still to collect</strong> <span class="badge warn">{{ gp.total }}</span>
+    <span class="small muted">— ask on your next call, or send just these as a short form</span></summary>
+  {% if gp['items'] %}<ul class="collect-list">{% for i in gp['items'] %}<li>{{ i.label }}{% if i.note %} <span class="small muted">({{ i.note }})</span>{% endif %}</li>{% endfor %}
+    {% if gp.more %}<li class="muted small">…and {{ gp.more }} more in the intake</li>{% endif %}</ul>{% endif %}
+  {% if gp.extra %}<p class="small"><strong>Also:</strong> {{ gp.extra|join(', ') }}</p>{% endif %}
+  {% if gp.photos %}<p class="small"><strong>Photos not received:</strong> {{ gp.photos|map(attribute=1)|join(', ') }}</p>{% endif %}
+  {% if gp.docs %}<p class="small"><strong>Documents not received:</strong> {{ gp.docs|map(attribute=1)|join(', ') }}</p>{% endif %}
+  {% if can('crm.log_activity') and (gp['items'] or gp.photos or gp.docs) %}
+  <form method="post" action="{{ url_for('forms.send', opp_id=opp.id) }}" class="inline">{{ _csrf2() }}
+    <input type="hidden" name="template_key" value="targeted">
+    <input type="hidden" name="purpose" value="Just a few details to complete your profile — skip anything you don't know.">
+    {% for i in gp['items'] %}<input type="hidden" name="fields" value="{{ i.key }}">{% endfor %}
+    {% for k, _l in gp.photos + gp.docs %}<input type="hidden" name="docs" value="{{ k }}">{% endfor %}
+    <select name="channel" aria-label="How to send"><option value="whatsapp_mock">Send on WhatsApp</option><option value="copy_link">Create a link to share myself</option></select>
+    <button class="btn sm primary">Send these as a short form</button>
+  </form>
+  <p class="small muted">The customer can skip anything. What they send comes back to you for review before it changes the record.</p>
+  {% endif %}
+  </details>
+</div>
+{% endif %}

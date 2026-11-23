@@ -46,7 +46,15 @@ def create_user():
         uid = db.insert("users", {"email": email, "full_name": name, "password_hash": hash_password(pw), "role": role,
                                   "team": team, "is_active": 1, "created_at": now_iso()})
         audit.record(db, g.user["id"], "user.create", "user", uid, {"email": email, "role": role})
-    flash(f"User {name} created. Share the temporary password securely.", "ok")
+    msg = f"User {name} created. Share the temporary password securely."
+    if (f.get("wa_number") or "").strip() or (f.get("number_id") or "").strip():
+        from ..domain import inbox as I
+        try:
+            I.set_team_number(db, g.user, uid, f.get("wa_number"), f.get("number_id"))
+            msg += " Their WhatsApp number is connected."
+        except ValidationError as e:
+            msg += " WhatsApp number not saved: " + " ".join(str(v) for v in e.errors.values())
+    flash(msg, "ok")
     return redirect(url_for("admin.users"))
 
 
@@ -235,6 +243,46 @@ def integrations():
     if request.method == "POST" and request.form.get("action") == "retry":
         flash(I.retry_failed_events(db), "ok")
         return redirect(url_for("admin.integrations"))
+    from .. import integrations as IG
+    act = request.form.get("action") if request.method == "POST" else None
+    if act == "settings":
+        try:
+            changed = IG.save(db, g.user, {k: v for k, v in request.form.items() if k in IG.SETTINGS})
+            flash(f"Saved: {', '.join(IG.SETTINGS[k][0] for k in changed)}." if changed else "Nothing changed.", "ok")
+        except ValidationError as e:
+            flash(" ".join(str(v) for v in e.errors.values()), "error")
+        return redirect(url_for("admin.integrations") + "#" + (request.form.get("connector") or ""))
+    if act == "verify_token":
+        IG.save(db, g.user, {"WHATSAPP_VERIFY_TOKEN": IG.new_verify_token()})
+        flash("A new webhook verify token was generated and saved (encrypted). Show it once below to copy into Meta.", "ok")
+        return redirect(url_for("admin.integrations", show_token=1) + "#whatsapp")
+    if act in ("go_live", "test_only"):
+        try:
+            if act == "go_live" and messaging.whatsapp_status(current_app.config)["missing"]:
+                raise ValidationError({"live": "Fill in all WhatsApp settings first."})
+            IG.set_live(db, g.user, act == "go_live", request.form.get("confirm"))
+            flash("WhatsApp is LIVE — real customers will receive messages." if act == "go_live"
+                  else "WhatsApp is back in test-only mode.", "ok")
+        except ValidationError as e:
+            flash(" ".join(str(v) for v in e.errors.values()), "error")
+        return redirect(url_for("admin.integrations") + "#whatsapp")
+    if act == "test_whatsapp":
+        to = db.scalar("SELECT wa_number FROM users WHERE id = ?", (g.user["id"],)) or \
+            (request.form.get("to") or "").strip()
+        from ..domain.common import normalize_indian_mobile
+        norm, _err = normalize_indian_mobile(to) if to else (None, None)
+        if not norm:
+            flash("Enter your own mobile number to receive the test.", "error")
+        else:
+            st = messaging.whatsapp_status(current_app.config)
+            res = messaging.provider(current_app.config).send(norm, "TeamOS test message", None,
+                                                              template_name="hello_world" if st["live"] else None,
+                                                              language="en_US")
+            audit.record(db, g.user["id"], "integration.whatsapp_test", None, None, {"status": res["status"]})
+            flash(f"Test message to {norm}: {res['status'].replace('_', ' ')}"
+                  + (f" — {res.get('detail')}" if res.get("detail") else ""),
+                  "ok" if res["status"] != "failed" else "error")
+        return redirect(url_for("admin.integrations") + "#whatsapp")
     if request.method == "POST" and request.form.get("action") == "team_number":
         f = request.form
         try:
@@ -245,9 +293,16 @@ def integrations():
         return redirect(url_for("admin.integrations") + "#numbers")
     cfg = current_app.config
     events = db.all("SELECT * FROM webhook_events ORDER BY id DESC LIMIT 30")
+    import os as _os
+    from_server = {k for k in IG.SETTINGS if cfg.get(k) not in (None, "") or _os.environ.get(k)}
+    shown_token = None
+    if request.args.get("show_token") and "WHATSAPP_VERIFY_TOKEN" not in from_server:
+        shown_token = IG.overlay(db).get("WHATSAPP_VERIFY_TOKEN")
     return render_template("admin/integrations.html", wa=messaging.whatsapp_status(cfg),
                            email=messaging.email_provider(cfg), files_ok=bool(cfg.get("FILES_KEY")),
-                           public_url=cfg.get("PUBLIC_BASE_URL") or "", events=events,
+                           public_url=messaging.setting("PUBLIC_BASE_URL") or "", events=events,
+                           CONNECTORS=IG.CONNECTORS, saved=IG.describe(db), from_server=from_server,
+                           shown_token=shown_token, webhook_url=messaging.public_base(request) + "/webhooks/whatsapp",
                            failed=sum(1 for e in events if e["status"] == "failed"), WA_SETTINGS=messaging.WA_SETTINGS,
                            team=db.all("SELECT id, full_name, role, wa_number, wa_phone_number_id FROM users WHERE "
                                        "is_active = 1 AND role <> 'finance' ORDER BY full_name"))

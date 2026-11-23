@@ -17,16 +17,108 @@
     state.addEventListener('change', function () { if (state.value && state.value !== 'value') input.value = ''; });
   });
 
-  // Conditional fields: <div data-show-if="business_model=franchise">
+  // Conditional fields: <div data-show-if="business_model=franchise"> (select or tap-button radios)
+  function valueOf(name) {
+    var src = document.querySelector('[name="' + name + '"]');
+    if (!src) return null;
+    if (src.type === 'radio') { var c = document.querySelector('[name="' + name + '"]:checked'); return c ? c.value : ''; }
+    return src.value;
+  }
   function refresh() {
     document.querySelectorAll('[data-show-if]').forEach(function (el) {
-      var parts = el.dataset.showIf.split('='), src = document.querySelector('[name="' + parts[0] + '"]');
-      if (!src) return;
-      el.classList.toggle('hide', src.value !== parts[1]);
+      var parts = el.dataset.showIf.split('='), v = valueOf(parts[0]);
+      if (v === null) return;
+      el.classList.toggle('hide', v !== parts[1]);
     });
   }
-  document.querySelectorAll('select').forEach(function (s) { s.addEventListener('change', refresh); });
+  document.addEventListener('change', refresh);
   refresh();
+
+  // Tap-button answers: tapping a selected button again clears it; answering clears "I don't know" and vice versa.
+  document.querySelectorAll('.chips input[type="radio"]').forEach(function (r) {
+    r.addEventListener('click', function () {
+      if (r.dataset.was === '1') { r.checked = false; r.dataset.was = ''; refresh(); return; }
+      document.querySelectorAll('[name="' + r.name + '"]').forEach(function (o) { o.dataset.was = ''; });
+      r.dataset.was = '1';
+      var field = r.closest('.qf'); if (!field) return;
+      var isState = /__state$/.test(r.name), base = r.name.replace(/__state$/, '');
+      if (isState) {
+        field.querySelectorAll('[name="' + base + '"]').forEach(function (o) { if (o.type === 'radio') { o.checked = false; o.dataset.was = ''; } else o.value = ''; });
+      } else if (!/__importance$/.test(r.name)) {
+        field.querySelectorAll('[name="' + base + '__state"]').forEach(function (o) { o.checked = false; o.dataset.was = ''; });
+      }
+    });
+    if (r.checked) r.dataset.was = '1';
+  });
+  document.querySelectorAll('.qf input:not([type]), .qf input[type="date"], .qf textarea, .qf select').forEach(function (i) {
+    i.addEventListener('input', function () {
+      if (!i.value) return;
+      i.closest('.qf').querySelectorAll('[name$="__state"]').forEach(function (o) { o.checked = false; o.dataset.was = ''; });
+    });
+  });
+
+  // Rupee amounts: show what was typed in words (45k -> ₹45,000; 25L -> ₹25 lakh)
+  function inrWords(raw) {
+    var v = (raw || '').toLowerCase().replace(/[,₹\s]|rs\.?/g, '');
+    var m = v.match(/^(\d+(?:\.\d+)?)(l|lac|lakh|lakhs|cr|crore|crores|k|thousand|thousands)?$/);
+    if (!m) return v ? 'Write a number like 45000, 45k or 25L' : '';
+    var mult = {l: 1e5, lac: 1e5, lakh: 1e5, lakhs: 1e5, cr: 1e7, crore: 1e7, crores: 1e7, k: 1e3, thousand: 1e3, thousands: 1e3}[m[2]] || 1;
+    var n = Math.round(parseFloat(m[1]) * mult);
+    var words = n >= 1e7 ? (n / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' crore' : n >= 1e5 ? (n / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' lakh' : '';
+    return '= ₹' + n.toLocaleString('en-IN') + (words ? ' (' + words + ')' : '');
+  }
+  document.querySelectorAll('input[data-inr]').forEach(function (i) {
+    var out = i.closest('.qf').querySelector('.inr-words');
+    var upd = function () { if (out) out.textContent = inrWords(i.value); };
+    i.addEventListener('input', upd); upd();
+  });
+
+  // Photos: shrink big phone photos before upload (keeps them under the 5 MB limit and quick on mobile data)
+  document.querySelectorAll('input[type="file"][data-compress]').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0];
+      var slot = inp.closest('.photo-slot');
+      if (slot) slot.classList.toggle('picked', !!f);
+      if (!f || !/^image\/(jpeg|png|webp|heic|heif)/i.test(f.type) || f.size < 900 * 1024 || !window.DataTransfer) return;
+      var img = new Image(), url = URL.createObjectURL(f);
+      img.onload = function () {
+        var scale = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function (b) {
+          URL.revokeObjectURL(url);
+          if (!b) return;
+          var dt = new DataTransfer();
+          dt.items.add(new File([b], f.name.replace(/\.[^.]+$/, '') + '.jpg', {type: 'image/jpeg'}));
+          inp.files = dt.files;
+        }, 'image/jpeg', 0.82);
+      };
+      img.src = url;
+    });
+  });
+
+  // Long forms: one step at a time with a progress bar (everything is still one normal form underneath)
+  var stepper = document.querySelector('form[data-stepper]');
+  if (stepper) {
+    var steps = Array.prototype.slice.call(stepper.querySelectorAll('.step'));
+    var bar = stepper.querySelector('.stepbar'), nav = stepper.querySelector('.stepnav'), cur = 0;
+    var firstErr = steps.findIndex(function (s) { return s.querySelector('.has-err'); });
+    if (firstErr >= 0) cur = firstErr;
+    var show = function (i) {
+      cur = Math.max(0, Math.min(steps.length - 1, i));
+      steps.forEach(function (s, k) { s.hidden = k !== cur; });
+      bar.hidden = false; nav.hidden = false;
+      bar.querySelector('.stepbar-fill').style.width = Math.round(100 * (cur + 1) / steps.length) + '%';
+      bar.querySelector('.stepbar-text').textContent = 'Step ' + (cur + 1) + ' of ' + steps.length + ' · ' + (steps[cur].dataset.title || '');
+      nav.querySelector('[data-step="-1"]').hidden = cur === 0;
+      nav.querySelector('[data-step="1"]').hidden = cur === steps.length - 1;
+      window.scrollTo(0, stepper.offsetTop - 10);
+    };
+    nav.querySelectorAll('[data-step]').forEach(function (b) {
+      b.addEventListener('click', function () { show(cur + parseInt(b.dataset.step, 10)); });
+    });
+    show(cur);
+  }
 
   // Stage selector: show reason / follow-up inputs only when needed
   var stageSel = document.querySelector('#stage-to');

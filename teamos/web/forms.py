@@ -71,7 +71,7 @@ def inbox():
                    "LEFT JOIN contacts c ON c.id = v.contact_id LEFT JOIN opportunities o ON o.id = m.opportunity_id "
                    "LEFT JOIN users u ON u.id = m.sent_by WHERE m.direction = 'out' AND m.kind = 'template' "
                    "ORDER BY m.id DESC LIMIT 15")
-    base = current_app.config.get("PUBLIC_BASE_URL") or request.host_url.rstrip("/")
+    base = __import__("teamos.messaging", fromlist=["public_base"]).public_base(request)
     return render_template("forms/inbox.html", pending=pending, open_links=open_links, reviewed=reviewed, comms=comms,
                            STATUS=F.STATUS_LABELS, public_links={"seller": f"{base}/f/seller",
                                                                  "buyer": f"{base}/f/buyer"},
@@ -115,7 +115,7 @@ def send(opp_id):
     if not opp:
         abort(404)
     f = request.form
-    base = current_app.config.get("PUBLIC_BASE_URL") or request.host_url.rstrip("/")
+    base = __import__("teamos.messaging", fromlist=["public_base"]).public_base(request)
     try:
         r = F.create_invitation(db, g.user, opp_id, f.get("template_key"), f.get("channel"),
                                 f.getlist("fields"), f.getlist("docs"), f.get("purpose"), link_base=base)
@@ -174,3 +174,14 @@ def document_review(doc_id):
     except ValidationError as e:
         flash(" ".join(str(v) for v in e.errors.values()), "error")
     return redirect(request.referrer or F.opp_path(F.load_opportunity(db, doc["opportunity_id"])))
+
+
+@bp.app_context_processor
+def _collect_helper():
+    """Record pages: what is still missing, so the team knows what to ask (call or short form)."""
+    def collect_gaps(opp):
+        from ..domain import collect as C
+        if not g.get("user") or not user_can(get_db(), g.user, "crm.view"):
+            return None
+        return C.gaps(get_db(), opp)
+    return {"collect_gaps": collect_gaps}

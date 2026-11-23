@@ -9,6 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 YES_NO_UNKNOWN = [("yes", "Yes"), ("no", "No")]
+LICENCE = [("yes", "Yes, have it"), ("applied", "Applied / renewing"), ("no", "No")]
+# Shared vocabulary: the buyer form offers exactly these options, so matching compares like with like.
+FLOOR_LEVELS = [("ground", "Ground floor"), ("first", "First floor"), ("upper", "Second floor or higher"),
+                ("mall", "Inside a mall"), ("basement", "Basement")]
+AREA_TYPES = [("main_road", "Main road / high street"), ("market", "Market / shopping street"),
+              ("mall", "Mall"), ("commercial", "Commercial complex / office area"),
+              ("residential", "Residential colony"), ("apartment", "Inside an apartment community")]
+PARKING = [("car_and_bike", "Cars and two-wheelers"), ("bike_only", "Two-wheelers only"), ("none", "No parking")]
 
 ANSWER_STATES = [
     ("value", "Answered"),
@@ -49,11 +57,13 @@ SECTIONS = [
     ("quick", "Quick screen"),
     ("ownership", "Ownership & decision"),
     ("profile", "Business profile"),
+    ("premises", "Location & premises"),
     ("asset", "Physical asset"),
     ("lease", "Lease & landlord"),
     ("customers", "Customers & demand"),
     ("operations", "Operating summary"),
     ("staff", "Staff & operations"),
+    ("licences", "Licences & registrations"),
     ("liabilities", "Liabilities & obligations"),
     ("reason", "Reason & urgency"),
     ("commercial", "Commercial offer"),
@@ -88,6 +98,7 @@ FIELDS: list[FieldDef] = [
     F("existing_broker", "Already listed with another broker?", "ownership", "enum", YES_NO_UNKNOWN),
 
     F("operating_years", "Years in operation", "profile", "int", matching=True, unit="years"),
+    F("started_year", "Year the salon started", "profile", "int", help="e.g. 2018. Used with years in operation."),
     F("gender_format", "Format", "profile", "enum",
       [("men", "Men"), ("women", "Women"), ("unisex", "Unisex")], matching=True, material=True),
     F("business_model", "Independent or franchise", "profile", "enum",
@@ -100,6 +111,18 @@ FIELDS: list[FieldDef] = [
       help="Exact address is restricted; the locality is operational."),
     F("landmark", "Nearby landmark", "profile", "text"),
     F("pin_code", "PIN code", "profile", "text", matching=True),
+    F("maps_link", "Google Maps location link", "profile", "text", privacy="restricted",
+      help="Exact location — restricted like the address. Ask the owner to share their location on WhatsApp."),
+
+    F("floor_level", "Floor", "premises", "enum", FLOOR_LEVELS, matching=True, material=True),
+    F("area_type", "Type of area", "premises", "enum", AREA_TYPES, matching=True),
+    F("frontage_ft", "Shop front width", "premises", "int", unit="ft",
+      help="Visibility from the road matters to most buyers."),
+    F("parking", "Parking for customers", "premises", "enum", PARKING, matching=True),
+    F("signage_visible", "Signboard visible from the main road?", "premises", "enum", YES_NO_UNKNOWN),
+    F("washrooms", "Washrooms inside the salon", "premises", "int"),
+    F("ac_type", "Air conditioning", "premises", "enum",
+      [("central", "Central AC"), ("split", "Split / window ACs"), ("none", "No AC")]),
 
     F("carpet_area_sqft", "Carpet area", "asset", "int", matching=True, unit="sq ft"),
     F("chairs", "Chairs / styling stations", "asset", "int", matching=True, material=True),
@@ -107,10 +130,14 @@ FIELDS: list[FieldDef] = [
     F("treatment_rooms", "Treatment rooms", "asset", "int", matching=True),
     F("equipment_condition", "Equipment condition", "asset", "enum",
       [("excellent", "Excellent"), ("good", "Good"), ("fair", "Fair"), ("poor", "Poor")], matching=True),
+    F("equipment_age_years", "Age of the main equipment", "asset", "int", unit="years"),
     F("inclusions_note", "Included / excluded assets", "asset", "textarea"),
 
     F("monthly_rent", "Monthly rent", "lease", "inr", matching=True, material=True),
-    F("rent_deposit", "Rent / security deposit", "lease", "inr", matching=True, material=True),
+    F("maintenance_monthly", "Monthly maintenance (CAM) charges", "lease", "inr", matching=True,
+      help="Paid to the building / landlord on top of rent. Buyers compare rent + maintenance."),
+    F("gst_on_rent", "Is GST charged on the rent?", "lease", "enum", YES_NO_UNKNOWN),
+    F("rent_deposit", "Rent advance / security deposit", "lease", "inr", matching=True, material=True),
     F("deposit_treatment", "How is the deposit handled in the sale?", "lease", "enum",
       [("included_in_asking", "Included in asking price"), ("buyer_pays_separately", "Buyer pays separately"),
        ("not_applicable", "No deposit")], matching=True, material=True,
@@ -129,11 +156,16 @@ FIELDS: list[FieldDef] = [
     F("avg_ticket", "Average ticket size", "customers", "inr"),
     F("repeat_customer_pct", "Repeat customers", "customers", "int", unit="%"),
     F("prepaid_liabilities", "Outstanding memberships / prepaid services", "customers", "inr", matching=True),
+    F("top_services", "Main services (what customers come for)", "customers", "text"),
+    F("google_rating", "Google rating and number of reviews", "customers", "text", help="e.g. 4.5 (320 reviews)"),
+    F("booking_software", "Billing / booking software used", "customers", "text"),
 
     F("avg_monthly_sales", "Average monthly sales (declared)", "operations", "inr", matching=True, material=True,
       help="Summary claim. Month-by-month figures and evidence go in Financials."),
     F("avg_monthly_expenses", "Average monthly operating expenses (declared)", "operations", "inr",
       matching=True, material=True),
+    F("electricity_monthly", "Average monthly electricity bill", "operations", "inr"),
+    F("monthly_salaries", "Total staff salaries per month", "operations", "inr"),
 
     F("staff_headcount", "Total staff", "staff", "int", matching=True),
     F("key_staff_dependence", "Dependence on key staff", "staff", "enum",
@@ -142,6 +174,10 @@ FIELDS: list[FieldDef] = [
       [("full_time", "Full-time"), ("part_time", "Part-time"), ("absentee", "Absentee")], matching=True),
     F("staff_continuity", "Staff expected to stay after sale?", "staff", "enum",
       [("yes", "Yes"), ("partial", "Partially"), ("no", "No")], matching=True),
+
+    F("trade_licence", "Trade licence", "licences", "enum", LICENCE),
+    F("gst_registered", "GST registration", "licences", "enum", LICENCE),
+    F("shop_establishment", "Shop & establishment registration", "licences", "enum", LICENCE),
 
     F("outstanding_loans", "Outstanding business loans", "liabilities", "inr", matching=True, material=True),
     F("supplier_dues", "Supplier dues", "liabilities", "inr", matching=True),

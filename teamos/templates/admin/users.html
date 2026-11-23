@@ -3,10 +3,10 @@
 {% block content %}
 <div class="ph"><div><h1>Users &amp; access</h1><div class="sub">Roles grant defaults; grants add specific, audited exceptions. Matrix: {{ MATRIX_VERSION }}</div></div></div>
 <div class="card flush"><div class="table-wrap"><table>
-<tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Two-step</th><th>Last login</th><th></th></tr>
+<tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>WhatsApp</th><th>Status</th><th>Two-step</th><th>Last login</th><th></th></tr>
 {% for u in rows %}<tr><td><strong>{{ u.full_name }}</strong>{% if u.is_synthetic %} <span class="badge syn">demo</span>{% endif %}</td><td>{{ u.email }}</td>
 <td>{% if u.id != current_user.id %}<form method="post" action="{{ url_for('admin.change_role', user_id=u.id) }}" class="inline">{{ csrf() }}<select name="role">{% for r, l in ROLE_LABELS.items() %}<option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ l }}</option>{% endfor %}</select><button class="btn sm">Set</button></form>{% else %}{{ ROLE_LABELS[u.role] }}{% endif %}</td>
-<td>{{ u.team }}</td><td>{% if u.is_active %}<span class="badge ok">Active</span>{% else %}<span class="badge bad">Disabled</span>{% endif %}</td>
+<td>{{ u.team }}</td><td class="small">{% if u.wa_phone_number_id %}<span class="badge ok">{{ u.wa_number }}</span>{% elif u.role != 'finance' %}<a href="{{ url_for('admin.integrations') }}#numbers">company number · add own</a>{% else %}—{% endif %}</td><td>{% if u.is_active %}<span class="badge ok">Active</span>{% else %}<span class="badge bad">Disabled</span>{% endif %}</td>
 <td>{% if u.mfa_enabled_at %}<span class="badge ok">On</span>{% if u.id != current_user.id %}<form method="post" action="{{ url_for('admin.reset_mfa', user_id=u.id) }}" data-confirm="Reset two-step sign-in for {{ u.full_name }}?">{{ csrf() }}<button class="btn link small">Reset</button></form>{% endif %}{% else %}<span class="badge grey">Off</span>{% endif %}</td><td class="small">{{ u.last_login_at|ist }}</td>
 <td>{% if u.id != current_user.id %}<form method="post" action="{{ url_for('admin.toggle_active', user_id=u.id) }}" data-confirm="{{ 'Disable' if u.is_active else 'Enable' }} {{ u.full_name }}?">{{ csrf() }}<button class="btn sm {{ 'danger' if u.is_active }}">{{ 'Disable' if u.is_active else 'Enable' }}</button></form>{% endif %}</td></tr>{% endfor %}
 </table></div></div>
@@ -18,6 +18,8 @@
       <div class="field"><label>Work email</label><input type="email" name="email" required></div>
       <div class="field"><label>Role</label><select name="role">{% for r, l in ROLE_LABELS.items() %}<option value="{{ r }}" {{ 'selected' if r == 'team_member' }}>{{ l }}</option>{% endfor %}</select></div>
       <div class="field"><label>Team</label><select name="team">{% for t in ['seller','buyer','general','finance','admin'] %}<option>{{ t }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Their WhatsApp Business number <span class="muted">(optional)</span></label><input name="wa_number" inputmode="tel" placeholder="98xxxxxxxx"></div>
+      <div class="field"><label>Meta phone number ID <span class="muted">(optional)</span></label><input name="number_id" inputmode="numeric"><div class="help">Leave both empty to use the company number. You can add them later in Integrations.</div></div>
       <div class="field full"><label>Temporary password</label><input type="password" name="password" required autocomplete="new-password"><div class="help">10+ characters, mixed case and a number.</div></div>
       <div class="full"><button class="btn primary">Create user</button></div></form></div>
   <div class="card"><h2>Grant a capability</h2>

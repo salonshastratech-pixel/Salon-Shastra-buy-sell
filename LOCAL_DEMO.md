@@ -22,6 +22,15 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 7.2 — easy forms, sync and integrations
+* Open any seller (e.g. **SL-00004**): the **Still to collect** card lists what is missing; choose *Create a link to
+  share myself* and **Send these as a short form**, then open the link on a phone-sized window: one step at a time,
+  tap-buttons, "I don't know" in one tap, rupees shown in words, photo slots that open the camera.
+* Send the full *Detailed form* to a seller or buyer from the record to see all 8 / 7 steps.
+* As `founder@`, **Admin → Integrations**: WhatsApp, e-mail and customer-link settings, team numbers, the GO LIVE
+  switch (needs typing GO LIVE) and the planned connectors. **Admin → Users → Add team member** can take a WhatsApp
+  number straight away.
+
 ## Milestone 7.1 — one-click messages after a call
 * Sign in as `shaheen@`, open **SL-00004 Urban Trim**, log a call with outcome *No answer*: the page jumps to a ready
   call-back message. Press **Send on WhatsApp**. Try *Connected* on another new lead: a thank-you and the personal

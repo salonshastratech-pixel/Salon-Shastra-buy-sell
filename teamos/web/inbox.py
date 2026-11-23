@@ -277,11 +277,11 @@ def batch(batch_id):
 def whatsapp():
     cfg = current_app.config
     if request.method == "GET":  # Meta's subscription handshake
-        token = cfg.get("WHATSAPP_VERIFY_TOKEN") or __import__("os").environ.get("WHATSAPP_VERIFY_TOKEN")
+        token = messaging._cfg("WHATSAPP_VERIFY_TOKEN", cfg)
         if token and request.args.get("hub.mode") == "subscribe" and request.args.get("hub.verify_token") == token:
             return Response(request.args.get("hub.challenge", ""), mimetype="text/plain")
         abort(403)
-    secret = cfg.get("WHATSAPP_APP_SECRET") or __import__("os").environ.get("WHATSAPP_APP_SECRET")
+    secret = messaging._cfg("WHATSAPP_APP_SECRET", cfg)
     raw = request.get_data()
     if not messaging.verify_signature(secret, raw, request.headers.get("X-Hub-Signature-256")):
         abort(403)
@@ -334,7 +334,7 @@ def quick_send(opp_id):
     outcome = f.get("outcome") or None
     try:
         r = Q.send(db, g.user, opp_id, f.get("sid"), outcome, acknowledge=f.get("acknowledge") == "1",
-                   link_base=current_app.config.get("PUBLIC_BASE_URL") or request.host_url)
+                   link_base=messaging.public_base(request))
         flash(f"WhatsApp sent: {r['label']} — {I.STATUS_LABELS.get(r['status'], r['status']).lower()}.", "ok")
         outcome = None  # done: show the normal record page again
     except I.CollisionWarning as w:

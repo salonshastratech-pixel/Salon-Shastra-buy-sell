@@ -183,7 +183,7 @@ def teaser_action(teaser_id, action):
 @login_required
 def share_teaser(cid):
     db = get_db()
-    base = current_app.config.get("PUBLIC_BASE_URL") or request.host_url.rstrip("/")
+    base = __import__("teamos.messaging", fromlist=["public_base"]).public_base(request)
     try:
         r = TZ.share_with_buyer(db, g.user, cid, request.form.get("channel") or "copy_link", link_base=base)
     except ValidationError as e:
