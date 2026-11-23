@@ -1,0 +1,6 @@
+# Store every text file with LF line endings, whatever the editor or OS (Windows editors write CRLF).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.db binary
