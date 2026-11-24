@@ -200,6 +200,19 @@
       }, 400);
     });
   });
+  // Clickable rows and task cards: a click anywhere opens the record (its first link), except on buttons, links,
+  // form fields or selected text. Ctrl/Cmd-click opens a new tab, like a normal link.
+  document.querySelectorAll('tr.row-link, li.task, .click-card').forEach(function (row) {
+    var link = row.getAttribute('data-href') ? null : row.querySelector('a[href]:not([href^="tel:"]):not([href="#"])');
+    var href = row.getAttribute('data-href') || (link && link.getAttribute('href'));
+    if (!href) return;
+    row.classList.add('is-clickable');
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('a, button, input, select, textarea, label, summary, form, details')) return;
+      if (window.getSelection && String(window.getSelection())) return;
+      if (e.ctrlKey || e.metaKey) { window.open(href, '_blank'); } else { window.location.href = href; }
+    });
+  });
   // Selects marked data-autosubmit submit their form on change (CSP forbids inline handlers).
   document.querySelectorAll('select[data-autosubmit]').forEach(function (sel) {
     sel.addEventListener('change', function () { sel.form.submit(); });

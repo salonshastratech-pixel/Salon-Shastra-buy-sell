@@ -22,7 +22,7 @@ def _msg(e: ValidationError) -> str:
 @require("crm.view")
 def desk():
     db = get_db()
-    stale = M.mark_stale_throttled(db)
+    stale = _stale_check_in_background(db)
     queue = request.args.get("queue") or request.args.get("q") or "new"
     if queue not in M.QUEUES:
         queue = "new"
@@ -76,7 +76,7 @@ def detail(cid):
     c = db.one(M.CAND_SELECT + "WHERE mc.id = ?", (cid,))
     if not c:
         abort(404)
-    M.mark_stale(db)
+    M.mark_stale(db, only=(c["buyer_opp_id"], c["seller_opp_id"]))   # just this pair: fast
     c = db.one(M.CAND_SELECT + "WHERE mc.id = ?", (cid,))
     r = M.latest_result(db, cid)
     families = []
@@ -219,13 +219,35 @@ def recompute_one(cid):
     return _back(cid)
 
 
+def _stale_check_in_background(db) -> int:
+    """The Match Desk shows the stored count at once; the full staleness check runs off the request (at most once a
+    minute per process)."""
+    import time
+    from .. import background
+    if time.time() - M._LAST_STALE_CHECK["at"] >= 60:
+        M._LAST_STALE_CHECK["at"] = time.time()
+        background.run(current_app._get_current_object(), "mark_stale", M.mark_stale)
+    return db.scalar("SELECT COUNT(*) FROM match_candidates WHERE stale = 1") or 0
+
+
+def _rescore(db, kind, opp_id):
+    M.refresh(db, **({"buyer_id": opp_id} if kind == "buyer" else {"seller_id": opp_id}))
+
+
 def record_matches(db, opp: dict) -> dict:
-    """Context for the Matches tab on buyer and seller pages (UAT-37 / UAT-38). Refreshes this record first."""
+    """Context for the Matches tab on buyer and seller pages (UAT-37 / UAT-38). Shows the stored matches at once; when
+    this record's facts changed since they were scored, re-scoring runs in the background (re-scoring one record
+    against every counterpart takes many queries — far too slow to make the person wait)."""
+    from .. import background
     side_col = "buyer_opp_id" if opp["kind"] == "buyer" else "seller_opp_id"
-    if opp["kind"] == "buyer":
-        M.refresh(db, buyer_id=opp["id"])
-    else:
-        M.refresh(db, seller_id=opp["id"])
+    fp_col = "buyer_fp" if opp["kind"] == "buyer" else "seller_fp"
+    rec = M.load_buyer(db, opp["id"]) if opp["kind"] == "buyer" else M.load_seller(db, opp["id"])
+    stored = {r[fp_col] for r in db.all(f"SELECT DISTINCT {fp_col} FROM match_candidates WHERE {side_col} = ?",
+                                        (opp["id"],))}
+    updating = False
+    if rec and (not stored or stored != {rec["fp"]}):
+        updating = background.run(current_app._get_current_object(), f"rescore:{opp['id']}", _rescore, opp["kind"],
+                                  opp["id"]) and not current_app.config.get("TESTING")
     rows = db.all(M.CAND_SELECT + f"WHERE mc.{side_col} = ? AND " + M.ACTIVE_WHERE +
                   "ORDER BY mc.suppressed, mc.rank_score DESC", (opp["id"],))
-    return {"match_rows": rows, "M": M}
+    return {"match_rows": rows, "M": M, "matches_updating": updating}

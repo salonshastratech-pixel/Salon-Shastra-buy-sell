@@ -21,7 +21,7 @@
   </div>
   <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Recent sheet imports</h2></div><div class="table-wrap"><table class="small">
     <tr><th>#</th><th>File</th><th>Status</th><th>Result</th><th>By</th><th>When</th></tr>
-    {% for i in smart %}<tr><td><a href="{{ url_for('imports.smart_preview', import_id=i.id) }}">{{ i.id }}</a></td><td><a href="{{ url_for('imports.smart_preview', import_id=i.id) }}">{{ i.filename }}</a></td>
+    {% for i in smart %}<tr class="row-link"><td><a href="{{ url_for('imports.smart_preview', import_id=i.id) }}">{{ i.id }}</a></td><td><a href="{{ url_for('imports.smart_preview', import_id=i.id) }}">{{ i.filename }}</a></td>
       <td><span class="badge {{ 'ok' if i.status == 'committed' else 'grey' if i.status == 'discarded' else 'info' }}">{{ i.status }}</span></td>
       <td>{% if i.counts_d %}{{ i.counts_d.created_seller }} sellers · {{ i.counts_d.created_buyer }} buyers · {{ i.counts_d.updated }} updated{% else %}—{% endif %}</td>
       <td>{{ i.by_name }}</td><td>{{ i.created_at|ist }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No sheet imports yet.</td></tr>{% endfor %}

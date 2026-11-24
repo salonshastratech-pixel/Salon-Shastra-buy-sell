@@ -19,7 +19,7 @@
 <tr class="row-link">
   <td class="nowrap"><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
   <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a><div class="small muted">{{ r.locality }}, {{ r.city }}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}</div></td>
-  <td>{{ r.contact_name }}<div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div></td>
+  <td><a class="cell-link" href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div></td>
   <td>{{ stage_badge(r.stage, STAGE_LABELS) }}</td>
   <td class="small">{% if r.areas %}{{ r.areas|join(', ') }}{% else %}<span class="muted">—</span>{% endif %}{% if r.form_status and r.form_status != 'not_sent' %}<div><span class="badge {{ 'ok' if r.form_status == 'filled' else 'warn' }}">{{ FORM_STATUS_LABELS[r.form_status] }}</span></div>{% endif %}</td>
   <td>{{ approval_badge(r.approval_state) }}</td>

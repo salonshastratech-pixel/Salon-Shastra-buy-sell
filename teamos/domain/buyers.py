@@ -621,18 +621,30 @@ def _service_consent(db, contact_id) -> bool:
                           "ORDER BY captured_at DESC, id DESC LIMIT 1", (contact_id,)))
 
 
-def check_transition(db, user, opp, mandate, prov, to: str) -> tuple[bool, str | None]:
+def check_transition(db, user, opp, mandate, prov, to: str, pre: dict | None = None) -> tuple[bool, str | None]:
+    """pre: answers shared by every stage check (transition_options computes them once instead of per stage)."""
+    if pre is None:
+        pre = {}
+
+    def can(cap):
+        if cap not in pre:
+            pre[cap] = user_can(db, user, cap)
+        return pre[cap]
     if to not in STAGE_LABELS:
         return False, "Unknown stage"
-    if opp["status"] == "closed" and not user_can(db, user, "listing.approve"):
+    if opp["status"] == "closed" and not can("listing.approve"):
         return False, "Closed opportunities can only be reopened by an approver"
     if to in FUTURE_STAGES:
         return False, FUTURE_STAGES[to]
-    if not user_can(db, user, "stage.operational"):
+    if not can("stage.operational"):
         return False, "You do not have permission to change stages"
-    locs = localities(db, mandate["id"])
+    if "locs" not in pre:
+        pre["locs"] = localities(db, mandate["id"])
+    locs = pre["locs"]
     if to in ("requirements_captured", "basic_qualified", "funding_review", "qualified_shortlist"):
-        missing = criteria_review_blockers(db, mandate)
+        if "blockers" not in pre:
+            pre["blockers"] = criteria_review_blockers(db, mandate)
+        missing = pre["blockers"]
         if missing:
             return False, "Needs " + ", ".join(missing)
     if to in ("basic_qualified", "funding_review", "qualified_shortlist"):
@@ -640,12 +652,14 @@ def check_transition(db, user, opp, mandate, prov, to: str) -> tuple[bool, str |
             return False, "Buyer is only exploring — use 'Exploring only' or confirm a real need first"
         if prov.get("decision_maker", {}).get("answer_state") != "value":
             return False, "Needs the decision-maker answer"
-        if not _service_consent(db, opp["contact_id"]):
+        if "consent" not in pre:
+            pre["consent"] = _service_consent(db, opp["contact_id"])
+        if not pre["consent"]:
             return False, "Needs recorded contact consent"
     if to == "funding_review" and prov.get("cash_ready", {}).get("answer_state") != "value":
         return False, "Needs the buyer's declared cash readiness"
     if to == "qualified_shortlist":
-        if not user_can(db, user, "evidence.review"):
+        if not can("evidence.review"):
             return False, "Only a reviewer can qualify a buyer to shortlist"
         if mandate.get("need_type") not in RESALE_NEEDS:
             return False, "New-salon buyers are not resale buyers — change the need type only with their confirmation"
@@ -659,11 +673,11 @@ def check_transition(db, user, opp, mandate, prov, to: str) -> tuple[bool, str |
 
 
 def transition_options(db, user, opp, mandate, prov) -> list[dict]:
-    out = []
+    out, pre = [], {}
     for code, label in STAGES + HOLDING:
         if code == opp["stage"]:
             continue
-        ok, why = check_transition(db, user, opp, mandate, prov, code)
+        ok, why = check_transition(db, user, opp, mandate, prov, code, pre)
         out.append({"code": code, "label": label, "allowed": ok, "why": why})
     return out
 

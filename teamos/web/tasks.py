@@ -17,7 +17,11 @@ def index():
     view = request.args.get("view", "mine")
     now = now_iso()
     _, day_end = ist_day_bounds()
-    if view == "all":
+    who = request.args.get("who") or ""
+    if who.isdigit():  # one person's open tasks (from the Team page)
+        view = "all"
+        rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.assignee_id = ?", (int(who),))
+    elif view == "all":
         rows = db.all(TASK_SELECT + "WHERE t.status = 'open'")
     elif view == "done":
         rows = db.all(TASK_SELECT + "WHERE t.status <> 'open' AND (t.assignee_id = ? OR t.completed_by = ?) "

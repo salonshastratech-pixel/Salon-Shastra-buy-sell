@@ -104,3 +104,16 @@ def test_activity_counts_calls_and_tasks(db, login):
     page = c.get("/team/activity?period=week").data.decode()
     assert "Team activity" in page and "Shaheen Seller" in page
     assert re.search(r"Calls logged · \d+ connected", page)
+
+
+def test_rows_and_names_open_their_record(db, login):
+    opp = _seller(db)
+    c = login("seller@t.test")
+    lst = c.get("/sellers/").data.decode()
+    assert 'class="row-link"' in lst and lst.count(f'href="/sellers/{opp}"') >= 3      # ref, salon and contact name
+    team = login("lead@t.test").get("/team").data.decode()
+    assert "data-href=\"/sellers/?owner=" in team and "/tasks/?who=" in team
+    me = user(db, "seller@t.test")
+    assert c.get(f"/tasks/?who={me['id']}").status_code == 200
+    js = c.get("/static/app.js").data.decode()
+    assert "tr.row-link, li.task, .click-card" in js

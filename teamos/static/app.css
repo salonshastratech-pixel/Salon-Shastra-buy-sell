@@ -679,3 +679,9 @@ input[type=time] { font: inherit; padding: 7px 9px; border: 1px solid var(--line
 .cbtn.wa,.wa-btn{color:#fff!important;background:#1f9d55!important;border-color:#1f9d55!important}
 .cbtn:hover{filter:brightness(.95)}
 .import-progress{display:block;width:100%;height:10px;margin-top:8px}
+
+/* clickable rows / cards: whole row opens the record */
+.is-clickable { cursor: pointer; }
+li.task.is-clickable:hover { background: var(--surface-2, #fcf8f5); }
+a.cell-link { color: inherit; text-decoration: none; }
+a.cell-link:hover { text-decoration: underline; }

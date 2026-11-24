@@ -6,8 +6,8 @@
 
 <div class="card flush" id="workload"><div class="card-h pad"><h2>Workload</h2><span class="small muted">records = live sellers + buyers they own</span></div><div class="table-wrap"><table>
   <tr><th>Person</th><th class="right">Records</th><th class="right">Open tasks</th><th class="right">Overdue</th><th class="right">Due today</th><th class="right">First calls waiting</th><th>Status</th><th></th></tr>
-  {% for u in workload %}<tr class="{{ 'row-away' if u.away }}">
-    <td><strong>{{ u.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[u.role] }}{% if u.team %} · {{ u.team }}{% endif %}</div></td>
+  {% for u in workload %}<tr class="row-link {{ 'row-away' if u.away }}" data-href="{{ url_for('sellers.index', owner=u.id) }}">
+    <td><a class="cell-link" href="{{ url_for('sellers.index', owner=u.id) }}" title="Open {{ u.full_name }}'s salon owners"><strong>{{ u.full_name }}</strong></a> <a class="small" href="{{ url_for('buyers.index', owner=u.id) }}">buyers</a> · <a class="small" href="{{ url_for('tasks.index', who=u.id) }}">tasks</a><div class="small muted">{{ ROLE_LABELS[u.role] }}{% if u.team %} · {{ u.team }}{% endif %}</div></td>
     <td class="right">{{ u.records }}{% if u.heavy %} <span class="badge warn" title="Well above the team average">heavy</span>{% endif %}<div class="small muted">{{ u.sellers }} S · {{ u.buyers }} B</div></td>
     <td class="right">{{ u.open }}</td>
     <td class="right">{% if u.overdue %}<span class="badge bad">{{ u.overdue }}</span>{% else %}0{% endif %}</td>

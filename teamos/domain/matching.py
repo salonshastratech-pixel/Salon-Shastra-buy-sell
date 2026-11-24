@@ -779,13 +779,15 @@ def attach_open_tasks(db, rows: list[dict]) -> list[dict]:
     return rows
 
 
-def mark_stale(db) -> int:
-    """Flag candidates whose inputs changed since evaluation (UAT-14). Cheap: fingerprints only."""
+def mark_stale(db, only: tuple | None = None) -> int:
+    """Flag candidates whose inputs changed since evaluation (UAT-14). Cheap: fingerprints only.
+    only=(buyer_opp_id, seller_opp_id) checks just that pair (the match page)."""
     n = 0
     fps_b, fps_s = {}, {}
+    extra, args = ("AND mc.buyer_opp_id = ? AND mc.seller_opp_id = ? ", list(only)) if only else ("", [])
     for c in db.all("SELECT mc.id, mc.buyer_opp_id, mc.seller_opp_id, mc.buyer_fp, mc.seller_fp, mc.stale "
                     "FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id "
-                    "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + ACTIVE_WHERE):  # closed = not stale
+                    "JOIN opportunities so ON so.id = mc.seller_opp_id WHERE " + ACTIVE_WHERE + extra, args):
         if c["buyer_opp_id"] not in fps_b:
             b = load_buyer(db, c["buyer_opp_id"])
             fps_b[c["buyer_opp_id"]] = b["fp"] if b else None
@@ -864,9 +866,12 @@ def unblock_suggestions(db, opp: dict, limit: int = 3) -> list[dict]:
     side = "buyer" if opp["kind"] == "buyer" else "seller"
     col = "buyer_opp_id" if side == "buyer" else "seller_opp_id"
     agg: dict[str, dict] = {}
-    for c in db.all(f"SELECT id, gate FROM match_candidates WHERE {col} = ? AND suppressed = 0 AND gate <> 'blocked'",
-                    (opp["id"],)):
-        for q in latest_result(db, c["id"]).get("questions", []):
+    # one query for every candidate's latest result (was one query per candidate)
+    for c in db.all("SELECT s.candidate_id AS id, s.result FROM match_snapshots s WHERE s.id IN ("
+                    "SELECT MAX(s2.id) FROM match_snapshots s2 JOIN match_candidates mc ON mc.id = s2.candidate_id "
+                    f"WHERE mc.{col} = ? AND mc.suppressed = 0 AND mc.gate <> 'blocked' GROUP BY s2.candidate_id) "
+                    "ORDER BY s.candidate_id", (opp["id"],)):
+        for q in json.loads(c["result"] or "{}").get("questions", []):
             if q["side"] != side:
                 continue
             a = agg.setdefault(q["text"], {**q, "count": 0, "candidates": []})
