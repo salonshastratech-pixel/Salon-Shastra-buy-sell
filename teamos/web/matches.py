@@ -246,7 +246,7 @@ def record_matches(db, opp: dict) -> dict:
                                         (opp["id"],))}
     updating = False
     if rec and (not stored or stored != {rec["fp"]}):
-        updating = background.run(current_app._get_current_object(), f"rescore:{opp['id']}", _rescore, opp["kind"],
+        updating = background.run(current_app._get_current_object(), "rescore", _rescore, opp["kind"],  # one at a time
                                   opp["id"]) and not current_app.config.get("TESTING")
     rows = db.all(M.CAND_SELECT + f"WHERE mc.{side_col} = ? AND " + M.ACTIVE_WHERE +
                   "ORDER BY mc.suppressed, mc.rank_score DESC", (opp["id"],))
