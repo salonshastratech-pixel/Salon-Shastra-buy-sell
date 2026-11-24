@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Pilot answers · {{ opp.salon_name }}{% endblock %}
+{% block content %}
+<div class="ph"><div><div class="small muted"><a href="{{ url_for('sellers.detail', opp_id=opp.id, tab='pilot') }}">{{ opp.ref_code }}</a> / Pilot answers</div>
+  <h1>Pilot form answers — {{ opp.salon_name }}</h1>
+  {% if resp %}<div class="sub">{{ 'Filled by the owner' if resp.source == 'link' else 'Filled by the team' if resp.source == 'staff' else 'Imported' }} · {{ resp.submitted_at|ist }}</div>{% endif %}</div>
+  <div class="actions"><a class="btn" href="{{ url_for('pilot.fill', opp_id=opp.id) }}">Edit answers</a></div></div>
+{% if not resp %}<div class="card"><p class="muted">Not filled yet.</p></div>{% else %}
+{% for sk, title, sub, qs in P.SECTIONS %}
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;{{ title }}</h2></div><div class="table-wrap"><table class="answers">
+  {% for q in qs %}{% set v = resp.answers.get(q.key) %}<tr><th scope="row">{{ q.label }}{% if q.extra %} <span class="badge grey">extra</span>{% endif %}</th>
+    <td>{% if v is none or v == '' %}<span class="muted">—</span>{% elif v is string %}{{ v }}{% else %}{{ v|join(', ') }}{% endif %}</td></tr>{% endfor %}
+</table></div></div>
+{% endfor %}{% endif %}
+{% endblock %}

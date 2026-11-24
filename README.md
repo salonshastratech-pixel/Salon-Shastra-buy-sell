@@ -19,7 +19,7 @@ python3 manage.py run           # http://127.0.0.1:8000
 ```
 
 Demo logins (synthetic): `founder@`, `shaheen@`, `harika@`, `lead@`, `accounts@` `demo.salonshastra.test`,
-password `Demo-Shastra-2026`. Try logging in as each to see role differences.
+password `Demo@123`. Try logging in as each to see role differences.
 
 In development you can switch off two-step sign-in for the demo admin with `export MFA_REQUIRED_ROLES=`
 (empty). Production always enforces it for Super Admin and Finance.

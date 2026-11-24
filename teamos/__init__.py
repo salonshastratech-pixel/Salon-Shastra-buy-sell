@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.10.0-m10"
+__version__ = "0.11.0-m11"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -129,11 +129,12 @@ def create_app(overrides: dict | None = None) -> Flask:
             ctx["nav_counts"] = _nav_counts(get_db(), g.user)
         return ctx
 
-    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, public,
-                      sellers, tasks, workflow)
+    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, pilot,
+                      public, sellers, tasks, workflow)
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
                matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp,
-               channels.bp, channels.feed_bp, workflow.bp, workflow.public_bp, workflow.pwa_bp):
+               channels.bp, channels.feed_bp, workflow.bp, workflow.public_bp, workflow.pwa_bp,
+               pilot.bp, pilot.public_bp):
         app.register_blueprint(bp)
     return app
 

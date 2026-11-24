@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Send to {{ opp.contact_name or opp.ref_code }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ 'Send the SWOT report' if purpose == 'report' else 'Send the pilot program form' }}</h1>
+  <div class="sub">{{ opp.salon_name }} · {{ opp.ref_code }} · this link is shown only now</div></div>
+  <div class="actions"><a class="btn" href="{{ url_for('sellers.detail', opp_id=opp.id, tab='pilot') }}">Back to the record</a></div></div>
+<div class="card">
+  <h2>Message</h2>
+  <textarea class="msg-preview" rows="9" readonly aria-label="Message to send">{{ text }}</textarea>
+  <p class="inline"><a class="btn primary" href="{{ wa }}" target="_blank" rel="noopener">Open in WhatsApp</a>
+    <code class="copy">{{ url }}</code></p>
+  {% if purpose == 'report' %}
+  <p class="small">The link opens the report on their phone with a <strong>Download PDF</strong> button and the times {{ P.CONSULTANT_NAME if P else 'Vikas' }} is free. You can also attach the PDF yourself: <a href="{{ url_for('pilot.report_pdf', opp_id=opp.id) }}">download it</a>.</p>
+  <form method="post" action="{{ url_for('pilot.sent', opp_id=opp.id) }}">{% from "macros.html" import csrf %}{{ csrf() }}<button class="btn">I've sent it — mark as sent</button></form>
+  {% else %}
+  <p class="small">The form status is now <strong>Form sent</strong>. It changes to <strong>Form filled</strong> by itself when they submit; a SWOT draft is then waiting on the record.</p>
+  {% endif %}
+  <p class="small muted">WhatsApp is not connected to TeamOS yet, so the button opens WhatsApp with the message ready — you press send. The link works for 90 days and only for this salon.</p>
+</div>
+{% endblock %}

@@ -1,3 +1,25 @@
+# Milestone 11 — Salon Owners pilot program (24 Nov 2026, v0.11.0)
+
+Most people who answer the ad want help growing their salon, not to sell it. "Sellers" is now **Salon Owners**, and every
+record has a **Pilot program** tab that follows the founder's process step by step.
+
+| Area | Status | How it works |
+|---|---|---|
+| Needs (first call) | **Built** | Lead type (salon owner / investor) and help areas ticked on the call: business consulting, digital marketing, operations, staff hiring, staff training, ChairPe software, consultation with Vikas Rachakonda, wants to sell — plus "other" and the problem in the team's words. Shown on the Salon Owners list and filterable on the Pilot program page. |
+| Pilot program form | **Built** | All 45 questions of the Google Form, same wording and choices, plus 5 extra questions for the report (years running, monthly customers, Google rating, Instagram/Google link, 12-month goal). **Send the form link** opens WhatsApp with the message ready (status → *Form sent*); submitting sets *Form filled* by itself. Staff can also **Fill it for them** on the call, or mark *Not filled*. Owners can write money as "40k" or "1.8L". |
+| SWOT report | **Built** | Drafted automatically from the answers (rules, no AI cost): summary, five health scores, strengths, weaknesses, opportunities, threats and up to six next steps, each tied to how Salon Shastra helps. Staff edit and **Approve**; editing an approved report makes a new version. |
+| PDF | **Built** | Branded 3-page PDF: cover with scores, the four SWOT boxes, next steps, then "Talk to Vikas Rachakonda" with the booking link, consultation prices and the free-video bonus. Staff download it any time (drafts are marked DRAFT). |
+| Sending | **Built** | **Send to the owner** makes a private link: the owner sees the report on their phone, downloads the PDF and books a call with Vikas on the same page. **Mark as sent** records it. |
+| Call with Vikas | **Built** | Pilot program → **Vikas's free times**: add times per day. Owners pick one (or request a time if none suits); Vikas gets an in-app alert and an e-mail, the record owner is alerted too. After the call: held / no-show / cancelled with notes; "held" creates a call-back task about the paid consultation. Alerts go to the person chosen on the Pilot program page (default: the first super admin). |
+| Paid consultation | **Built** | Office meeting ₹3,000 or salon visit ₹5,000 in Hyderabad; ₹10,000 outside Hyderabad — filled in automatically. Mark paid (UPI / cash / bank / card + reference); track the free video by Vikas (to do → shot → posted, with link). Pilot program page totals consultations, money collected and videos posted. |
+| ChairPe | **Built** | Each salon owner has a **ChairPe** card: not offered → demo shown → 14-day free Elite trial → paying / not interested. Plans from chairpe.com (Basic Rs 599, Standard Rs 1,199, Elite Rs 1,499, Elite Multi-branch Rs 2,499 per month; paid for 1, 3, 6 or 12 months). TeamOS suggests a plan from the form (Basic for one/two-chair salons, otherwise Elite) and sets a call task 2 days before the trial ends. The SWOT report recommends ChairPe when the salon has no billing software or messy appointments, and the PDF then shows a ChairPe box. Pilot program page counts demos/trials and paying salons. |
+| Website wording | **Built** | Lead type now includes **Opening a new salon**. Help areas and next steps use salonshastra.com service names (Business Audit & Diagnosis, Fix & Relaunch, Hyperlocal Marketing, Customer Retention & Reactivation, Technical and Behaviour/Retail/Sales training, staff hiring, New salon setup). The PDF ends with the website, phone and e-mail. |
+| Pilot program page | **Built** | Counts by form status, filters by help area, upcoming calls with Vikas, and one row per salon owner with form / SWOT / Vikas / consultation status. |
+
+Privacy: customer links are stored only as a hash, work for 90 days, can all be switched off per record, and show only
+that salon's own report. The real responses sheet was used only for its questions — no customer data was copied into
+the code, tests or Supabase.
+
 # Milestone 10 — transparency & follow-through (24 Nov 2026, v0.10.0)
 
 | Area | Status | How it works |

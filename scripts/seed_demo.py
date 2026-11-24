@@ -11,7 +11,7 @@ from teamos.domain import tasks as T
 from teamos.security import hash_password
 from teamos.timeutil import now_iso, now_utc, to_iso
 
-DEMO_PASSWORD = os.environ.get("SEED_PASSWORD", "Demo-Shastra-2026")
+DEMO_PASSWORD = os.environ.get("SEED_PASSWORD", "Demo@123")
 
 USERS = [
     ("founder@demo.salonshastra.test", "Founder (demo)", "super_admin", "admin"),
@@ -51,6 +51,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM seller_listings WHERE floor_level IS NOT NULL"):
             seed_premises(db)  # demo database created before Milestone 7.2
             added.append("premises, running costs & buyer floor/area/parking preferences (M7.2)")
+        if not db.scalar("SELECT COUNT(*) FROM pilot_profiles"):
+            seed_pilot(db)  # demo database created before the pilot program
+            added.append("pilot program: needs, forms, SWOT reports, Vikas call, consultation")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -193,6 +196,7 @@ def seed(db):
     seed_deals(db)
     seed_inbox(db)
     seed_premises(db)
+    seed_pilot(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -511,3 +515,83 @@ def seed_premises(db):
         B.set_choice_preferences(db, admin, B.load(db, r["id"]),
                                  {"pref__floor_level__ground": "prefer", "pref__floor_level__basement": "avoid",
                                   "pref__area_type__main_road": "prefer" if i % 2 else "flexible"})
+
+
+def seed_pilot(db):
+    """Pilot program (salon owners who want help): needs on most demo salons, two filled forms with SWOT reports,
+    a call booked with Vikas Rachakonda, a paid consultation with the free video, and some free times."""
+    from datetime import datetime, timedelta as _td
+
+    from teamos.domain import pilot as P
+    from teamos.domain import sellers as S
+    from teamos.timeutil import IST, now_utc, to_iso
+    admin = db.one("SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    team = db.one("SELECT * FROM users WHERE team = 'seller' AND is_active = 1 ORDER BY id LIMIT 1") or admin
+    opps = db.all("SELECT id FROM opportunities WHERE kind = 'seller' AND is_synthetic = 1 AND status <> 'closed' "
+                  "ORDER BY id")
+    needs = [["sell_salon", "vikas_consult"], ["digital_marketing", "chairpe"], ["staff_hiring", "staff_training"],
+             ["business_consulting", "operations"], ["digital_marketing", "staff_training", "vikas_consult"],
+             ["chairpe"], ["business_consulting"]]
+    for i, r in enumerate(opps):
+        o = S.load(db, r["id"])
+        P.save_needs(db, team, o, {"lead_type": "salon_owner", "help_areas": needs[i % len(needs)],
+                                   "problem_note": ["Owner relocating; wants a clean exit.", "Few new customers; "
+                                                    "no online presence.", "Staff leave within months.",
+                                                    "Busy but not profitable.", "Wants to grow but unsure where to "
+                                                    "start."][i % 5]})
+    base = {"salon_type": "Unisex Salon", "area_sft": "900", "floor": "Ground Floor", "chairs": "6", "beds": "1",
+            "pedicure_stations": "1", "hair_dressers": "3", "beauticians": "2", "manager": "No",
+            "housekeeping": "Yes", "years_running": "4", "monthly_revenue": "1.8L", "monthly_expenses": "1.5L",
+            "monthly_rent": "45k", "price_women_cut": "600", "price_men_cut": "250", "digital_marketing_spend": "No",
+            "billing_software": "No", "stand_out": ["Highly skilled staff", "Unique services/treatments"],
+            "service_rating": "4", "customers_love": "Friendly staff and hair spa", "training_program": "No",
+            "marketing_worked": "Word of mouth", "staff_struggle": "Yes, they leave for higher pay",
+            "op_challenges": ["Staff turnover & inconsistent service", "Limited digital marketing or online presence"],
+            "online_presence": "3", "track_financials": "No", "complaints": "Waiting time on weekends",
+            "growth_opps": ["New customer segments (bridal, men’s grooming, luxury)",
+                            "Improving digital marketing & social media presence"], "extra_revenue": "No",
+            "digital_ads": "No", "loyalty": "No", "growth_strategies": "Bridal packages and memberships",
+            "threats": ["New competitors in the market", "Rising costs (rent, staff salaries, products)"],
+            "price_competition": "Yes", "revenue_fluctuation": "Yes", "external_factors": "Two new salons nearby",
+            "want_report": "Yes", "pilot_interest": "Yes", "willing_invest": "Yes", "comments": "Please help us grow"}
+    for i, r in enumerate(opps[1:3]):
+        o = S.load(db, r["id"])
+        o2 = db.one("SELECT o.*, c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, b.locality, "
+                    "b.city FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b "
+                    "ON b.id = o.business_id WHERE o.id = ?", (r["id"],))
+        ans = dict(base, salon_name=o2["salon_name"] or "Demo salon", owner_name=o2["contact_name"],
+                   location=f"{o2['locality']}, {o2['city']}", contact_number=o2["phone_normalized"][-10:],
+                   email="owner@example.test")
+        if i:
+            ans.update(online_presence="7", billing_software="Yes", digital_ads="Yes", loyalty="Yes")
+        P.save_response(db, o2, ans, "link")
+        if i == 0:
+            rep = P.latest_report(db, r["id"])
+            c = rep["c"]
+            form = {"summary": c["summary"], **{k: "\n".join(c[k]) for k in ("strengths", "weaknesses",
+                                                                              "opportunities", "threats")}}
+            for j, st in enumerate(c["steps"]):
+                form.update({f"step_title_{j}": st["title"], f"step_why_{j}": st["why"], f"step_how_{j}": st["how"],
+                             f"step_when_{j}": st["when"], f"step_area_{j}": st["area"]})
+            P.save_report(db, admin, o, rep["id"], form, approve=True)
+            P.mark_sent(db, team, o)
+            bid = P.book(db, o2, None, "Saturday after 3 pm", "link", note="Wants help with staff")
+            P.update_booking(db, admin, o, bid, "done", "Discussed staff plan; open to a salon visit.")
+            cid = P.book_consultation(db, team, o, {"kind": "salon_visit", "in_hyderabad": "1",
+                                                     "note": "Visit + staff training plan"})
+            P.update_consultation(db, team, o, cid, {"paid": "1", "paid_mode": "upi", "paid_ref": "DEMO-UPI-001",
+                                                     "video_status": "shot"})
+    if len(opps) > 3:
+        P.set_form_status(db, team, S.load(db, opps[3]["id"]), "sent")
+    if len(opps) > 2:  # ChairPe: one paying customer, one on the free trial
+        P.set_chairpe(db, team, S.load(db, opps[1]["id"]), {"chairpe_status": "paying", "chairpe_plan": "elite",
+                                                            "chairpe_months": "12"})
+        P.set_chairpe(db, team, S.load(db, opps[2]["id"]), {"chairpe_status": "trial", "chairpe_plan": "elite",
+                                                            "chairpe_note": "Wants to see staff commissions"})
+    day = (now_utc().astimezone(IST) + _td(days=2)).strftime("%Y-%m-%d")
+    try:
+        P.add_slots(db, admin, day, ["10:00", "10:30", "16:00", "16:30"], 30, "phone")
+    except Exception:  # noqa: BLE001 — slots are a convenience for the demo
+        pass
+    db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN (SELECT id FROM opportunities "
+               "WHERE is_synthetic = 1)")

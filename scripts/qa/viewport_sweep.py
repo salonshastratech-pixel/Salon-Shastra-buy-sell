@@ -37,7 +37,7 @@ SEEDS = ["/", "/team", "/tasks/", "/tasks/?view=all", "/sellers/", "/sellers/?st
          "/inbox/", "/inbox/batches", "/reports/", "/reports/sources", "/reports/learning", "/calendar", "/tools",
          "/automations", "/install", "/admin/users", "/admin/audit", "/admin/duplicates", "/admin/finance",
          "/admin/jobs", "/admin/integrations", "/admin/templates", "/admin/outbox", "/admin/lead-ads", "/me/digest",
-         "/sellers/new", "/buyers/new"]
+         "/sellers/new", "/buyers/new", "/pilot", "/pilot/vikas"]
 PUBLIC = ["/login", "/f/seller", "/f/buyer", "/f/seller?lang=te", "/f/buyer?lang=te", "/offline"]
 
 
@@ -161,7 +161,7 @@ class Links(HTMLParser):
 
 
 def creds(role):
-    v = os.environ.get(f"QA_LOGIN_{role.upper()}") or f"{role}@demo.salonshastra.test:Demo-Shastra-2026"
+    v = os.environ.get(f"QA_LOGIN_{role.upper()}") or f"{role}@demo.salonshastra.test:Demo@123"
     return v.split(":", 1)
 
 

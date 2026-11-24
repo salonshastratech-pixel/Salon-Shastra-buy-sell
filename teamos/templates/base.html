@@ -24,7 +24,8 @@
       {{ item('channels.calendar', 'Calendar', ep == 'channels.calendar') }}
       {% if can('crm.view') %}{{ item('main.team_board', 'Team', ep in ('main.team_board', 'improve.hand_over')) }}
       <div class="group">People</div>
-      {{ item('sellers.index', 'Sellers', ep.startswith('sellers.')) }}
+      {{ item('sellers.index', 'Salon Owners', ep.startswith('sellers.')) }}
+      {{ item('pilot.index', 'Pilot program', ep in ('pilot.index', 'pilot.vikas')) }}
       {{ item('buyers.index', 'Buyers & investors', ep.startswith('buyers.')) }}
       <div class="group">Matching &amp; deals</div>
       {{ item('matches.desk', 'Match Desk', ep.startswith('matches.')) }}

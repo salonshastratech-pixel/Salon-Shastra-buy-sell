@@ -1,0 +1,9 @@
+{% extends "public/layout.html" %}
+{% block title %}Thank you{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Thank you{% if opp.contact_name %}, {{ opp.contact_name.split(' ')[0] }}{% endif %}!</h1>
+  <p>We have received your answers. Our team is preparing your personalised SWOT report and will send it to you on WhatsApp soon.</p>
+  <p class="small muted">You can close this page. If you want to change an answer, open the same link again.</p>
+</div>
+{% endblock %}

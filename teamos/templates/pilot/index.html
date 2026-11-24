@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Pilot program{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Pilot program</h1><div class="sub">Salon owners who want help growing: what they need, form, SWOT report, call with {{ P.CONSULTANT_NAME }}, consultation.</div></div>
+  <div class="actions"><a class="btn" href="{{ url_for('pilot.vikas') }}">Vikas's free times</a>{% if can('crm.create') %} <a class="btn primary" href="{{ url_for('sellers.new') }}">+ New salon owner</a>{% endif %}</div></div>
+
+<div class="kpis">
+  {% for v, l in P.FORM_STATUS %}<a class="kpi {{ 'on' if status == v }}" href="{{ url_for('pilot.index', status=v if status != v else None, area=area or None) }}"><b>{{ o.counts[v] }}</b><span>{{ l }}</span></a>{% endfor %}
+  <div class="kpi"><b>{{ o.money.n }}</b><span>Consultations</span></div>
+  <div class="kpi"><b>₹{{ '{:,}'.format(o.money.collected|int) }}</b><span>collected of ₹{{ '{:,}'.format(o.money.booked|int) }}</span></div>
+  <div class="kpi"><b>{{ o.money.videos }}</b><span>Videos posted</span></div>
+  <a class="kpi {{ 'on' if area == 'chairpe_open' }}" href="{{ url_for('pilot.index', area='chairpe_open' if area != 'chairpe_open' else None) }}"><b>{{ o.chairpe.demo + o.chairpe.trial }}</b><span>ChairPe demos &amp; trials</span></a>
+  <div class="kpi"><b>{{ o.chairpe.paying }}</b><span>ChairPe paying</span></div>
+</div>
+
+<div class="card"><div class="small muted">Needs help with:</div><div class="chips">
+  <a class="chip-link {{ 'on' if not area }}" href="{{ url_for('pilot.index', status=status or None) }}">All</a>
+  {% for v, l in P.HELP_AREAS %}<a class="chip-link {{ 'on' if area == v }}" href="{{ url_for('pilot.index', area=v, status=status or None) }}">{{ l }} <b>{{ o.area_counts[v] }}</b></a>{% endfor %}</div></div>
+
+{% if o.upcoming %}
+<div class="card"><h2>Calls with {{ P.CONSULTANT_NAME }}</h2><ul class="plain">{% for b in o.upcoming %}
+  <li><a href="{{ url_for('sellers.detail', opp_id=b.opportunity_id, tab='pilot') }}#vikas"><strong>{{ b.salon_name or b.ref_code }}</strong></a> · {{ b.contact_name }} —
+    {% if b.starts_at %}{{ b.starts_at|ist('%a %d %b, %I:%M %p') }}{% else %}<span class="badge warn">requested</span> {{ b.preferred_time }}{% endif %}</li>{% endfor %}</ul></div>
+{% endif %}
+
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Salon</th><th>Needs help with</th><th>Form</th><th>SWOT</th><th>ChairPe</th><th>Vikas</th><th class="right">Consultation</th><th>Owner</th></tr>
+{% for r in o.rows %}
+<tr class="row-link">
+  <td><a href="{{ url_for('sellers.detail', opp_id=r.id, tab='pilot') }}"><strong>{{ r.salon_name or r.ref_code }}</strong></a><div class="small muted">{{ r.contact_name }} · {{ r.locality }}{% if r.lead_type == 'investor' %} · <span class="badge info">investor</span>{% endif %}</div></td>
+  <td class="small">{% for a in r.areas %}{{ P.HELP_LABELS[a] }}{{ ', ' if not loop.last }}{% else %}<span class="muted">—</span>{% endfor %}</td>
+  <td><span class="badge {{ 'ok' if r.form_status == 'filled' else 'warn' if r.form_status in ('sent','not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[r.form_status] }}</span></td>
+  <td class="small">{% if r.report_sent_at %}<span class="badge ok">sent</span>{% elif r.report_status == 'approved' %}<span class="badge warn">approved</span>{% elif r.report_status %}<span class="badge warn">draft</span>{% else %}—{% endif %}</td>
+  <td class="small">{% if r.chairpe_status != 'not_offered' %}<span class="badge {{ 'ok' if r.chairpe_status == 'paying' else 'warn' if r.chairpe_status in ('demo','trial') else 'grey' }}">{{ {'demo': 'demo', 'trial': 'trial', 'paying': 'paying', 'not_interested': 'no'}[r.chairpe_status] }}</span>{% else %}—{% endif %}</td>
+  <td class="small">{% if r.vikas_status %}{{ {'requested': 'requested', 'booked': (r.vikas_at|ist('%d %b')) if r.vikas_at else 'booked', 'done': 'held', 'cancelled': 'cancelled', 'no_show': 'no-show'}[r.vikas_status] }}{% else %}—{% endif %}</td>
+  <td class="right small">{% if r.consults %}{{ r.consults }}{% if r.paid %} · ₹{{ '{:,}'.format(r.paid|int) }} paid{% endif %}{% else %}—{% endif %}</td>
+  <td class="small">{{ r.owner_name or '—' }}</td>
+</tr>
+{% else %}<tr><td colspan="8" class="empty">No salon owners match.</td></tr>{% endfor %}
+</table></div></div>
+
+{% if can_settings %}
+<form method="post" action="{{ url_for('pilot.set_consultant') }}" class="card inline">{{ csrf() }}
+  <label for="cons">Booking alerts go to</label>
+  <select id="cons" name="user_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if consultant and consultant.id == u.id }}>{{ u.full_name }}</option>{% endfor %}</select>
+  <button class="btn">Save</button><span class="small muted">— {{ P.CONSULTANT_NAME }}'s TeamOS login (in-app alert + e-mail).</span>
+</form>{% endif %}
+{% endblock %}

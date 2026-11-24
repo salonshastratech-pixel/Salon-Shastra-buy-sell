@@ -2,6 +2,7 @@ Flask>=3.1,<4
 Werkzeug>=3.1,<4
 Jinja2>=3.1,<4
 openpyxl>=3.1          # .xlsx imports
+reportlab>=4.2,<5      # SWOT report PDFs (pilot program)
 cryptography>=42       # encrypted SQLite backups
 # production
 gunicorn>=23

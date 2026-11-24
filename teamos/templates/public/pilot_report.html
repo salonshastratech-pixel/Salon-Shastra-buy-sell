@@ -1,0 +1,22 @@
+{% extends "public/layout.html" %}
+{% block title %}Your SWOT report{% endblock %}
+{% block content %}
+{% if not rep %}
+<div class="card"><h1>Your report is being prepared</h1><p>Our team will message you as soon as it is ready.</p></div>
+{% else %}{% set c = rep.c %}
+<div class="card">
+  <h1>{{ c.salon_name }} — SWOT report</h1>
+  <p>{{ c.summary }}</p>
+  <p><a class="btn primary" href="{{ url_for('public_pilot.public_pdf', token=token) }}">Download the full report (PDF)</a></p>
+</div>
+<div class="swot-grid">
+  {% for k, t in [('strengths','Strengths'),('weaknesses','Weaknesses'),('opportunities','Opportunities'),('threats','Threats')] %}
+  <div class="card swot-q swot-{{ k }}"><h2>{{ t }}</h2><ul>{% for x in c[k] %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endfor %}
+</div>
+<div class="card"><h2>Your next steps</h2><ol class="steps-list">{% for s in c.steps %}<li><strong>{{ s.title }}</strong> <span class="badge">{{ s.when }}</span>{% if s.why %}<div class="small muted">{{ s.why }}</div>{% endif %}{% if s.how %}<div class="small">How we help: {{ s.how }}</div>{% endif %}</li>{% endfor %}</ol></div>
+<div class="card" id="book"><h2>Talk to {{ P.CONSULTANT_NAME }}</h2>
+  <p>Discuss this report with the founder of Salon Shastra and get a clear plan for your salon.</p>
+  {% include "public/_pilot_slots.html" %}
+</div>
+{% endif %}
+{% endblock %}

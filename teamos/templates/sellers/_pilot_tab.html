@@ -1,0 +1,168 @@
+{% from "macros.html" import csrf %}
+{% set prof = pilot %}{% set rep = pilot_report %}
+<div class="pilot-flow">
+<ol class="pilot-steps" aria-label="Pilot program steps">
+  <li class="{{ 'done' if prof.exists and prof.help_areas }}"><a href="#needs">1 · Needs</a></li>
+  <li class="{{ 'done' if prof.form_status == 'filled' else 'now' if prof.form_status == 'sent' }}"><a href="#form">2 · Pilot form</a></li>
+  <li class="{{ 'done' if rep and rep.sent_at else 'now' if rep }}"><a href="#report">3 · SWOT report</a></li>
+  <li class="{{ 'done' if pilot_bookings and pilot_bookings[0].status == 'done' else 'now' if pilot_bookings }}"><a href="#vikas">4 · Call with Vikas</a></li>
+  <li class="{{ 'done' if pilot_consults and pilot_consults[0].paid else 'now' if pilot_consults }}"><a href="#consult">5 · Consultation</a></li>
+</ol>
+
+<div class="split">
+<div>
+  {# 1. Needs ------------------------------------------------------------------------------------------- #}
+  <form method="post" action="{{ url_for('pilot.needs', opp_id=opp.id) }}" class="card" id="needs">{{ csrf() }}
+    <div class="card-h"><h2>What do they need?</h2><span class="small muted">From the first call</span></div>
+    <div class="field"><label>Lead type</label>
+      <div class="chips" role="radiogroup">{% for v, l in P.LEAD_TYPES %}<label class="chip"><input type="radio" name="lead_type" value="{{ v }}" {{ 'checked' if prof.lead_type == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+      {% if prof.lead_type == 'new_salon' %}<div class="help">The pilot form is for running salons. For a new salon, tick <strong>New salon setup</strong> (feasibility, location &amp; rent, brand, interiors, staffing, launch) and book a call with Vikas.</div>{% endif %}
+      {% if prof.lead_type == 'investor' %}<div class="help">Investors looking to buy a salon belong in <a href="{{ url_for('buyers.new') }}">Buyers &amp; investors</a> — add them there too.</div>{% endif %}</div>
+    <div class="field"><label>Where do they need help? <span class="muted small">(tick all that apply)</span></label>
+      <div class="chips" role="group" aria-label="Help areas">{% for v, l in P.HELP_AREAS %}<label class="chip"><input type="checkbox" name="help_areas" value="{{ v }}" {{ 'checked' if v in prof.help_areas }}><span>{{ l }}</span></label>{% endfor %}</div></div>
+    <div class="field"><label for="help-other">Other help</label><input id="help-other" name="help_other" maxlength="300" value="{{ prof.help_other or '' }}" placeholder="e.g. interior redesign, franchise advice"></div>
+    <div class="field"><label for="problem">Their problem, in short</label><textarea id="problem" name="problem_note" rows="3" maxlength="2000" placeholder="What did they say on the call?">{{ prof.problem_note or '' }}</textarea></div>
+    <button class="btn primary">Save</button>
+  </form>
+
+  {# 2. Pilot form ------------------------------------------------------------------------------------------ #}
+  <div class="card" id="form">
+    <div class="card-h"><h2>Pilot program form</h2>
+      <span class="badge {{ 'ok' if prof.form_status == 'filled' else 'warn' if prof.form_status in ('sent', 'not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[prof.form_status] }}</span></div>
+    {% if prof.form_sent_at %}<p class="small muted">Sent {{ prof.form_sent_at|rel }}{% if prof.form_filled_at %} · filled {{ prof.form_filled_at|rel }}{% endif %}</p>{% endif %}
+    <div class="inline">
+      <form method="post" action="{{ url_for('pilot.link', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="purpose" value="form"><button class="btn primary">{{ 'Send the form again' if prof.form_status in ('sent', 'filled') else 'Send the form link' }}</button></form>
+      <a class="btn" href="{{ url_for('pilot.fill', opp_id=opp.id) }}">{{ 'Edit answers' if pilot_response else 'Fill it for them' }}</a>
+      {% if pilot_response %}<a class="btn" href="{{ url_for('pilot.answers', opp_id=opp.id) }}">See answers</a>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('pilot.form_status', opp_id=opp.id) }}" class="inline mark-status">{{ csrf() }}
+      <span class="small muted">Mark as:</span>{% for v, l in P.FORM_STATUS if v != prof.form_status %}<button class="btn sm" name="status" value="{{ v }}">{{ l }}</button>{% endfor %}</form>
+  </div>
+
+  {# 3. SWOT report ----------------------------------------------------------------------------------------- #}
+  <div class="card" id="report">
+    <div class="card-h"><h2>SWOT report</h2>
+      {% if rep %}<span class="badge {{ 'ok' if rep.status == 'approved' else 'warn' }}">v{{ rep.version }} · {{ 'Approved' if rep.status == 'approved' else 'Draft — check and approve' }}</span>{% endif %}</div>
+    {% if not rep %}<p class="muted">The report is drafted automatically as soon as the pilot form is filled.</p>
+    {% else %}{% set c = rep.c %}
+    <div class="inline report-actions">
+      <a class="btn" href="{{ url_for('pilot.report_pdf', opp_id=opp.id) }}">Download PDF{{ ' (draft)' if rep.status != 'approved' }}</a>
+      {% if rep.status == 'approved' %}<form method="post" action="{{ url_for('pilot.link', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="purpose" value="report"><button class="btn primary">Send to the owner</button></form>{% endif %}
+      <form method="post" action="{{ url_for('pilot.redraft', opp_id=opp.id) }}">{{ csrf() }}<button class="btn sm" title="Throws away edits in a new version made from the latest answers">Re-draft from answers</button></form>
+    </div>
+    {% if rep.sent_at %}<p class="small ok-text">Sent {{ rep.sent_at|rel }}.</p>{% elif rep.status == 'approved' %}<p class="small muted">Approved by {{ rep.approver_name }} {{ rep.approved_at|rel }} — not sent yet.</p>{% endif %}
+    <div class="scores">{% for label, s in c.scores %}<div class="score"><span>{{ label }}</span><b class="{{ 'good' if s >= 7 else 'mid' if s >= 5 else 'low' }}">{{ s }}/10</b></div>{% endfor %}</div>
+    <form method="post" action="{{ url_for('pilot.save_report', opp_id=opp.id, rid=rep.id) }}" class="report-edit">{{ csrf() }}
+      <div class="field"><label for="r-sum">In short</label><textarea id="r-sum" name="summary" rows="3" maxlength="1200">{{ c.summary }}</textarea></div>
+      <div class="form-grid">
+        {% for k, t in [('strengths','Strengths'),('weaknesses','Weaknesses'),('opportunities','Opportunities'),('threats','Threats')] %}
+        <div class="field swot-edit swot-{{ k }}"><label for="r-{{ k }}">{{ t }} <span class="muted small">one per line</span></label><textarea id="r-{{ k }}" name="{{ k }}" rows="6">{{ c[k]|join('\n') }}</textarea></div>{% endfor %}
+      </div>
+      <h3>Next steps <span class="muted small">(in order; leave a title empty to drop it)</span></h3>
+      {% for i in range(((c.steps|length) + 2) if (c.steps|length) < 6 else 8) %}{% set s = c.steps[i] if i < c.steps|length else {} %}
+      <div class="step-edit"><span class="step-no">{{ i + 1 }}</span>
+        <div class="form-grid">
+          <div class="field"><label for="st-t{{ i }}">Step</label><input id="st-t{{ i }}" name="step_title_{{ i }}" value="{{ s.title or '' }}" maxlength="120"></div>
+          <div class="field"><label for="st-w{{ i }}">When</label><select id="st-w{{ i }}" name="step_when_{{ i }}">{% for w in ['This week', 'Next 30 days', 'Next 60 days', 'Next 90 days'] %}<option {{ 'selected' if (s.when or 'Next 30 days') == w }}>{{ w }}</option>{% endfor %}</select></div>
+          <div class="field full"><label for="st-y{{ i }}">Why it matters</label><input id="st-y{{ i }}" name="step_why_{{ i }}" value="{{ s.why or '' }}" maxlength="240"></div>
+          <div class="field full"><label for="st-h{{ i }}">How Salon Shastra helps</label><input id="st-h{{ i }}" name="step_how_{{ i }}" value="{{ s.how or '' }}" maxlength="240"></div>
+          <input type="hidden" name="step_area_{{ i }}" value="{{ s.area or '' }}">
+        </div></div>{% endfor %}
+      <div class="inline"><button class="btn" name="action" value="save">Save changes</button>
+        <button class="btn primary" name="action" value="approve">{{ 'Save and keep approved' if rep.status == 'approved' else 'Approve report' }}</button></div>
+      {% if rep.status == 'approved' %}<p class="small muted">Saving changes to an approved report makes a new draft version; approve it again before sending.</p>{% endif %}
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div>
+  {# ChairPe sale ------------------------------------------------------------------------------------------- #}
+  <div class="card" id="chairpe">
+    <div class="card-h"><h2>ChairPe</h2>
+      <span class="badge {{ 'ok' if prof.chairpe_status == 'paying' else 'warn' if prof.chairpe_status in ('demo', 'trial') else 'grey' }}">{{ P.CHAIRPE_STATUS_LABELS[prof.chairpe_status] }}</span></div>
+    <p class="small muted">Salon Shastra's salon operating system: billing, appointments, staff, stock, memberships, WhatsApp bills and win-back, and each chair's profit (ChairPe Core). 14-day free Elite trial, no card. <a href="{{ P.CHAIRPE_URL }}" target="_blank" rel="noopener noreferrer">chairpe.com</a></p>
+    {% if prof.chairpe_status == 'trial' and chairpe_trial_ends %}<p class="small"><strong>Trial ends {{ chairpe_trial_ends|ist('%d %b') }}</strong> ({{ chairpe_trial_ends|rel }}). A reminder task is set 2 days before.</p>{% endif %}
+    {% if prof.chairpe_status == 'paying' %}<p class="small"><strong>{{ P.CHAIRPE_PLAN_LABELS.get(prof.chairpe_plan, '') }}</strong> × {{ prof.chairpe_months }} month(s){% if prof.chairpe_paid_on %} · paid {{ prof.chairpe_paid_on|ist('%d %b %Y') }}{% endif %}</p>{% endif %}
+    {% if prof.chairpe_note %}<p class="small">“{{ prof.chairpe_note }}”</p>{% endif %}
+    <details class="disclose" {{ 'open' if prof.chairpe_status == 'not_offered' and ('chairpe' in prof.help_areas) }}><summary>Update ChairPe</summary>
+      <form method="post" action="{{ url_for('pilot.chairpe', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        <div class="field"><label for="cp-status">Status</label><select id="cp-status" name="chairpe_status">{% for v, l in P.CHAIRPE_STATUS %}<option value="{{ v }}" {{ 'selected' if prof.chairpe_status == v }}>{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="cp-plan">Plan</label><select id="cp-plan" name="chairpe_plan"><option value="">—</option>{% for k, n, price, fit in P.CHAIRPE_PLANS %}<option value="{{ k }}" {{ 'selected' if (prof.chairpe_plan or chairpe_suggested) == k }}>{{ n }} · ₹{{ '{:,}'.format(price) }}/month{{ ' (suggested)' if k == chairpe_suggested }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="cp-months">Paid for (if paying)</label><select id="cp-months" name="chairpe_months"><option value="">—</option>{% for m in P.CHAIRPE_MONTHS %}<option value="{{ m }}" {{ 'selected' if prof.chairpe_months == m }}>{{ m }} month{{ 's' if m > 1 }}</option>{% endfor %}</select></div>
+        <div class="field full"><label for="cp-note">Note</label><input id="cp-note" name="chairpe_note" maxlength="500" value="{{ prof.chairpe_note or '' }}" placeholder="e.g. wants to see staff commissions first"></div>
+        <div class="full small muted">{% for k, n, price, fit in P.CHAIRPE_PLANS %}<div><strong>{{ n }}</strong> ₹{{ '{:,}'.format(price) }}/month: {{ fit }}</div>{% endfor %}<div>1, 3, 6 or 12 months; longer is cheaper (Elite yearly ≈ ₹1,000/month).</div></div>
+        <div class="full"><button class="btn primary">Save</button></div>
+      </form></details>
+  </div>
+
+  {# 4. Call with Vikas ------------------------------------------------------------------------------------- #}
+  <div class="card" id="vikas">
+    <div class="card-h"><h2>Call with {{ P.CONSULTANT_NAME }}</h2><a class="small" href="{{ url_for('pilot.vikas') }}">His free times →</a></div>
+    {% for b in pilot_bookings %}
+    <div class="booking {{ b.status }}">
+      <div><strong>{% if b.starts_at %}{{ b.starts_at|ist('%a %d %b, %I:%M %p') }}{% else %}Requested: {{ b.preferred_time }}{% endif %}</strong>
+        <span class="badge {{ 'ok' if b.status == 'done' else 'warn' if b.status in ('requested', 'booked') else 'grey' }}">{{ {'requested': 'Requested', 'booked': 'Booked', 'done': 'Held', 'cancelled': 'Cancelled', 'no_show': 'No-show'}[b.status] }}</span>
+        <span class="small muted">· booked {{ 'by the owner' if b.source == 'link' else 'by the team' }} {{ b.created_at|rel }}</span></div>
+      {% if b.note %}<div class="small">“{{ b.note }}”</div>{% endif %}
+      {% if b.outcome_note %}<div class="small"><strong>Outcome:</strong> {{ b.outcome_note }}</div>{% endif %}
+      {% if b.status in ('requested', 'booked') %}
+      <details class="disclose"><summary>Update this call</summary>
+        <form method="post" action="{{ url_for('pilot.booking', opp_id=opp.id, bid=b.id) }}" class="form-grid">{{ csrf() }}
+          {% if b.status == 'requested' %}<div class="field"><label>Confirmed time (IST)</label><input type="datetime-local" name="starts_at"></div>{% endif %}
+          <div class="field"><label>Status</label><select name="status">{% if b.status == 'requested' %}<option value="booked">Confirm the time</option>{% endif %}<option value="done">Held</option><option value="no_show">Owner didn't join</option><option value="cancelled">Cancelled</option></select></div>
+          <div class="field full"><label>What was discussed / next step</label><textarea name="outcome" rows="2" maxlength="1000"></textarea></div>
+          <div class="full"><button class="btn primary">Save</button></div>
+        </form></details>{% endif %}
+    </div>
+    {% endfor %}
+    {% if not pilot_bookings or pilot_bookings[0].status not in ('requested', 'booked') %}
+    <details class="disclose" {{ 'open' if not pilot_bookings }}><summary>Book a call for them</summary>
+      <form method="post" action="{{ url_for('pilot.staff_book', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        {% if pilot_slots %}<div class="field full"><label>Free time</label><select name="slot_id"><option value="">— none suits; note a preferred time below —</option>{% for s in pilot_slots %}<option value="{{ s.id }}">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} · {{ s.mode }}</option>{% endfor %}</select></div>
+        {% else %}<p class="small muted full">No free times are listed. <a href="{{ url_for('pilot.vikas') }}">Add his free times</a>, or note what the owner prefers.</p>{% endif %}
+        <div class="field full"><label>Owner's preferred time (if no slot)</label><input name="preferred" maxlength="200" placeholder="e.g. Saturday after 3 pm"></div>
+        <div class="field full"><label>Note for Vikas</label><input name="note" maxlength="500"></div>
+        <div class="full"><button class="btn primary">Book — alert {{ P.CONSULTANT_NAME.split(' ')[0] }}</button></div>
+      </form></details>{% endif %}
+    <p class="small muted">Alerts go to {{ pilot_consultant.full_name if pilot_consultant else '— nobody set —' }} (in TeamOS and by e-mail).</p>
+  </div>
+
+  {# 5. Consultation ---------------------------------------------------------------------------------------- #}
+  <div class="card" id="consult">
+    <div class="card-h"><h2>Paid consultation</h2><span class="small muted">+ free video by Vikas</span></div>
+    {% for k in pilot_consults %}
+    <div class="booking {{ k.status }}">
+      <div><strong>{{ dict(P.CONSULT_KINDS)[k.kind] }}</strong> · {{ 'Hyderabad' if k.in_hyderabad else 'Outside Hyderabad' }} · <strong>₹{{ '{:,}'.format(k.fee) }}</strong>
+        <span class="badge {{ 'ok' if k.paid else 'warn' }}">{{ 'Paid' if k.paid else 'Not paid' }}</span>
+        {% if k.status != 'booked' %}<span class="badge grey">{{ 'Held' if k.status == 'done' else 'Cancelled' }}</span>{% endif %}</div>
+      <div class="small muted">{% if k.scheduled_at %}{{ k.scheduled_at|ist('%a %d %b, %I:%M %p') }} · {% endif %}Video: {{ dict(P.VIDEO_STATUS)[k.video_status] }}{% if k.video_link %} · <a href="{{ k.video_link }}" target="_blank" rel="noopener noreferrer">watch</a>{% endif %}{% if k.paid %} · {{ dict(P.PAY_MODES).get(k.paid_mode, k.paid_mode) }}{% if k.paid_ref %} ref {{ k.paid_ref }}{% endif %}{% endif %}</div>
+      {% if k.note %}<div class="small">{{ k.note }}</div>{% endif %}
+      <details class="disclose"><summary>Update</summary>
+        <form method="post" action="{{ url_for('pilot.consultation_update', opp_id=opp.id, cid=k.id) }}" class="form-grid">{{ csrf() }}
+          <div class="field"><label>Status</label><select name="status">{% for v, l in [('booked','Booked'),('done','Held'),('cancelled','Cancelled')] %}<option value="{{ v }}" {{ 'selected' if k.status == v }}>{{ l }}</option>{% endfor %}</select></div>
+          {% if not k.paid %}<div class="field"><label class="check"><input type="checkbox" name="paid" value="1"> Payment received</label>
+            <select name="paid_mode" aria-label="How was it paid"><option value="">How?</option>{% for v, l in P.PAY_MODES %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+            <input name="paid_ref" maxlength="80" placeholder="UPI / bank reference" aria-label="Payment reference"></div>{% endif %}
+          <div class="field"><label>Free video</label><select name="video_status">{% for v, l in P.VIDEO_STATUS %}<option value="{{ v }}" {{ 'selected' if k.video_status == v }}>{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Video link</label><input name="video_link" maxlength="300" value="{{ k.video_link or '' }}" placeholder="https://instagram.com/…"></div>
+          <div class="full"><button class="btn primary">Save</button></div>
+        </form></details>
+    </div>
+    {% endfor %}
+    <details class="disclose" {{ 'open' if not pilot_consults and pilot_bookings and pilot_bookings[0].status == 'done' }}><summary>Book a consultation</summary>
+      <form method="post" action="{{ url_for('pilot.consultation', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        <div class="field"><label>Type</label><select name="kind">{% for v, l in P.CONSULT_KINDS %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Where</label><select name="in_hyderabad"><option value="1">Within Hyderabad</option><option value="0">Outside Hyderabad</option></select></div>
+        <div class="field"><label>Date &amp; time (IST)</label><input type="datetime-local" name="scheduled_at"></div>
+        <div class="field full"><label>Note</label><input name="note" maxlength="500"></div>
+        <div class="full"><table class="fee-table small"><tr><th></th><th>Hyderabad</th><th>Outside</th></tr>
+          <tr><td>Office meeting</td><td>₹{{ '{:,}'.format(P.FEES[('office', 1)]) }}</td><td>₹{{ '{:,}'.format(P.FEES[('office', 0)]) }}</td></tr>
+          <tr><td>Salon visit</td><td>₹{{ '{:,}'.format(P.FEES[('salon_visit', 1)]) }}</td><td>₹{{ '{:,}'.format(P.FEES[('salon_visit', 0)]) }}</td></tr></table>
+          <p class="small muted">The fee is filled in from this table. Every paid consultation includes a free video by Vikas.</p></div>
+        <div class="full"><button class="btn primary">Book consultation</button></div>
+      </form></details>
+  </div>
+</div>
+</div>
+</div>

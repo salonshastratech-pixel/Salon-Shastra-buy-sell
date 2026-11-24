@@ -38,15 +38,25 @@ def index():
     status = request.args.get("status") or "active"
     rows = db.all(
         "SELECT o.*, c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, b.locality, b.city, "
-        "u.full_name AS owner_name, l.asking_price, l.approval_state, l.chairs, l.gender_format "
+        "u.full_name AS owner_name, l.asking_price, l.approval_state, l.chairs, l.gender_format, "
+        "p.help_areas, p.form_status "
         "FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id "
         "LEFT JOIN users u ON u.id = o.primary_owner_id LEFT JOIN seller_listings l ON l.opportunity_id = o.id "
+        "LEFT JOIN pilot_profiles p ON p.opportunity_id = o.id "
         "WHERE " + " AND ".join(where) + " ORDER BY CASE WHEN o.next_action_due IS NULL THEN 1 ELSE 0 END, "
         "o.next_action_due LIMIT 300", params)
+    import json
+    from ..domain import pilot as P
+    for r in rows:
+        try:
+            r["areas"] = [P.HELP_LABELS[a] for a in json.loads(r.get("help_areas") or "[]") if a in P.HELP_LABELS]
+        except ValueError:
+            r["areas"] = []
     return render_template("sellers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage,
                            owner=owner, status=status, STAGES=S.STAGES + S.HOLDING, STAGE_LABELS=S.STAGE_LABELS,
                            saved=SS.mine(db, g.user["id"], "seller"), list_kind="seller",
-                           current_qs=SS.query_string("seller", request.args))
+                           current_qs=SS.query_string("seller", request.args),
+                           FORM_STATUS_LABELS=P.FORM_STATUS_LABELS)
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -64,7 +74,7 @@ def new():
                 duplicates = result["duplicates"]
             else:
                 _link_chat(db, form.get("from_conv"), result["opportunity_id"])
-                flash("Seller lead created. A first-contact task is on the owner's My Day.", "ok")
+                flash("Salon owner added. A first-contact task is on the owner's My Day.", "ok")
                 return redirect(url_for("sellers.detail", opp_id=result["opportunity_id"]))
         except ValidationError as e:
             errors = e.errors

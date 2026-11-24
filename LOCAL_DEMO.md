@@ -11,7 +11,7 @@ C:\Users\user\.venvs\teamos-m2\Scripts\python.exe run_local.py
 (`run_local.py` loads `.env` and refuses to start if APP_ENV=production.)
 The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's path is too long for pip on Windows.
 
-## Demo logins — password `Demo-Shastra-2026` (all synthetic, badged "demo")
+## Demo logins — password `Demo@123` (all synthetic, badged "demo")
 | Email | Role |
 |---|---|
 | founder@demo.salonshastra.test | Super Admin |
@@ -21,6 +21,15 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 | accounts@demo.salonshastra.test | Finance specialist |
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
+
+## Milestone 11 — pilot program, what to try
+1. Menu → **Pilot program**: counts by form status, filter by help area, upcoming calls with Vikas.
+2. Open **Mane Street Men's Salon** → **Pilot program** tab: needs ticked, form filled, SWOT approved and sent, call with
+   Vikas held, ₹5,000 salon visit paid, video shot. **Download PDF** to see the report the owner gets.
+3. Open **Lotus Women's Spa & Salon** → the SWOT is a draft: edit a line, **Approve report**, then **Send to the owner** —
+   WhatsApp opens with the message and private link. Open the link in another browser to see the owner's page and book
+   one of Vikas's free times (Pilot program → **Vikas's free times** to add more).
+4. On any other salon: tick help areas, **Send the form link**, or **Fill it for them** to try the 45-question form.
 
 ## Milestone 10 — what to try
 * **Tools & admin → Automations**: see what runs by itself; as Founder, pause one and switch it back on.

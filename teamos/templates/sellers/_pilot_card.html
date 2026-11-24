@@ -1,0 +1,13 @@
+{% if pilot is defined %}{% set rep = pilot_report %}
+<div class="card pilot-card">
+  <div class="card-h"><h2>Pilot program</h2><a class="small" href="{{ url_for('sellers.detail', opp_id=opp.id, tab='pilot') }}">Open →</a></div>
+  <p class="small">{% if pilot.help_areas %}<strong>Needs help with:</strong> {% for a in pilot.help_areas %}{{ P.HELP_LABELS[a] }}{{ ', ' if not loop.last }}{% endfor %}{% else %}<span class="muted">Help areas not ticked yet.</span>{% endif %}</p>
+  <div class="inline small">
+    <span class="badge {{ 'ok' if pilot.form_status == 'filled' else 'warn' if pilot.form_status in ('sent','not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[pilot.form_status] }}</span>
+    {% if rep %}<span class="badge {{ 'ok' if rep.sent_at else 'warn' }}">SWOT {{ 'sent' if rep.sent_at else 'approved' if rep.status == 'approved' else 'draft to check' }}</span>{% endif %}
+    {% if pilot_bookings %}{% set b = pilot_bookings[0] %}<span class="badge {{ 'ok' if b.status == 'done' else 'warn' if b.status in ('requested','booked') else 'grey' }}">Vikas: {{ {'requested': 'requested', 'booked': b.starts_at|ist('%d %b %I:%M %p') if b.starts_at else 'booked', 'done': 'call held', 'cancelled': 'cancelled', 'no_show': 'no-show'}[b.status] }}</span>{% endif %}
+    {% if pilot.chairpe_status != 'not_offered' %}<span class="badge {{ 'ok' if pilot.chairpe_status == 'paying' else 'warn' if pilot.chairpe_status in ('demo','trial') else 'grey' }}">ChairPe: {{ P.CHAIRPE_STATUS_LABELS[pilot.chairpe_status]|lower }}</span>{% endif %}
+    {% if pilot_consults %}{% set k = pilot_consults[0] %}<span class="badge {{ 'ok' if k.paid else 'warn' }}">Consultation ₹{{ '{:,}'.format(k.fee) }} {{ 'paid' if k.paid else 'unpaid' }}</span>{% endif %}
+  </div>
+</div>
+{% endif %}

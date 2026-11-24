@@ -461,3 +461,62 @@ code.copy { user-select: all; word-break: break-all; }
 .pause-box input[name=note] { width: 170px; padding: 4px 8px; font-size: 13px; }
 @media (max-width: 640px) { .auto-row { flex-wrap: wrap; } .auto-act { flex-basis: 100%; text-align: left; padding-left: 22px; } }
 
+
+/* ---- Pilot program (salon owners who want help) ---------------------------------------------------------- */
+.req { color: var(--bad); }
+.other-in { margin-top: 6px; max-width: 420px; }
+.chips.scale { align-items: center; }
+.scale-end { padding: 0 4px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; color: var(--text); }
+.kpi b { font-size: 22px; line-height: 1.1; }
+.kpi span { font-size: 12px; color: var(--muted); }
+a.kpi:hover, .kpi.on { border-color: var(--brand); }
+.kpi.on { background: var(--brand-tint); }
+.chip-link { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 13px; }
+.chip-link b { color: var(--muted); font-weight: 600; margin-left: 2px; }
+.chip-link.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.chip-link.on b { color: var(--brand-ink); }
+ul.plain { list-style: none; padding: 0; margin: 0; }
+ul.plain li { padding: 6px 0; border-top: 1px solid var(--line); }
+ul.plain li:first-child { border-top: 0; }
+.pilot-steps { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 0 0 14px; }
+.pilot-steps li a { display: inline-block; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13px; }
+.pilot-steps li.now a { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.pilot-steps li.done a { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+.mark-status { margin-top: 10px; flex-wrap: wrap; }
+.report-actions { flex-wrap: wrap; margin-bottom: 8px; }
+.report-actions form, .inline form { display: inline; }
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin: 10px 0 14px; }
+.score { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.score b.good { color: var(--ok); } .score b.mid { color: var(--warn); } .score b.low { color: var(--bad); }
+.swot-edit textarea { min-height: 120px; }
+.swot-edit.swot-strengths label { color: var(--ok); } .swot-edit.swot-weaknesses label { color: var(--bad); }
+.swot-edit.swot-opportunities label { color: var(--info); } .swot-edit.swot-threats label { color: var(--warn); }
+.step-edit { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.step-edit .form-grid { flex: 1; min-width: 0; }
+.step-no { flex: 0 0 26px; height: 26px; border-radius: 6px; background: var(--brand); color: var(--brand-ink); font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.booking { padding: 10px 0; border-top: 1px solid var(--line); }
+.booking:first-of-type { border-top: 0; }
+.booking.cancelled, .booking.no_show { opacity: .7; }
+.fee-table { border-collapse: collapse; margin: 4px 0; }
+.fee-table th, .fee-table td { padding: 4px 10px; border: 1px solid var(--line); text-align: left; }
+.msg-preview { width: 100%; font-family: inherit; }
+table.answers th { width: 45%; font-weight: 500; color: var(--muted); vertical-align: top; }
+.swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.swot-q h2 { margin-top: 0; }
+.swot-q ul { padding-left: 18px; margin: 0; }
+.swot-q li { margin: 4px 0; }
+.swot-strengths { background: #eaf6ef; } .swot-strengths h2 { color: #1f7a4d; }
+.swot-weaknesses { background: #fdecea; } .swot-weaknesses h2 { color: #b3261e; }
+.swot-opportunities { background: #e9f1fb; } .swot-opportunities h2 { color: #1d5fa8; }
+.swot-threats { background: #fff4de; } .swot-threats h2 { color: #9a6200; }
+.steps-list { padding-left: 20px; } .steps-list li { margin: 8px 0; }
+.slot-day { font-size: 14px; margin: 12px 0 4px; }
+@media (max-width: 640px) {
+  .swot-grid { grid-template-columns: 1fr; }
+  .step-edit { flex-direction: column; }
+  .kpi b { font-size: 18px; }
+}
+/* long checkbox labels inside a button row (e.g. "a colleague messaged this person… send anyway") wrap instead of overflowing */
+.inline > label.check { flex: 1 1 240px; min-width: 0; }

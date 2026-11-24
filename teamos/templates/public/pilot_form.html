@@ -1,0 +1,22 @@
+{% extends "public/layout.html" %}{% from "pilot/_questions.html" import sections %}
+{% block title %}Salon Shastra Pilot Program{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Salon Shastra Pilot Program</h1>
+  <p>This form helps us understand your salon’s current position, challenges, and opportunities so we can provide personalized solutions to help you grow.</p>
+  <p class="small">🔹 <strong>Please answer all questions honestly and in detail.</strong><br>🔹 <strong>It will take around 05-10 minutes to complete.</strong></p>
+  <p class="small muted"><span class="req">*</span> Indicates required question. Based on your answers we prepare a free SWOT report for your salon with clear next steps.</p>
+  {% if filled %}<p class="flash ok">We already have your answers — thank you! You can update them below and submit again.</p>{% endif %}
+  {% if errors %}<p class="flash error">Please check the highlighted answers.</p>{% endif %}
+</div>
+<form method="post" novalidate data-stepper>
+  <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
+  <div class="stepbar" hidden><div class="stepbar-fill"></div><span class="stepbar-text small"></span></div>
+  {{ sections(P, answers, errors) }}
+  <div class="card step" data-title="Submit"><h2>All done?</h2>
+    <p>Thank you for your time. Your answers are seen only by the Salon Shastra team and are used to prepare your report.</p>
+    <button class="btn primary">Submit</button></div>
+  <div class="stepnav" hidden><button type="button" class="btn" data-step="-1">Back</button>
+    <button type="button" class="btn primary" data-step="1">Next</button></div>
+</form>
+{% endblock %}

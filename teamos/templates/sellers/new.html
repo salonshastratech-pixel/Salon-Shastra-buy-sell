@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% from "macros.html" import csrf, err %}
-{% block title %}New seller lead{% endblock %}
+{% block title %}New salon owner{% endblock %}
 {% block content %}
-<div class="ph"><div><h1>New seller lead</h1><div class="sub">Quick screen for a first call. Don't chase full financials yet — the detailed intake comes later.</div></div></div>
+<div class="ph"><div><h1>New salon owner</h1><div class="sub">Quick screen for a first call. Don't chase full financials yet — the detailed intake comes later.</div></div></div>
 
 <form method="post" class="split">{{ csrf() }}{% if form.from_conv %}<input type="hidden" name="from_conv" value="{{ form.from_conv }}">{% endif %}
 <div>

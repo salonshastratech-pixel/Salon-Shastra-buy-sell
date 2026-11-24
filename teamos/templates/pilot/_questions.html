@@ -1,0 +1,31 @@
+{# The pilot program questions, one card per section (works as a step-by-step form on phones). #}
+{% macro question(q, answers, errors) %}{% set v = answers.get(q.key) %}
+<div class="field qf {{ 'has-err' if errors.get(q.key) }}">
+  <label for="q-{{ q.key }}" class="qlabel">{{ q.label }}{% if q.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  {% if q.hint %}<div class="help">{{ q.hint }}</div>{% endif %}
+  {% if q.kind == 'choice' %}{% set is_other = v and v not in q.options %}
+    <div class="chips" role="radiogroup">{% for o in q.options %}<label class="chip"><input type="radio" name="{{ q.key }}" value="{{ o }}" {{ 'checked' if v == o }}{% if loop.first %} id="q-{{ q.key }}"{% endif %}><span>{{ o }}</span></label>{% endfor %}
+    {% if q.other %}<label class="chip"><input type="radio" name="{{ q.key }}" value="__other" {{ 'checked' if is_other }}><span>Other</span></label>{% endif %}</div>
+    {% if q.other %}<input class="other-in" name="{{ q.key }}__other" maxlength="300" placeholder="Other — please write" aria-label="{{ q.label }} — other" value="{{ v[7:] if is_other and v.startswith('Other: ') else (v if is_other else '') }}">{% endif %}
+  {% elif q.kind == 'multi' %}{% set vals = v or [] %}{% set others = vals|select('string')|select('ne', '')|reject('in', q.options)|list %}
+    <div class="chips" role="group" aria-label="{{ q.label }}">{% for o in q.options %}<label class="chip"><input type="checkbox" name="{{ q.key }}" value="{{ o }}" {{ 'checked' if o in vals }}{% if loop.first %} id="q-{{ q.key }}"{% endif %}><span>{{ o }}</span></label>{% endfor %}</div>
+    {% if q.other %}<input class="other-in" name="{{ q.key }}__other" maxlength="300" placeholder="Other (short answer)" aria-label="{{ q.label }} — other" value="{{ (others[0][7:] if others and others[0].startswith('Other: ') else (others[0] if others else '')) }}">{% endif %}
+  {% elif q.kind in ('scale5', 'scale10') %}{% set top = 5 if q.kind == 'scale5' else 10 %}
+    <div class="chips scale" role="radiogroup">{% if top == 10 %}<span class="small muted scale-end">weak</span>{% endif %}{% for n in range(1, top + 1) %}<label class="chip"><input type="radio" name="{{ q.key }}" value="{{ n }}" {{ 'checked' if v|string == n|string }}{% if loop.first %} id="q-{{ q.key }}"{% endif %}><span>{{ n }}{{ '★' if top == 5 }}</span></label>{% endfor %}{% if top == 10 %}<span class="small muted scale-end">strong</span>{% endif %}</div>
+  {% elif q.kind == 'long' %}<textarea id="q-{{ q.key }}" name="{{ q.key }}" maxlength="2000" rows="2">{{ v or '' }}</textarea>
+  {% elif q.kind == 'money' %}<div class="inr"><span class="inr-sym">₹</span><input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="40" inputmode="decimal" placeholder="e.g. 45000 or 45k or 1.5L" data-inr></div><div class="inr-words help" aria-live="polite"></div>
+  {% elif q.kind == 'number' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="numeric">
+  {% elif q.kind == 'phone' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="tel" autocomplete="tel">
+  {% elif q.kind == 'email' %}<input id="q-{{ q.key }}" type="email" name="{{ q.key }}" value="{{ v or '' }}" maxlength="200" autocomplete="email">
+  {% else %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="300">{% endif %}
+  {% if errors.get(q.key) %}<div class="err">{{ errors[q.key] }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro sections(P, answers, errors) %}
+{% for sk, title, sub, qs in P.SECTIONS %}
+<div class="card step" data-title="{{ title }}"><h2>{{ title }}</h2>{% if sub %}<p class="small muted">{{ sub }}</p>{% endif %}
+  {% for q in qs %}{{ question(q, answers, errors) }}{% endfor %}
+</div>
+{% endfor %}
+{% endmacro %}

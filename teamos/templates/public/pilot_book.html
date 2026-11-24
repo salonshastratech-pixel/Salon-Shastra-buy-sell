@@ -1,0 +1,9 @@
+{% extends "public/layout.html" %}
+{% block title %}Book a call with {{ P.CONSULTANT_NAME }}{% endblock %}
+{% block content %}
+<div class="card"><h1>Book a call with {{ P.CONSULTANT_NAME }}</h1>
+  {% if done %}<p class="flash ok">Thank you! {{ P.CONSULTANT_NAME }} and our team have been told. We look forward to speaking with you.</p>{% endif %}
+  {% if error %}<p class="flash error">{{ error }}</p>{% endif %}
+  {% include "public/_pilot_slots.html" %}
+</div>
+{% endblock %}

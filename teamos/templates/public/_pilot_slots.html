@@ -1,0 +1,20 @@
+{% if booked %}
+<p class="flash ok">Your call with {{ P.CONSULTANT_NAME }} is {% if booked.starts_at %}booked for <strong>{{ booked.starts_at|ist('%A %d %b, %I:%M %p') }}</strong>{% else %}requested (you asked for: {{ booked.preferred_time }}) — our team will confirm the time with you{% endif %}.</p>
+{% else %}
+<form method="post" action="{{ url_for('public_pilot.book', token=token) }}" class="book-form">
+  <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
+  {% if slots %}
+  <p class="small muted">Pick a time that suits you (Indian time):</p>
+  {% set ns = namespace(day='') %}
+  <div class="slot-days">{% for s in slots %}{% set d = s.starts_at|ist('%A %d %b') %}{% if d != ns.day %}{% if ns.day %}</div>{% endif %}<h3 class="slot-day">{{ d }}</h3><div class="chips">{% set ns.day = d %}{% endif %}
+    <label class="chip"><input type="radio" name="slot_id" value="{{ s.id }}" required><span>{{ s.starts_at|ist('%I:%M %p') }} · {{ {'phone': 'Phone', 'video': 'Video call', 'office': 'At our office'}[s.mode] }}</span></label>{% endfor %}</div></div>
+  <div class="field"><label for="bk-note">Anything you want to discuss? (optional)</label><textarea id="bk-note" name="note" rows="2" maxlength="500"></textarea></div>
+  <button class="btn primary">Book this time</button>
+  {% else %}
+  <p>No open times are listed right now. Tell us when suits you and we will confirm.</p>
+  <div class="field"><label for="bk-pref">Which day and time suits you?</label><input id="bk-pref" name="preferred" maxlength="200" placeholder="e.g. Saturday after 3 pm" required></div>
+  <div class="field"><label for="bk-note">Anything you want to discuss? (optional)</label><textarea id="bk-note" name="note" rows="2" maxlength="500"></textarea></div>
+  <button class="btn primary">Request a call</button>
+  {% endif %}
+</form>
+{% endif %}

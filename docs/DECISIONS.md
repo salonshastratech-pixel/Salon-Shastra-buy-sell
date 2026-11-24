@@ -117,3 +117,14 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-69 | Customer progress link | Shows first name, reference, journey step, what we still need (plain wording), contact's first name and next contact date. Never prices, notes, scores, other parties, documents. 60 days; one live link per record; closed / do-not-contact records show nothing. | Founder | Proposed |
 | D-70 | TeamOS on phones | Installable from the browser (no app store). Only the app's look and an offline notice are stored on the phone; customer pages are never cached. | Founder | Proposed |
 | D-71 | Database hosting (Supabase) | Supabase project in Mumbai on the free plan; TeamOS connects directly (public Supabase API locked off). Only synthetic demo data until the founder approves moving pilot data with `scripts/copy_to_postgres.py --allow-real`. | Founder | Proposed |
+
+## Added in Milestone 11 — pilot program (proposals — pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-72 | Naming | "Sellers" is shown as **Salon Owners**; "wants to sell" is one of the help areas. Investors stay under Buyers & investors. | Founder | Proposed |
+| D-73 | SWOT report wording | Drafted by fixed rules from the answers (version `pilot-swot rules v1`); staff must approve before it can be sent. Scores are a guide, not an audit. | Founder | Proposed |
+| D-74 | Consultation fees | Office ₹3,000 / salon visit ₹5,000 within Hyderabad; ₹10,000 outside Hyderabad; free video by Vikas with every paid consultation. Recorded in TeamOS; no online payment yet. | Founder | Proposed |
+| D-75 | Booking alerts | Bookings alert the chosen consultant user (in-app + e-mail) and the record owner. Times within the next 2 hours can't be booked online. | Founder | Proposed |
+| D-76 | Demo password | All synthetic demo logins use `Demo@123` (founder's request). Real staff accounts keep their own passwords. | Founder | Proposed |
+| D-77 | ChairPe in the pilot program | Prices and trial terms copied from chairpe.com on 24 Nov 2026 (TeamOS does not take ChairPe payments; the team records plan and months). Plan suggestion: Basic for 1-2 chairs and 2 or fewer staff, else Elite. Trial reminder 2 days before the 14-day trial ends. | Founder | Proposed |
