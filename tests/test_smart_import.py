@@ -178,7 +178,7 @@ def test_seller_sheet_import_end_to_end_through_the_screens(app, db, login):
 
 
 def test_only_import_role_and_nothing_relevant_is_refused(app, db, login):
-    assert login("seller@t.test").post("/imports/smart", {"file": (io.BytesIO(workbook()), "x.xlsx")},
+    assert login("fin@t.test").post("/imports/smart", {"file": (io.BytesIO(workbook()), "x.xlsx")},
                                        content_type="multipart/form-data").status_code == 403
     wb = Workbook()
     wb.active.title = "Lists"

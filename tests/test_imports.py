@@ -19,9 +19,9 @@ def upload(c, content=CSV, name="leads.csv"):
                     content_type="multipart/form-data")
 
 
-def test_team_member_cannot_import(login):
-    r = upload(login("seller@t.test"))
-    assert r.status_code == 403
+def test_finance_cannot_import_team_can(login):
+    assert upload(login("fin@t.test")).status_code == 403
+    assert upload(login("seller@t.test")).status_code != 403  # D-85: team = everything except Finance
 
 
 def test_uat03_import_preview_flags_duplicates_and_invalid_without_writing(login, db):

@@ -62,9 +62,12 @@ ID_TYPES = {
 
 
 class Database:
-    def __init__(self, url: str):
+    def __init__(self, url: str, conn=None):
         self.url = url
-        if url.startswith("sqlite:///"):
+        self.pooled = False
+        if conn is not None:  # a pooled PostgreSQL connection being reused
+            self.dialect, self.conn, self.pooled = "postgres", conn, True
+        elif url.startswith("sqlite:///"):
             self.dialect = "sqlite"
             path = url[len("sqlite:///"):]
             if path != ":memory:":
@@ -135,7 +138,9 @@ class Database:
         marks = ", ".join("?" for _ in values)
         sql = f"INSERT INTO {table} ({cols}) VALUES ({marks})"
         if self.dialect == "postgres":
-            return self.execute(sql + " RETURNING id", values.values()).fetchone()["id"]
+            # RETURNING * also works for tables keyed without an id column (field_provenance, buyer_preferences …)
+            row = self.execute(sql + " RETURNING *", values.values()).fetchone()
+            return row.get("id") if row else None
         return self.execute(sql, values.values()).lastrowid
 
     def update(self, table: str, row_id: int, values: dict) -> None:
@@ -161,15 +166,73 @@ class Database:
         self.conn.close()
 
 
+# -- PostgreSQL connection reuse ------------------------------------------------------------------------------
+# Opening an encrypted connection to a hosted database (Supabase) costs several network round trips — about half a
+# second from Render Singapore to Supabase Mumbai. Each server process keeps a few idle connections and reuses them.
+# A connection idle for more than a minute is checked before reuse (the pooler may have dropped it); one that is in
+# the middle of a transaction, or broken, is closed instead of being reused.
+import threading as _threading  # noqa: E402
+import time as _time  # noqa: E402
+
+_POOL: dict[str, list] = {}
+_POOL_LOCK = _threading.Lock()
+POOL_MAX = int(os.environ.get("DB_POOL_MAX", "6"))
+POOL_RECHECK_SECONDS = 60
+
+
+def _take_pg(url: str):
+    while True:
+        with _POOL_LOCK:
+            idle = _POOL.get(url) or []
+            item = idle.pop() if idle else None
+        if item is None:
+            return None
+        conn, last_used = item
+        try:
+            if conn.closed:
+                continue
+            if _time.monotonic() - last_used > POOL_RECHECK_SECONDS:
+                conn.execute("SELECT 1")
+            return conn
+        except Exception:  # noqa: BLE001 — a dropped connection: discard and try the next one / a new one
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def _give_pg(db: "Database") -> None:
+    conn = db.conn
+    try:
+        import psycopg  # type: ignore
+        ok = (not conn.closed and db._tx_depth == 0
+              and conn.info.transaction_status == psycopg.pq.TransactionStatus.IDLE)
+    except Exception:  # noqa: BLE001
+        ok = False
+    if ok:
+        with _POOL_LOCK:
+            idle = _POOL.setdefault(db.url, [])
+            if len(idle) < POOL_MAX:
+                idle.append((conn, _time.monotonic()))
+                return
+    conn.close()
+
+
 def get_db() -> Database:
     if "db" not in g:
-        g.db = Database(current_app.config["DATABASE_URL"])
+        url = current_app.config["DATABASE_URL"]
+        conn = _take_pg(url) if url.startswith(("postgresql://", "postgres://")) else None
+        g.db = Database(url, conn=conn) if conn is not None else Database(url)
     return g.db
 
 
 def close_db(_exc=None):
     db = g.pop("db", None)
-    if db is not None:
+    if db is None:
+        return
+    if db.dialect == "postgres":
+        _give_pg(db)
+    else:
         db.close()
 
 

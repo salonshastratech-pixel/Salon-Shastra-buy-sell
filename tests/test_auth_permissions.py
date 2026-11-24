@@ -60,24 +60,17 @@ def test_team_members_share_operational_visibility(login, db):
     assert login("buyer@t.test").get(f"/sellers/{opp_id}").status_code == 200
 
 
-def test_restricted_fields_masked_for_non_owner(login, db, app):
+def test_restricted_fields_visible_to_team_not_to_finance(login, db, app):
+    # D-85 (24 Nov 2026): the whole team can do everything except Finance — including restricted seller fields.
     owner = login("seller@t.test")
     owner.post("/sellers/new", SELLER_FORM)
     opp_id = db.scalar("SELECT id FROM opportunities")
     owner.post(f"/sellers/{opp_id}/section/reason", {"sale_reason": "personal",
                                                      "sale_reason_note": "PRIVATE-DEBT-CONTEXT"})
-    owner.post(f"/sellers/{opp_id}/section/commercial", {"negotiable": "yes", "negotiable_min_price": "17L"})
     assert b"PRIVATE-DEBT-CONTEXT" in owner.get(f"/sellers/{opp_id}?tab=intake").data
-    other = login("buyer@t.test")
-    page = other.get(f"/sellers/{opp_id}?tab=intake").data
-    assert b"PRIVATE-DEBT-CONTEXT" not in page
-    assert b"negotiable_min_price" not in page
-    hist = other.get(f"/sellers/{opp_id}?tab=history").data
-    assert b"PRIVATE-DEBT-CONTEXT" not in hist and b"1700000" not in hist
-    # and cannot overwrite it by posting the field
-    other.post(f"/sellers/{opp_id}/section/reason", {"sale_reason": "personal", "sale_reason_note": "overwritten"})
-    assert db.scalar("SELECT sale_reason_note FROM seller_listings") == "PRIVATE-DEBT-CONTEXT"
-    assert login("admin@t.test").get(f"/sellers/{opp_id}?tab=intake").data.count(b"PRIVATE-DEBT-CONTEXT") == 1
+    assert b"PRIVATE-DEBT-CONTEXT" in login("buyer@t.test").get(f"/sellers/{opp_id}?tab=intake").data
+    fin = login("fin@t.test").get(f"/sellers/{opp_id}?tab=intake")
+    assert fin.status_code in (302, 403) and b"PRIVATE-DEBT-CONTEXT" not in fin.data
 
 
 def test_scoped_grant_unlocks_restricted_fields_for_one_record(login, db):
@@ -90,7 +83,7 @@ def test_scoped_grant_unlocks_restricted_fields_for_one_record(login, db):
     assert b"SECRET" in login("buyer@t.test").get(f"/sellers/{opp_id}?tab=intake").data
 
 
-def test_uat08_staff_cannot_approve_listing_admin_can(login, db):
+def test_team_can_approve_listing_finance_cannot(login, db):
     staff = login("seller@t.test")
     staff.post("/sellers/new", SELLER_FORM)
     opp_id = db.scalar("SELECT id FROM opportunities")
@@ -98,22 +91,18 @@ def test_uat08_staff_cannot_approve_listing_admin_can(login, db):
     for key, _ in S.LISTING_CHECKLIST:
         db.execute("UPDATE listing_checklist SET status = 'reviewed' WHERE listing_id = ? AND item_key = ?",
                    (listing_id, key))
-    r = staff.post(f"/sellers/{opp_id}/decision", {"decision": "approved"})
-    assert r.status_code == 403
-    assert db.scalar("SELECT approval_state FROM seller_listings") == "draft"
-    assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE action = 'listing.decide' AND outcome = 'denied'") == 1
-    login("admin@t.test").post(f"/sellers/{opp_id}/decision", {"decision": "approved"})
+    r = login("fin@t.test").post(f"/sellers/{opp_id}/decision", {"decision": "approved"})
+    assert r.status_code in (302, 403) and db.scalar("SELECT approval_state FROM seller_listings") == "draft"
+    staff.post(f"/sellers/{opp_id}/decision", {"decision": "approved"})   # D-85: team members can approve
     assert db.scalar("SELECT approval_state FROM seller_listings") == "approved"
     assert db.scalar("SELECT stage FROM opportunities") == "listing_approved"
 
 
-def test_evidence_review_requires_reviewer(login, db):
+def test_team_can_review_evidence(login, db):
     staff = login("seller@t.test")
     staff.post("/sellers/new", SELLER_FORM)
     opp_id = db.scalar("SELECT id FROM opportunities")
-    r = staff.post(f"/sellers/{opp_id}/evidence", {"field_key": "asking_price", "status": "verified"})
-    assert r.status_code == 403
-    login("lead@t.test").post(f"/sellers/{opp_id}/evidence", {"field_key": "asking_price", "status": "verified"})
+    staff.post(f"/sellers/{opp_id}/evidence", {"field_key": "asking_price", "status": "verified"})
     assert db.scalar("SELECT evidence_status FROM field_provenance WHERE field_key = 'asking_price'") == "verified"
 
 

@@ -272,10 +272,12 @@ def save_response(db, opp, answers, source, actor_id=None) -> int:
                        ("Investor" if source == "link" else "Team (on the investor's behalf)")
                        + " filled the investor form — readiness report draft ready; next: call with Vikas")
         draft_report(db, opp["id"], rid, actor_id)
+        sync_to_mandate(db, opp["id"], answers, actor_id)
         T.notify(db, opp.get("primary_owner_id"), "investor_form",
                  f"Investor form filled: {opp.get('contact_name') or opp.get('ref_code')} — book the call with Vikas",
                  f"/buyers/{opp['id']}?tab=investor")
         audit.record(db, actor_id, "investor.form_filled", "opportunity", opp["id"], {"source": source})
+    P.rescore_matches(db, "buyer", opp["id"])
     return rid
 
 
@@ -641,3 +643,168 @@ def overview(db, verdict: str = "") -> dict:
 
 def _clean(s):
     return re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+# -- Public (open) Investor form ----------------------------------------------------------------------------------------
+GOAL_TO_NEED = {"Buy a running salon": "acquire_operating", "Open a new salon": "new_salon",
+                "Take a franchise": "franchise", "Invest money only — someone else runs it": "passive_invest",
+                "Wants advice / support only, not investing yet": "exploring", "Just exploring": "exploring"}
+START_TO_WINDOW = {"Within 3 months": "90d", "3–6 months": "180d", "6–12 months": "later", "Just exploring": "later"}
+
+
+def screen_from_form(a: dict) -> dict:
+    """The 5 screening answers, read from the investor's own form (the team can correct them after the call)."""
+    goal = {"Buy a running salon": "buy_running", "Open a new salon": "new_salon", "Take a franchise": "franchise",
+            "Invest money only — someone else runs it": "invest_only",
+            "Wants advice / support only, not investing yet": "support_only", "Just exploring": "exploring"}.get(
+        a.get("goal"), "exploring")
+    total = P.parse_amount(a.get("total_budget"))
+    budget = ("unknown" if not total else "lt5" if total < 5e5 else "5_15" if total < 15e5 else "15_30"
+              if total < 30e5 else "30_60" if total < 60e5 else "60p")
+    src = a.get("source") or []
+    ready = a.get("money_ready") or ""
+    loan = any("loan" in s.lower() for s in src)
+    if loan:
+        money = "loan_plan" if ready in ("Not arranged yet", "In 3–6 months") else "loan_ok"
+    elif "Own savings" in src:
+        money = "savings_ready" if ready == "Ready now" else "savings_soon" if ready else "unsure"
+    elif src:
+        money = "family" if ready != "Not arranged yet" else "unsure"
+    else:
+        money = "unsure"
+    runway = {"Yes — 6 months or more": "yes", "Partly — 3 to 6 months": "partly", "Less than 3 months": "partly",
+              "No — it must run from sales": "no"}.get(a.get("runway"), "never_thought")
+    days = a.get("days_per_week") or ""
+    operator = ("manager" if goal == "invest_only" or days == "Only weekends / remotely" else
+                "me_full" if days == "Every day, full-time" else "me_part" if days else "undecided")
+    return {"goal": goal, "budget": budget, "money": money, "runway": runway, "operator": operator}
+
+
+def submit_public(db, answers: dict, consent: bool) -> int:
+    """Create the buyer/investor record from the open Investor form, pre-screen it (Pursue / Nurture / Not now from
+    their own answers), save the answers and draft the readiness report."""
+    from . import buyers as B
+    total = P.parse_amount(answers.get("total_budget"))
+    payload = {"full_name": answers.get("full_name"), "phone": answers.get("phone"), "city": answers.get("city"),
+               "locality": re.split(r"[,/;]", answers.get("areas") or "")[0].strip()[:80], "email": answers.get("email"),
+               "need_type": GOAL_TO_NEED.get(answers.get("goal"), "exploring"),
+               "all_in_max": str(int(total)) if total else "",
+               "purchase_window": START_TO_WINDOW.get(answers.get("start_when"), "later"),
+               "preferred_city": answers.get("city"), "consent_contact": "1" if consent else ""}
+    with db:
+        opp_id = B.submit_respondent_form(db, payload, source="landing_page")
+        db.execute("UPDATE opportunities SET source_detail = ? WHERE id = ?", ("Investor form (public)", opp_id))
+        opp = B.load(db, opp_id)
+        scr = screen_from_form(answers)
+        res = screen_result(scr)
+        _upsert(db, opp_id, None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
+                                   "screen_verdict": res["verdict"], "screen_note": "From the investor's own form — "
+                                   "confirm on the call.", "screened_at": now_iso()})
+        save_response(db, opp, answers, "link")
+    return opp_id
+
+
+# -- Form → buyer requirements ------------------------------------------------------------------------------------
+# The investor's answers fill the buyer record's requirement fields that are still EMPTY (never overwriting what the
+# team entered), add the areas they named as preferred localities and the salon type as a format preference — so the
+# Match Desk can score them against salon owners straight away.
+SIZE_TO_CHAIRS = {"2–4 chairs": (2, 4), "5–8 chairs": (5, 8), "9–12 chairs": (9, 12), "More than 12": (12, None)}
+TYPE_TO_FORMAT = {"Unisex": "unisex", "Family salon": "unisex", "Men's salon": "men",
+                  "Women's salon / beauty parlour": "women"}
+TYPE_TO_POSITIONING = {"Luxury / premium": "premium"}
+
+
+def mandate_values_from_answers(a: dict) -> dict:
+    out = {"need_type": GOAL_TO_NEED.get(a.get("goal")),
+           "purchase_window": START_TO_WINDOW.get(a.get("start_when")),
+           "preferred_city": (a.get("city") or "").strip() or None,
+           "decision_timeline": a.get("start_when")}
+    total = P.parse_amount(a.get("total_budget"))
+    if total and total >= 50000:
+        out["all_in_max"] = int(total)
+    decision = a.get("decision") or ""
+    out["decision_maker"] = {"Only me": "yes"}.get(decision, "shared" if decision else None)
+    out["investor_type"] = ("partnership" if decision.startswith("My partners") else "individual" if decision else None)
+    exp = a.get("salon_experience") or ""
+    out["salon_background"] = ("operator" if exp.startswith("I own") else "industry_other" if exp.startswith("I ")
+                               else "none" if exp else None)
+    src = a.get("source") or []
+    loan = [s for s in src if "loan" in s.lower()]
+    if src:
+        out["funding_source"] = ("loan" if loan and len(loan) == len(src) else "mixed" if loan and len(src) > 1
+                                 else "investor_group" if src == ["Partners / friends"] else "self"
+                                 if len(src) == 1 else "mixed")
+        if not loan:
+            out["finance_dependence"] = "none"
+        else:
+            amt = P.parse_amount(a.get("loan_amount"))
+            out["finance_dependence"] = "full" if (len(loan) == len(src) or (amt and total and amt >= 0.7 * total)) \
+                else "partial"
+    ready = a.get("money_ready") or ""
+    out["cash_ready"] = "now" if ready == "Ready now" else "planned" if ready else None
+    if ready == "Ready now" and total:
+        out["cash_ready_amount"] = int(total)
+    days = a.get("days_per_week") or ""
+    out["involvement"] = ("absentee" if out["need_type"] == "passive_invest" or days == "Only weekends / remotely"
+                          else "owner_operator" if days == "Every day, full-time" else "partly" if days else None)
+    lo, hi = SIZE_TO_CHAIRS.get(a.get("size"), (None, None))
+    out["chairs_min"], out["chairs_max"] = lo, hi
+    if a.get("need_help"):
+        out["transition_support_need"] = "yes"
+    return {k: v for k, v in out.items() if v not in (None, "")}
+
+
+def sync_to_mandate(db, opp_id: int, answers: dict, actor_id=None) -> list[str]:
+    from . import buyer_fields as BF
+    from . import buyers as B
+    from . import sellers as S
+    m = db.one("SELECT * FROM buyer_mandates WHERE opportunity_id = ?", (opp_id,))
+    if not m:
+        return []
+    prov = B.provenance(db, m["id"])
+    fill = {}
+    for k, v in mandate_values_from_answers(answers).items():
+        fd = BF.BY_KEY.get(k)
+        if not fd or m.get(k) not in (None, "") or k in prov:
+            continue
+        if fd.ftype == "enum" and v not in [o[0] for o in fd.options]:
+            continue
+        try:
+            fill[k] = (S._parse_one(fd, str(v)), "value")
+        except ValueError:
+            continue
+    changed = B._apply_values(db, actor_id, m["id"], fill, source="investor_form", evidence="buyer_declared") \
+        if fill else []
+    labels = [BF.BY_KEY[k].label for k in changed]
+    # preferred areas: add the ones not listed yet (nothing the team listed or excluded is changed)
+    city = (answers.get("city") or m.get("preferred_city") or "").strip()
+    areas = [x.strip() for x in re.split(r"[,/;]| and ", answers.get("areas") or "") if 2 <= len(x.strip()) <= 60]
+    listed = {r["locality"].lower() for r in db.all("SELECT locality FROM buyer_localities WHERE mandate_id = ?",
+                                                    (m["id"],))}
+    new_areas = [x for x in dict.fromkeys(areas[:8]) if x.lower() not in listed]
+    if city and new_areas:
+        rank = db.scalar("SELECT MAX(rank_order) FROM buyer_localities WHERE mandate_id = ? AND kind = 'preferred'",
+                         (m["id"],)) or 0
+        for loc in new_areas:
+            rank += 1
+            db.insert("buyer_localities", {"mandate_id": m["id"], "kind": "preferred", "city": city, "locality": loc,
+                                           "rank_order": rank, "note": "From the investor form", "added_by": actor_id,
+                                           "added_at": now_iso()})
+        labels.append("preferred areas")
+    types = answers.get("salon_type") or []
+    types = [types] if isinstance(types, str) else types
+    wanted = [("gender_format", TYPE_TO_FORMAT[t]) for t in types if t in TYPE_TO_FORMAT] +              [("positioning", TYPE_TO_POSITIONING[t]) for t in types if t in TYPE_TO_POSITIONING]
+    have = {r["dimension"] for r in db.all("SELECT dimension FROM buyer_preferences WHERE mandate_id = ?", (m["id"],))}
+    version = db.scalar("SELECT data_version FROM buyer_mandates WHERE id = ?", (m["id"],)) + 1
+    added = False
+    for dim, choice in dict.fromkeys(wanted):
+        if dim not in have and B._set_importance(db, actor_id, m["id"], dim, choice, "prefer", version):
+            added = True
+    if added:
+        labels.append("salon format preference")
+    if labels and len(labels) > len(changed):
+        B._bump(db, m["id"])
+    if labels:
+        T.add_activity(db, actor_id, "opportunity", opp_id, "data_update",
+                       "Filled from the investor form (empty fields only): " + ", ".join(labels))
+    return labels

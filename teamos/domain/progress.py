@@ -256,7 +256,7 @@ def pick_owner(db, team: str, load: dict | None = None) -> int | None:
     load = {} if load is None else load
     from .availability import away_ids
     on_leave = away_ids(db)
-    people = [p for p in db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND team = ? AND role IN "
+    people = [p for p in db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND team IN (?, 'general') AND role IN "
                                 "('team_member','team_lead') ORDER BY id", (team,)) if not is_away(p) and p["id"] not in on_leave]
     if not people:
         return None

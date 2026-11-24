@@ -53,7 +53,8 @@ def test_team_teaches_a_phrase(db, login):
     assert r("Nenu chusi chepta annaru", db)["meanings"].get("thinking")
     page = lead.get("/imports/remarks?t=nenu+chusi+chepta").data.decode()
     assert "Still thinking" in page and "nenu chusi chepta" in page
-    assert login("seller@t.test").post("/imports/remarks", {"phrase": "abc def", "meaning": "busy"}).status_code == 403
+    assert login("fin@t.test").post("/imports/remarks", {"phrase": "abc def", "meaning": "busy"}).status_code in (302, 403)
+    assert not r("abc def", db)["meanings"].get("busy")
 
 
 PILOT_HDR = [q["label"] for q in P.QUESTIONS if not q["extra"]] + ["Remarks", "Column 1 2", "software ",

@@ -1,0 +1,25 @@
+{% extends "public/layout.html" %}{% from "pilot/_questions.html" import sections %}
+{% block title %}{{ meta.title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ meta.title }}</h1>
+  <p>{{ meta.intro }}</p>
+  <p class="small">🔹 <strong>Please answer honestly and in detail.</strong><br>🔹 <strong>It takes {{ meta.time }}.</strong></p>
+  <p class="small muted"><span class="req">*</span> Required question. Your answers are seen only by the Salon Shastra team.</p>
+  {% if errors %}<p class="flash error">{{ errors.get('_') or 'Please check the highlighted answers.' }}</p>{% endif %}
+</div>
+<form method="post" novalidate data-stepper>
+  <input type="hidden" name="form_token" value="{{ form_token }}">
+  <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
+  <div class="stepbar" hidden><div class="stepbar-fill"></div><span class="stepbar-text small"></span></div>
+  {{ sections(Q, answers, errors) }}
+  <div class="card step" data-title="Submit"><h2>All done?</h2>
+    <label class="check {{ 'has-err' if errors.get('consent_contact') }}"><input type="checkbox" name="consent_contact" value="1" {{ 'checked' if request.form.get('consent_contact') }}> Salon Shastra may contact me by phone or WhatsApp about my answers.</label>
+    {% if errors.get('consent_contact') %}<div class="err">{{ errors.consent_contact }}</div>{% endif %}
+    {% for k in ['full_name', 'phone', 'city'] if errors.get(k) %}<div class="err">{{ errors[k] }}</div>{% endfor %}
+    <p class="small muted">Thank you for your time. Nothing is shared outside Salon Shastra without your permission.</p>
+    <button class="btn primary">Submit</button></div>
+  <div class="stepnav" hidden><button type="button" class="btn" data-step="-1">Back</button>
+    <button type="button" class="btn primary" data-step="1">Next</button></div>
+</form>
+{% endblock %}

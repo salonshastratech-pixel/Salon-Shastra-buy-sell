@@ -1,10 +1,10 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line with context %}
+{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line, investor_badge with context %}
 {% block title %}Match {{ c.buyer_ref }} ↔ {{ c.seller_ref }}{% endblock %}
 {% block content %}
 {% set back = request.path %}
 <div class="ph"><div>
   <h1><a href="{{ url_for('buyers.detail', opp_id=c.buyer_opp_id) }}">{{ c.buyer_name }}</a> <span class="muted">↔</span> <a href="{{ url_for('sellers.detail', opp_id=c.seller_opp_id) }}">{{ c.salon_name }}</a></h1>
-  <div class="inline sub">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span> <span class="badge info">{{ M.STAGES[c.stage] }}</span>
+  <div class="inline sub">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span> {{ investor_badge(c) }} <span class="badge info">{{ M.STAGES[c.stage] }}</span>
     {% if c.stale %}<span class="badge warn">Facts changed since scoring</span>{% endif %}
     <span class="small muted">{{ c.salon_locality }}, {{ c.salon_city }} · scored {{ c.computed_at|rel }}</span></div>
 </div>

@@ -1,5 +1,5 @@
 {# Matches tab for a buyer (ranked salons, UAT-38) or a seller (ranked buyers, UAT-37). Expects match_rows, M, opp. #}
-{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line with context %}
+{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line, investor_badge with context %}
 <div class="card">
   <div class="card-h"><h2>{{ 'Salons for this buyer' if opp.kind == 'buyer' else 'Buyers for this salon' }}</h2>
     <form method="post" action="{{ url_for('matches.recompute') }}">{{ csrf() }}<input type="hidden" name="{{ opp.kind }}" value="{{ opp.id }}"><input type="hidden" name="force" value="1"><button class="btn sm">Re-score</button></form></div>
@@ -15,7 +15,7 @@
       <div class="small muted">{% if opp.kind == 'buyer' %}{{ c.salon_locality }}, {{ c.salon_city }} · {% endif %}{{ money_line(c) }}</div></div>
     {{ scores(c) }}
   </div>
-  <div class="mc-badges">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span>
+  <div class="mc-badges">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span> {{ investor_badge(c) }}
     {% if c.stage != 'suggested' %}<span class="badge info">{{ M.STAGES[c.stage] }}</span>{% endif %}</div>
   <div class="mc-why">{{ c.headline }}</div>
   {% if c.next_question and not c.suppressed %}<div class="mc-next">Next: {{ c.next_question }}</div>{% endif %}

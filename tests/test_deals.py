@@ -99,7 +99,8 @@ def test_uat15_introduction_needs_consent_and_approver_and_logs_exactly_what_was
     assert db.scalar("SELECT COUNT(*) FROM deals") == 0
     for side in ("buyer", "seller"):
         m.post(f"/deals/match/{cid}/consent", {"side": side, "method": "call"})
-    assert m.post(f"/deals/introductions/{iid}", {"decision": "approved"}).status_code == 403  # approver only
+    assert login("fin@t.test").post(f"/deals/introductions/{iid}", {"decision": "approved"}).status_code in (302, 403)
+    assert db.scalar("SELECT status FROM introductions WHERE id = ?", (iid,)) != "approved"
     admin.post(f"/deals/introductions/{iid}", {"decision": "approved"})
     intro = db.one("SELECT * FROM introductions WHERE id = ?", (iid,))
     shared, consents = json.loads(intro["details_shared"]), json.loads(intro["consent_snapshot"])

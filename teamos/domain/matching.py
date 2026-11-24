@@ -805,13 +805,14 @@ CAND_SELECT = (
     "bu.full_name AS buyer_owner, bo.last_contact_at AS buyer_last_contact, bo.status AS buyer_status, "
     "so.ref_code AS seller_ref, sb.name AS salon_name, sb.locality AS salon_locality, sb.city AS salon_city, "
     "so.primary_owner_id AS seller_owner_id, su.full_name AS seller_owner, so.last_contact_at AS seller_last_contact, "
-    "so.status AS seller_status, mu.full_name AS match_owner, "
+    "so.status AS seller_status, mu.full_name AS match_owner, ip.screen_verdict AS investor_verdict, "
+    "ip.form_status AS investor_form, "
     "(SELECT COUNT(*) FROM tasks t WHERE t.status = 'open' AND t.parent_task_id IN "
     " (SELECT id FROM tasks p WHERE p.entity_type = 'match' AND p.entity_id = mc.id)) AS open_tasks "
     "FROM match_candidates mc JOIN opportunities bo ON bo.id = mc.buyer_opp_id JOIN contacts bc ON bc.id = bo.contact_id "
     "JOIN opportunities so ON so.id = mc.seller_opp_id LEFT JOIN salon_businesses sb ON sb.id = so.business_id "
     "LEFT JOIN users bu ON bu.id = bo.primary_owner_id LEFT JOIN users su ON su.id = so.primary_owner_id "
-    "LEFT JOIN users mu ON mu.id = mc.match_owner_id ")
+    "LEFT JOIN users mu ON mu.id = mc.match_owner_id LEFT JOIN investor_profiles ip ON ip.opportunity_id = mc.buyer_opp_id ")
 ACTIVE_WHERE = "bo.status = 'active' AND so.status = 'active' "
 
 QUEUES = {  # key: (label, SQL condition)

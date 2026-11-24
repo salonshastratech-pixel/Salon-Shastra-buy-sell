@@ -29,3 +29,5 @@ vs {{ c.buyer_ceiling|inr if c.buyer_ceiling is not none else '?' }} ceiling
   {%- else %} <span class="ok-text">({{ (0 - gap)|inr }} headroom)</span>{% endif %}
 {%- endif -%}
 {%- endmacro %}
+
+{% macro investor_badge(c) %}{% set v = {'pursue': ('Investor: Pursue', 'ok'), 'nurture': ('Investor: Nurture', 'warn'), 'not_now': ('Investor: Not now', 'bad')}.get(c.investor_verdict) %}{% if v %}<span class="badge {{ v[1] }}" title="From the 5 screening questions">{{ v[0] }}</span>{% endif %}{% if c.investor_form == 'filled' %}<span class="badge info">Investor form filled</span>{% endif %}{% endmacro %}

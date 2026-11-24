@@ -206,7 +206,8 @@ def test_uat45_batch_rechecks_consent_at_send_time(app, db, login):
     member, lead = login("buyer@t.test"), login("lead@t.test")
     r = member.post("/inbox/batches", {"name": "Callbacks", "template_key": "callback_request", "audience": "buyers_active"})
     bid = int(r.headers["Location"].rstrip("/").split("/")[-1])
-    assert member.post(f"/inbox/batches/{bid}", {"action": "approve"}).status_code == 403  # creator can't approve
+    assert login("fin@t.test").post(f"/inbox/batches/{bid}", {"action": "approve"}).status_code in (302, 403)
+    assert db.scalar("SELECT status FROM batches") != "approved"
     lead.post(f"/inbox/batches/{bid}", {"action": "approve"})
     assert db.scalar("SELECT status FROM batches") == "approved"
     with app.test_request_context():

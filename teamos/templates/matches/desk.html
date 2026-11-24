@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line with context %}
+{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "matches/_macros.html" import outcome_badge, gate_badge, scores, money_line, investor_badge with context %}
 {% block title %}Match Desk{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Match Desk</h1>
@@ -36,7 +36,7 @@
           <div class="small muted">{{ c.salon_locality }}, {{ c.salon_city }} · {{ money_line(c) }}</div></div>
         {{ scores(c) }}
       </div>
-      <div class="mc-badges">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span>
+      <div class="mc-badges">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span> {{ investor_badge(c) }}
         {% if c.stage != 'suggested' %}<span class="badge info">{{ M.STAGES[c.stage] }}</span>{% endif %}
         {% if c.red_flags %}<span class="badge bad">{{ c.red_flags }} red flag{{ 's' if c.red_flags > 1 }}</span>{% endif %}
         {% if c.stale %}<span class="badge warn">stale — re-score</span>{% endif %}

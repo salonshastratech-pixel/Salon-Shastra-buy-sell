@@ -236,6 +236,9 @@ def save_needs(db, actor, opp, data) -> None:
                        + (f"; other: {other}" if other else ""))
         audit.record(db, actor["id"], "pilot.needs", "opportunity", opp["id"], {"lead_type": lead_type,
                                                                                "areas": areas})
+        resp = latest_response(db, opp["id"])
+        sync_to_listing(db, opp["id"], resp["answers"] if resp else None, actor["id"])
+    rescore_matches(db, "seller", opp["id"])
 
 
 def set_form_status(db, actor, opp, status: str) -> None:
@@ -370,10 +373,12 @@ def save_response(db, opp: dict, answers: dict, source: str, actor_id=None, quie
         T.add_activity(db, actor_id, "opportunity", opp["id"], "system",
                        f"{who} filled the pilot program form — SWOT report draft ready to review")
         draft_report(db, opp["id"], rid, actor_id)
+        sync_to_listing(db, opp["id"], answers, actor_id)
         owner = None if quiet else opp.get("primary_owner_id")
         T.notify(db, owner, "pilot_form", f"Pilot form filled: {opp.get('salon_name') or opp.get('ref_code')} — "
                  "SWOT draft ready", f"/sellers/{opp['id']}?tab=pilot")
         audit.record(db, actor_id, "pilot.form_filled", "opportunity", opp["id"], {"source": source, "response": rid})
+    rescore_matches(db, "seller", opp["id"])
     return rid
 
 
@@ -1149,3 +1154,119 @@ def answers_from_sheet(raw: dict) -> dict:
         else:
             answers[key] = v[:2000]
     return answers if len(answers) >= 15 else {}
+
+
+# -- Public (open) Pilot Program form: anyone can fill it, e.g. from an ad --------------------------------------------
+def submit_public(db, answers: dict, consent: bool) -> int:
+    """Create the salon-owner record from the open Pilot Program form, save the answers and draft the SWOT report.
+    Same safeguards as the other public forms: never merged into an existing contact (possible duplicates go to the
+    review queue), owner-declared, with a high-priority review task for the team."""
+    from . import sellers as S
+    loc = (answers.get("location") or "").strip()
+    city, locality = (loc.split(",", 1)[1].strip(), loc.split(",", 1)[0].strip()) if "," in loc else (loc, loc)
+    payload = {"full_name": answers.get("owner_name"), "phone": answers.get("contact_number"),
+               "salon_name": answers.get("salon_name"), "city": city or loc, "locality": locality or loc,
+               "email": answers.get("email"), "consent_contact": "1" if consent else ""}
+    with db:
+        opp_id = S.submit_respondent_form(db, payload, source="landing_page")
+        db.execute("UPDATE opportunities SET source_detail = ? WHERE id = ?", ("Pilot Program form (public)", opp_id))
+        opp = db.one("SELECT o.*, c.full_name AS contact_name, b.name AS salon_name FROM opportunities o JOIN contacts c "
+                     "ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id WHERE o.id = ?",
+                     (opp_id,))
+        save_response(db, opp, answers, "link")
+    return opp_id
+
+
+# -- Form → salon-owner record ------------------------------------------------------------------------------------
+# The pilot form asks many of the same things the salon-owner record holds (size, floor, chairs, rent, sales, …).
+# Answers fill only fields that are still EMPTY — whatever the team has already entered is never overwritten.
+FLOOR_TO_LEVEL = {"ground floor": "ground", "1st floor": "first"}
+SALON_TYPE_TO_FORMAT = {"Unisex Salon": ("unisex", None), "Family Salon": ("unisex", "mid"),
+                        "High End Barber Salon(HEBS)": ("men", "premium"), "Mens Salon": ("men", None),
+                        "Luxury Beauty Salon": ("women", "luxury"), "Beauty Parlour": ("women", None)}
+
+
+def _num(v) -> int | None:
+    n = parse_amount(v)
+    return int(round(n)) if n is not None and n >= 0 else None
+
+
+def listing_values_from_answers(a: dict) -> dict:
+    """{seller field key: value} the pilot answers give."""
+    out = {}
+    for key, ans in (("carpet_area_sqft", "area_sft"), ("chairs", "chairs"), ("operating_years", "years_running"),
+                     ("avg_monthly_sales", "monthly_revenue"), ("avg_monthly_expenses", "monthly_expenses"),
+                     ("monthly_rent", "monthly_rent"), ("avg_monthly_bills", "monthly_customers")):
+        n = _num(a.get(ans))
+        if n is not None and (n > 0 or key == "operating_years"):
+            out[key] = n
+    if out.get("operating_years", 0) > 80:
+        out.pop("operating_years")
+    floor = str(a.get("floor") or "").strip().lower()
+    if floor:
+        out["floor_level"] = FLOOR_TO_LEVEL.get(floor, "upper" if "floor" in floor else None)
+    staff = sum(_num(a.get(k)) or 0 for k in ("hair_dressers", "beauticians"))
+    staff += sum(1 for k in ("manager", "housekeeping") if _yes(a.get(k)))
+    if staff:
+        out["staff_headcount"] = staff
+    fmt, pos = SALON_TYPE_TO_FORMAT.get(a.get("salon_type"), (None, None))
+    out["gender_format"], out["positioning"] = fmt, pos
+    if out.get("avg_monthly_sales") and out.get("avg_monthly_bills"):
+        out["avg_ticket"] = int(out["avg_monthly_sales"] / out["avg_monthly_bills"])
+    rating = re.search(r"\d(?:\.\d)?", str(a.get("google_rating") or ""))
+    if rating and 1 <= float(rating.group()) <= 5:
+        out["google_rating"] = rating.group()
+    if out.get("avg_monthly_sales") or out.get("operating_years"):
+        out["operating_status"] = "operating"
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def sale_purpose_for(help_areas: list[str]) -> str:
+    """Pilot-program owners want help unless the team ticked "Wants to sell the salon" — only sellers are matched
+    with buyers."""
+    return "sell_entire" if "sell_salon" in help_areas else "seek_help"
+
+
+def rescore_matches(db, kind: str, opp_id: int) -> None:
+    """Re-check this record's buyer/seller matches after a form fills it in. Never blocks the form itself."""
+    import logging
+    from . import matching as M
+    try:
+        M.refresh(db, **({"buyer_id": opp_id} if kind == "buyer" else {"seller_id": opp_id}))
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("match re-score after form failed (opp %s)", opp_id)
+
+
+def sync_to_listing(db, opp_id: int, answers: dict | None, actor_id=None) -> list[str]:
+    """Fill the salon-owner record's empty fields from the pilot answers and the help areas the team ticked.
+    Returns the field keys filled."""
+    from . import seller_fields as SF
+    from . import sellers as S
+    listing = db.one("SELECT * FROM seller_listings WHERE opportunity_id = ?", (opp_id,))
+    if not listing:
+        return []
+    prov = S.provenance(db, listing["id"])
+    vals = listing_values_from_answers(answers or {})
+    purpose = sale_purpose_for(profile(db, opp_id)["help_areas"])
+    if purpose:
+        vals["sale_purpose"] = purpose
+    fill = {}
+    for k, v in vals.items():
+        if k not in SF.BY_KEY or listing.get(k) not in (None, "") or k in prov:
+            continue
+        try:
+            fill[k] = (S._parse_one(SF.BY_KEY[k], str(v)), "value")
+        except ValueError:
+            continue
+    # the sell / help-only flag follows the ticks the team changes later, unless someone set it by hand
+    if purpose and listing.get("sale_purpose") in ("sell_entire", "seek_help") and listing["sale_purpose"] != purpose \
+            and (prov.get("sale_purpose") or {}).get("source") == "pilot_form":
+        fill["sale_purpose"] = (purpose, "value")
+    if not fill:
+        return []
+    changed = S._apply_values(db, {"id": actor_id}, listing["id"], fill, source="pilot_form")
+    if changed:
+        labels = ", ".join(SF.BY_KEY[k].label for k in changed)
+        T.add_activity(db, actor_id, "opportunity", opp_id, "data_update",
+                       f"Filled from the pilot form (empty fields only): {labels}")
+    return changed

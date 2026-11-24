@@ -77,9 +77,9 @@ def test_hand_over_moves_records_with_their_open_tasks_after_a_preview(db, login
                      "'open' AND assignee_id = ?", (s, shaheen["id"])) == 0
 
 
-def test_team_members_cannot_hand_over_others_work(db, login):
+def test_finance_cannot_hand_over_work(db, login):
     s = seller(db, approved=False)
-    r = login("buyer@t.test").post("/team/hand-over", {"from_id": user(db, "seller@t.test")["id"],
+    r = login("fin@t.test").post("/team/hand-over", {"from_id": user(db, "seller@t.test")["id"],
                                                        "to_ids": [user(db, "buyer@t.test")["id"]], "go": "1"})
     assert r.status_code == 403
     assert db.scalar("SELECT primary_owner_id FROM opportunities WHERE id = ?", (s,)) == user(db, "seller@t.test")["id"]
@@ -200,7 +200,7 @@ def test_menu_is_grouped_and_admin_tools_live_on_one_page(db, login):
     for t in ("Users &amp; access", "Integrations", "Audit log", "Spreadsheet import", "Match learning"):
         assert t in tools
     member = login("seller@t.test").get("/tools").data.decode()
-    assert "Audit log" not in member and "Field dictionary" in member
+    assert "Field dictionary" in member and "Users &amp; access" not in member  # D-85: team = everything except Finance
 
 
 def test_ai_connector_listed_and_off_by_default(db, login):

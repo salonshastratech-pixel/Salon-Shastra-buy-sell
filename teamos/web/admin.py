@@ -4,7 +4,10 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from .. import audit
 from ..db import get_db
 from ..domain.errors import ValidationError
-from ..permissions import CAPABILITIES, MATRIX_VERSION, ROLE_CAPABILITIES, ROLE_LABELS, user_can
+from ..permissions import CAPABILITIES, MATRIX_VERSION, ROLE_CAPABILITIES, ROLE_CHOICES, ROLE_LABELS, user_can
+
+TEAM_LABELS = {"general": "Both", "seller": "Salon owners", "buyer": "Buyers & investors", "finance": "Finance",
+               "admin": "Admin"}
 from ..security import hash_password, require, revoke_user_sessions, validate_password_strength
 from ..timeutil import now_iso, parse_local_input
 
@@ -19,7 +22,8 @@ def users():
     grants = db.all("SELECT gr.*, u.full_name AS granted_by_name FROM user_grants gr JOIN users u ON u.id = gr.granted_by "
                     "WHERE gr.revoked_at IS NULL ORDER BY gr.created_at DESC")
     return render_template("admin/users.html", rows=rows, grants=grants, CAPABILITIES=CAPABILITIES,
-                           ROLE_CAPABILITIES=ROLE_CAPABILITIES, ROLE_LABELS=ROLE_LABELS, MATRIX_VERSION=MATRIX_VERSION)
+                           ROLE_CAPABILITIES=ROLE_CAPABILITIES, ROLE_LABELS=ROLE_LABELS, MATRIX_VERSION=MATRIX_VERSION,
+                           ROLE_CHOICES=ROLE_CHOICES, TEAM_LABELS=TEAM_LABELS)
 
 
 @bp.route("/users", methods=["POST"])
@@ -35,6 +39,8 @@ def create_user():
         err = "Name and a valid email are required."
     elif role not in ROLE_LABELS:
         err = "Choose a role."
+    if role in ("finance", "super_admin") and team in ("seller", "buyer", "general"):
+        team = "finance" if role == "finance" else "admin"
     elif db.one("SELECT id FROM users WHERE email = ?", (email,)):
         err = "A user with that email already exists."
     else:

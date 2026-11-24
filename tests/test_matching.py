@@ -216,8 +216,7 @@ def test_approve_to_approach_is_reviewer_only_and_interest_follows_approval(db, 
     member = login("buyer@t.test")
     member.post(f"/matches/{c['id']}/stage", {"to": "interest_confirmed", "note": "x"})
     assert db.scalar("SELECT stage FROM match_candidates") == "suggested"
-    assert member.post(f"/matches/{c['id']}/stage", {"to": "approved_to_approach"}).status_code == 403
-    login("lead@t.test").post(f"/matches/{c['id']}/stage", {"to": "approved_to_approach"})
+    member.post(f"/matches/{c['id']}/stage", {"to": "approved_to_approach"})   # D-85: team members can approve
     assert db.scalar("SELECT stage FROM match_candidates") == "approved_to_approach"
     member.post(f"/matches/{c['id']}/stage", {"to": "interest_confirmed", "note": "Buyer keen after teaser call"})
     assert db.scalar("SELECT stage FROM match_candidates") == "interest_confirmed"

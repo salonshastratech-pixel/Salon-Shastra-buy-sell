@@ -84,11 +84,9 @@ def test_uat09_staff_data_entry_and_crafted_posts_cannot_set_funding(db, login):
     c.post(f"/buyers/{opp_id}/section/funding", {"funding_source": "self", "funding_status": "verified"})
     assert mandate(db, opp_id)["funding_status"] == "not_reviewed"
     assert mandate(db, opp_id)["funding_source"] == "self"  # the legitimate field still saved
-    # crafted reviewer action by a team member
-    r = c.post(f"/buyers/{opp_id}/funding", {"status": "verified", "note": "trust me"})
-    assert r.status_code == 403
-    assert mandate(db, opp_id)["funding_status"] == "not_reviewed"
-    assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE action = 'buyer.funding_review' AND outcome = 'denied'")
+    # D-85: team members record the funding review through its own audited action
+    c.post(f"/buyers/{opp_id}/funding", {"status": "staff_reviewed", "note": "Bank statement seen"})
+    assert mandate(db, opp_id)["funding_status"] == "staff_reviewed"
 
 
 # -- UAT-05 ----------------------------------------------------------------------------
@@ -149,9 +147,7 @@ def test_team_sees_funding_evidence_but_only_reviewers_record_the_review(db, log
     login("admin@t.test").post(f"/buyers/{opp_id}/funding", {"status": "verified", "note": "CA letter seen"})
     seller_exec = login("seller@t.test")
     assert b"CA letter seen" in seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
-    assert b"Record funding review" not in seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data
-    assert seller_exec.post(f"/buyers/{opp_id}/funding", {"status": "insufficient", "note": "x"}).status_code == 403
-    assert db.scalar("SELECT funding_status FROM buyer_mandates WHERE opportunity_id = ?", (opp_id,)) == "verified"
+    assert b"Record funding review" in seller_exec.get(f"/buyers/{opp_id}?tab=qualification").data  # D-85
     # a role without CRM access (finance) sees it only with an explicit per-case grant
     from teamos.domain import buyers as BB
     fin = user(db, "fin@t.test")
@@ -216,7 +212,6 @@ def test_ranked_localities_and_exclusions(db, login):
 def test_criteria_confirmation_goes_stale_when_requirements_change(db, login):
     c, opp_id = make_buyer(login)
     lead = login("lead@t.test")
-    assert c.post(f"/buyers/{opp_id}/confirm-criteria").status_code == 403  # team member is not a reviewer
     lead.post(f"/buyers/{opp_id}/confirm-criteria")
     m = mandate(db, opp_id)
     assert B.criteria_review_state(m) == "current"
@@ -235,7 +230,7 @@ def test_qualified_to_shortlist_needs_reviewed_funding_confirmed_criteria_and_a_
         m = mandate(db, opp_id)
         return B.check_transition(db, user(db, u), o, m, B.provenance(db, m["id"]), to)
 
-    assert why("buyer@t.test") == (False, "Only a reviewer can qualify a buyer to shortlist")
+    assert why("buyer@t.test")[1] == "Funding must be staff-reviewed or verified"  # D-85: team can qualify
     assert why("lead@t.test")[1] == "Funding must be staff-reviewed or verified"
     lead.post(f"/buyers/{opp_id}/funding", {"status": "staff_reviewed", "note": "Statement seen"})
     assert "confirmed by a reviewer" in why("lead@t.test")[1]

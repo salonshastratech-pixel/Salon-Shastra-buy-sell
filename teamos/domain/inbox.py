@@ -176,8 +176,9 @@ def set_team_number(db, actor, user_id: int, wa_number: str | None, number_id: s
         if number_id and (not number_id.isdigit() or len(number_id) < 6):
             raise ValidationError({"number_id": "Enter Meta's phone number ID (digits only, from WhatsApp Manager / API setup)."})
         nid = number_id or None  # number saved now; the Meta ID is added once the number is in Meta's account
-        clash = db.scalar("SELECT full_name FROM users WHERE id <> ? AND ((? IS NOT NULL AND wa_phone_number_id = ?) "
-                          "OR wa_number = ?)", (user_id, nid, nid, norm))
+        # (no "? IS NOT NULL": PostgreSQL cannot tell the type of a bare parameter)
+        clash = db.scalar("SELECT full_name FROM users WHERE id <> ? AND (wa_phone_number_id = ? OR wa_number = ?)",
+                          (user_id, nid or "-", norm))
         if clash:
             raise ValidationError({"number_id": f"That number is already connected to {clash}."})
     with db:

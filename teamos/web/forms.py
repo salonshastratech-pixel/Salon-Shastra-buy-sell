@@ -74,7 +74,9 @@ def inbox():
     base = __import__("teamos.messaging", fromlist=["public_base"]).public_base(request)
     return render_template("forms/inbox.html", pending=pending, open_links=open_links, reviewed=reviewed, comms=comms,
                            STATUS=F.STATUS_LABELS, public_links={"seller": f"{base}/f/seller",
-                                                                 "buyer": f"{base}/f/buyer"},
+                                                                 "buyer": f"{base}/f/buyer",
+                                                                 "pilot": f"{base}/f/pilot",
+                                                                 "investor": f"{base}/f/investor"},
                            MOCK_LABEL=messaging.PROVIDER_LABEL)
 
 

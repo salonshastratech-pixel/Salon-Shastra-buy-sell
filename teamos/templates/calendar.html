@@ -9,6 +9,7 @@
     <a class="btn sm" href="{{ url_for('channels.calendar', week=next, who=who) }}">Next →</a></div></div>
 
 {% if new_link %}<div class="flash ok"><strong>Your private calendar link</strong> (shown only now — copy it):<br><code class="copy">{{ new_link }}</code><br>
+  <a class="btn sm primary" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/r?cid={{ new_link.replace('https://', 'webcal://').replace('http://', 'webcal://')|urlencode }}">Add to my Google Calendar</a><br>
   In Google Calendar: <em>Other calendars → + → From URL</em> → paste. On iPhone: <em>Settings → Calendar → Accounts → Add subscribed calendar</em>. It updates every few hours and shows only the kind of task, the reference code and the area — no customer names or numbers.</div>{% endif %}
 
 <div class="week">{% for d in days %}

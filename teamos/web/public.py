@@ -56,6 +56,74 @@ def _remember_lang(db, sid):
         db.execute("UPDATE form_submissions SET lang = ? WHERE id = ?", (i18n.pick(request), sid))
 
 
+OPEN_FORMS = {
+    "pilot": {"key": "pilot_open", "title": "Salon Shastra Pilot Program",
+              "intro": "This form helps us understand your salon’s current position, challenges, and opportunities "
+                       "so we can provide personalized solutions to help you grow. Based on your answers we prepare "
+                       "a free SWOT report for your salon with clear next steps.",
+              "time": "05-10 minutes"},
+    "investor": {"key": "investor_open", "title": "Planning a salon investment?",
+                 "intro": "These questions help Salon Shastra understand your plan, your money and how much support "
+                          "you'll need — so we can tell you honestly whether and how to invest. After you submit, "
+                          "you can speak with our founder Vikas Rachakonda.",
+                 "time": "about 10 minutes"},
+}
+
+
+@bp.route("/pilot", methods=["GET", "POST"])
+@bp.route("/investor", methods=["GET", "POST"])
+def open_form():
+    """The two open questionnaires anyone can fill (ads, WhatsApp groups, website): the Pilot Program form for salon
+    owners and the Investor form. Each submission creates the record, saves every answer and drafts the report."""
+    from ..domain import investor as INV
+    from ..domain import pilot as PIL
+    kind = request.path.rstrip("/").rsplit("/", 1)[-1]
+    meta = OPEN_FORMS[kind]
+    mod = PIL if kind == "pilot" else INV
+    db = get_db()
+    answers, errors = {}, {}
+    if request.method == "POST":
+        ip = _ip_hash()
+        try:
+            if _signer().loads(request.form.get("form_token", ""), max_age=FORM_TOKEN_MAX_AGE) != meta["key"]:
+                raise BadData("wrong form")
+        except BadData:
+            F.record_public_hit(db, ip, meta["key"], "bad_token")
+            return _page("public/message.html", 400, title="Please try again",
+                         message="This form expired or was not loaded correctly. Please reload the page and resubmit.")
+        if request.form.get("website"):
+            F.record_public_hit(db, ip, meta["key"], "honeypot")
+            return redirect(url_for("public.open_thanks", kind=kind))
+        if F.public_rate_limited(db, ip):
+            F.record_public_hit(db, ip, meta["key"], "rate_limited")
+            return _page("public/message.html", 429, title="Too many submissions",
+                         message="We have already received several forms from this connection. Please try again "
+                                 "later or call us.")
+        answers, errors = mod.parse_answers(request.form)
+        if not request.form.get("consent_contact"):
+            errors["consent_contact"] = "Please tick this box so we can contact you about your answers."
+        if not errors:
+            try:
+                mod.submit_public(db, answers, consent=True)
+                F.record_public_hit(db, ip, meta["key"], "submitted")
+                return redirect(url_for("public.open_thanks", kind=kind))
+            except ValidationError as e:
+                errors = e.errors if isinstance(e.errors, dict) else {"_": str(e.errors)}
+    return _page("public/open_form.html", meta=meta, kind=kind, Q=mod, answers=answers, errors=errors,
+                 form_token=_signer().dumps(meta["key"]))
+
+
+@bp.route("/<kind>/done")
+def open_thanks(kind):
+    if kind not in OPEN_FORMS:
+        abort(404)
+    msg = ("Thank you! We have received your answers. Our team is preparing your free SWOT report and will send it "
+           "to you on WhatsApp soon." if kind == "pilot" else
+           "Thank you! We have received your answers. A member of the Salon Shastra team will call you to set up a "
+           "short call with our founder, Vikas Rachakonda.")
+    return _page("public/message.html", title="Thank you", message=msg)
+
+
 @bp.route("/<kind>", methods=["GET", "POST"])
 def quick(kind):
     form_key = {"seller": "seller_quick", "buyer": "buyer_quick"}.get(kind)

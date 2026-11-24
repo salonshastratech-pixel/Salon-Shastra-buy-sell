@@ -239,11 +239,9 @@ def test_uploads_are_encrypted_and_only_authorised_people_can_download(app, db, 
     assert doc["content_type"] == "application/pdf" and doc["encrypted"] == 1 and doc["opportunity_id"] == opp_id
     assert c.get(f"/forms/documents/{doc['id']}").data == PDF  # primary owner
     assert login("admin@t.test").get(f"/forms/documents/{doc['id']}").data == PDF
-    other = login("buyer@t.test")  # team member, not the owner
-    assert other.get(f"/forms/documents/{doc['id']}").status_code == 403
+    assert login("buyer@t.test").get(f"/forms/documents/{doc['id']}").data == PDF  # D-85: team = everything except Finance
     assert login("fin@t.test").get(f"/forms/documents/{doc['id']}").status_code == 403
-    assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE action = 'document.open' AND outcome = 'denied'") == 2
-    assert b"Restricted" in other.get(f"/sellers/{opp_id}").data
+    assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE action = 'document.open' AND outcome = 'denied'") == 1
     assert p.get(f"/forms/documents/{doc['id']}").status_code == 302  # anonymous → login
 
 

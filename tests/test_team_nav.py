@@ -40,7 +40,7 @@ def test_every_staff_page_has_back_breadcrumb_and_module_tabs(db, login):
 
 def test_module_tabs_respect_permissions(db, login):
     member = login("seller@t.test").get("/tools").data.decode()
-    assert ">Users</a>" not in member and ">Audit log</a>" not in member
+    assert ">Users</a>" not in member  # D-85: team = everything except Finance
     admin = login("admin@t.test").get("/tools").data.decode()
     assert ">Users</a>" in admin and ">Audit log</a>" in admin
 
@@ -71,9 +71,8 @@ def test_status_hours_and_leave(db, login):
     assert me["id"] in AV.away_ids(db)
     week = c.get("/team/availability").data.decode()
     assert "Leave" in week and "Family function" in week
-    # nobody can edit someone else's availability unless they are a team lead
     other = user(db, "buyer@t.test")
-    assert c.get(f"/me/availability?user={other['id']}").status_code == 403
+    assert login("fin@t.test").get(f"/me/availability?user={other['id']}").status_code in (302, 403)
     assert login("lead@t.test").get(f"/me/availability?user={other['id']}").status_code == 200
 
 
@@ -82,7 +81,7 @@ def test_leave_stops_new_leads(db):
     today = now_utc().astimezone(IST).date().isoformat()
     assert PR.pick_owner(db, "seller") == me["id"]
     AV.add_time_off(db, me, me["id"], today, today, "leave", None)
-    assert PR.pick_owner(db, "seller") is None  # the only seller-team person is on leave
+    assert PR.pick_owner(db, "seller") == user(db, "lead@t.test")["id"]  # on leave → goes to a "Both" person
     w = {r["id"]: r for r in PR.workload(db)}
     assert w[me["id"]]["on_leave"] and w[me["id"]]["away"]
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .timeutil import now_iso
 
-MATRIX_VERSION = "2026-11-22.v0.1 (PRD §3.2 default proposal; pending founder approval D-07/D-12)"
+MATRIX_VERSION = "2026-11-24.v1 (simple: team = everything except Finance; D-85)"
 
 # Capability catalogue -------------------------------------------------------------
 CAPABILITIES = {
@@ -35,21 +35,29 @@ CAPABILITIES = {
     "export.restricted": "Export restricted data",
 }
 
-_TEAM_BASE = {"crm.view", "crm.create", "crm.edit", "crm.log_activity", "stage.operational"}
+# Founder decision (24 Nov 2026): keep it simple — the team can do everything the admin can, except Finance.
+# Only adding/removing users and changing integrations & secrets stay with the admin.
+_ADMIN_ONLY = {"finance.view", "finance.edit", "users.manage", "settings.manage"}
+_TEAM = set(CAPABILITIES) - _ADMIN_ONLY
 
 ROLE_CAPABILITIES: dict[str, set[str]] = {
     "super_admin": set(CAPABILITIES),
-    "team_lead": _TEAM_BASE | {"crm.assign", "evidence.review", "crm.import"},
-    "team_member": set(_TEAM_BASE),
-    # Finance specialist: no operational CRM by default ("limited deal references" arrive with Deals milestone).
+    "team_lead": set(_TEAM),
+    "team_member": set(_TEAM),
     "finance": {"finance.view", "finance.edit"},
 }
 
 ROLE_LABELS = {
-    "super_admin": "Super Admin",
-    "team_lead": "Team lead / reviewer",
+    "super_admin": "Admin",
+    "team_lead": "Team member",
     "team_member": "Team member",
-    "finance": "Finance specialist",
+    "finance": "Finance only",
+}
+# What the Users page offers (team_lead is kept only for older accounts; it has the same access as team_member).
+ROLE_CHOICES = {
+    "team_member": "Team member — everything except Finance",
+    "super_admin": "Admin — everything, including Finance and users",
+    "finance": "Finance only",
 }
 
 

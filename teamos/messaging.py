@@ -264,8 +264,13 @@ class SmtpEmailProvider:
         msg["From"], msg["To"], msg["Subject"] = self.sender, to_addr, subject
         msg.set_content(body)
         try:
-            with smtplib.SMTP(self.host, self.port, timeout=15) as s:
-                s.starttls()
+            if self.port == 465:  # implicit TLS (Hostinger, Zoho, …)
+                conn = smtplib.SMTP_SSL(self.host, self.port, timeout=15)
+            else:
+                conn = smtplib.SMTP(self.host, self.port, timeout=15)
+            with conn as s:
+                if self.port != 465:
+                    s.starttls()
                 if self.user:
                     s.login(self.user, self.password)
                 s.send_message(msg)
@@ -276,7 +281,8 @@ class SmtpEmailProvider:
 
 def email_provider(config=None):
     host = _cfg("SMTP_HOST", config)
-    if host and _cfg("SMTP_FROM", config):
+    # a username without its password is not usable yet — keep e-mails in the outbox instead of failing them
+    if host and _cfg("SMTP_FROM", config) and (not _cfg("SMTP_USER", config) or _cfg("SMTP_PASSWORD", config)):
         return SmtpEmailProvider(host, _cfg("SMTP_PORT", config), _cfg("SMTP_USER", config),
                                  _cfg("SMTP_PASSWORD", config), _cfg("SMTP_FROM", config))
     return OutboxEmailProvider()

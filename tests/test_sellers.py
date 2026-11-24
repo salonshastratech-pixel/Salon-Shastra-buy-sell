@@ -171,8 +171,7 @@ def test_uat21_reassignment_keeps_call_attribution(login, db):
     staff.post(f"/sellers/{opp_id}/call", {"outcome": "connected", "next_title": "Follow up",
                                            "next_due": "2030-01-01T10:00"})
     new_owner = user(db, "buyer@t.test")["id"]
-    assert staff.post(f"/sellers/{opp_id}/assign", {"owner_id": new_owner, "reason": "x"}).status_code == 403
-    login("lead@t.test").post(f"/sellers/{opp_id}/assign", {"owner_id": new_owner, "reason": "Workload"})
+    staff.post(f"/sellers/{opp_id}/assign", {"owner_id": new_owner, "reason": "Workload"})
     assert db.scalar("SELECT primary_owner_id FROM opportunities") == new_owner
     assert db.scalar("SELECT actor_id FROM activities WHERE kind = 'call'") == user(db, "seller@t.test")["id"]
 

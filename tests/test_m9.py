@@ -56,12 +56,12 @@ def test_calendar_feed_is_private_revocable_and_has_no_customer_details(db, logi
     assert anon.get("/cal/not-a-real-token.ics").status_code == 404
 
 
-def test_only_team_leads_see_other_peoples_calendars(db, login):
+def test_team_sees_each_others_calendars(db, login):
     s_id = user(db, "seller@t.test")["id"]
     lead = login("lead@t.test").get(f"/calendar?who={s_id}").data.decode()
     assert "Shaheen Seller" in lead
     me = login("buyer@t.test").get(f"/calendar?who={s_id}").data.decode()
-    assert '<select name="who"' not in me
+    assert '<select name="who"' in me  # D-85: team = everything except Finance
 
 
 def test_week_start_is_monday():
