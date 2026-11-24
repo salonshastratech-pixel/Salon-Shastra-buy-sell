@@ -55,7 +55,8 @@ def create_user():
         return redirect(url_for("admin.users"))
     with db:
         uid = db.insert("users", {"email": email, "full_name": name, "password_hash": hash_password(pw), "role": role,
-                                  "team": team, "is_active": 1, "created_at": now_iso()})
+                                  "team": team, "is_active": 1, "must_change_password": 1,
+                                  "created_at": now_iso()})
         audit.record(db, g.user["id"], "user.create", "user", uid, {"email": email, "role": role})
     msg = f"User {name} created. Share the temporary password securely."
     if (f.get("wa_number") or "").strip() or (f.get("number_id") or "").strip():

@@ -126,4 +126,4 @@ def test_add_team_member_form_resists_browser_autofill(login, db):
     admin.post("/admin/users", {"full_name": "Shaheen", "new_member_email": "Shaheen.New@Example.com",
                                 "role": "team_member", "team": "general", "password": "Temp-Password-123"})
     u = db.one("SELECT * FROM users WHERE email = 'shaheen.new@example.com'")
-    assert u and u["role"] == "team_member"
+    assert u and u["role"] == "team_member" and u["must_change_password"] == 1   # own password at first sign-in
