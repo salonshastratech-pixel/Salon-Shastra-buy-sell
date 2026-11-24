@@ -17,6 +17,8 @@ bp = Blueprint("ops", __name__)
 def tick():
     expected = os.environ.get("CRON_TOKEN") or ""
     given = request.args.get("token") or request.headers.get("X-Cron-Token") or ""
+    # Render's generated token can contain '+', which a web address turns into a space when not encoded as %2B
+    given = given.replace(" ", "+")
     if len(expected) < 16 or not hmac.compare_digest(given.encode(), expected.encode()):
         return jsonify({"ok": False}), 404  # looks like any unknown page to strangers
     from .. import jobs

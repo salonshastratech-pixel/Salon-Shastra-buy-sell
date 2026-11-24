@@ -172,3 +172,11 @@ def test_database_move_bad_address_shows_failed_not_stuck(app, db, login, monkey
     a.post("/admin/database-move")
     page = a.get("/admin/database-move").data.decode()
     assert "The copy stopped" in page and "Copy now" in page
+
+
+def test_tick_token_with_plus_sign_pasted_unencoded(app, db, monkeypatch):
+    monkeypatch.setenv("CRON_TOKEN", "abc+def/ghi=jkl+mnopqrstu=")
+    c = app.test_client()
+    assert c.get("/internal/tick?token=abc+def/ghi=jkl+mnopqrstu=").status_code == 200   # '+' arrives as a space
+    assert c.get("/internal/tick?token=abc%2Bdef/ghi=jkl%2Bmnopqrstu=").status_code == 200
+    assert c.get("/internal/tick?token=abc def").status_code == 404
