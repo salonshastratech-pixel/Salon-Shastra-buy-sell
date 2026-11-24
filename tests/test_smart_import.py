@@ -3,6 +3,7 @@ made up): several tabs incl. helper/staff tabs, a header-less lead-ads tab, ad c
 format, remarks typed into the wrong column, test rows, "not interested" elsewhere, a buyer who wants to sell,
 the same person in several tabs, and a person already in TeamOS."""
 import io
+import re
 import json
 
 from openpyxl import Workbook
@@ -224,3 +225,31 @@ def test_import_cannot_start_twice_and_resumes_without_duplicates(app, db, login
     assert db.scalar("SELECT status FROM sheet_imports WHERE id = ?", (iid,)) == "committed"
     creates = db.scalar("SELECT COUNT(*) FROM sheet_import_rows WHERE import_id = ? AND action = 'create'", (iid,))
     assert db.scalar("SELECT COUNT(*) FROM opportunities") == before + creates - 1   # the saved row not saved twice
+
+
+
+def test_connected_sheet_prepares_a_preview_only_when_there_are_new_people(app, db, login, monkeypatch):
+    from teamos.domain import connected_sheets as CS
+    lead = login("lead@t.test")
+    url = "https://docs.google.com/spreadsheets/d/" + "A" * 30 + "/edit"
+    data = {"bytes": workbook()}
+    monkeypatch.setattr(CS, "fetch", lambda u: ("google-sheet.xlsx", data["bytes"]))   # no network in tests
+    r = lead.post("/imports/sheets", {"name": "Pilot responses", "link": url}, follow_redirects=True)
+    page = r.data.decode()
+    assert "Sheet connected" in page and "ready to review" in page and "Pilot responses" in page
+    s = db.one("SELECT * FROM connected_sheets")
+    iid = s["last_import_id"]
+    assert db.scalar("SELECT status FROM sheet_imports WHERE id = ?", (iid,)) == "preview"
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 0             # nothing saved without a click
+    assert db.scalar("SELECT COUNT(*) FROM notifications WHERE kind = 'sheet_new_rows'") >= 1
+    assert "No change" in CS.check(db, db.one("SELECT * FROM connected_sheets"))      # same file: no work
+    lead.post(f"/imports/smart/{iid}/commit")
+    data["bytes"] = workbook() + b""                                          # same people, nothing new
+    db.execute("UPDATE connected_sheets SET last_sha = 'old'")
+    assert "no new people" in CS.check(db, db.one("SELECT * FROM connected_sheets"))
+    assert db.scalar("SELECT COUNT(*) FROM sheet_imports") == 1
+    assert "already connected" in lead.post("/imports/sheets", {"name": "x", "link": url},
+                                            follow_redirects=True).data.decode()
+    lead.post(f"/imports/sheets/{s['id']}/remove")
+    assert db.scalar("SELECT active FROM connected_sheets") == 0
+    assert login("fin@t.test").post("/imports/sheets", {"name": "x", "link": url}).status_code in (302, 403)

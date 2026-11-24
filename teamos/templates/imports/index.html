@@ -28,6 +28,24 @@
   </table></div></div>
 </div>
 
+<div class="card" id="sheets"><div class="card-h"><h2>Connected Google Sheets</h2><span class="small muted">checked every hour</span></div>
+  <p class="small">Connect the sheets your team keeps filling (Google Form responses, ad leads). Every hour TeamOS looks for new people and prepares an import preview; you get a notification and press <strong>Import now</strong> after a quick look. Nothing is saved without that click.</p>
+  {% if sheets %}<div class="table-wrap"><table class="small">
+    <tr><th>Sheet</th><th>Last check</th><th>Result</th><th></th></tr>
+    {% for s in sheets %}<tr><td><strong>{{ s.name }}</strong><div class="muted">connected by {{ s.by_name }}</div></td>
+      <td>{{ s.last_checked_at|rel if s.last_checked_at else '—' }}</td>
+      <td>{{ s.last_result or '—' }}{% if s.last_import_id and s.import_status == 'preview' %} <a href="{{ url_for('imports.smart_preview', import_id=s.last_import_id) }}">Review preview #{{ s.last_import_id }}</a>{% endif %}</td>
+      <td class="nowrap"><form method="post" action="{{ url_for('imports.sheet_check', sheet_id=s.id) }}" class="inline">{{ csrf() }}<button class="btn sm">Check now</button></form>
+        <form method="post" action="{{ url_for('imports.sheet_remove', sheet_id=s.id) }}" class="inline" data-confirm="Stop checking {{ s.name }}? Records already imported stay.">{{ csrf() }}<button class="btn sm">Disconnect</button></form></td></tr>{% endfor %}
+  </table></div>{% endif %}
+  <form method="post" action="{{ url_for('imports.sheet_connect') }}" class="form-grid">{{ csrf() }}
+    <div class="field"><label for="cs-name">Name</label><input id="cs-name" name="name" placeholder="e.g. Pilot program responses"></div>
+    <div class="field"><label for="cs-link">Google Sheets link</label><input id="cs-link" name="link" required placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+    <div class="full help">In Google Sheets: Share &gt; General access &gt; "Anyone with the link" &gt; Viewer. Anyone who has this exact link can open the sheet, so share it only with TeamOS and your team.</div>
+    <div class="full"><button class="btn primary">Connect sheet</button></div></form>
+</div>
+
+
 <details class="card disclose"><summary>Manual column-by-column import (sellers only)</summary>
   <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.upload') }}">{{ csrf() }}
     <div class="field"><label>CSV or XLSX (first tab only, max 5 MB, 2,000 rows)</label><input type="file" name="file" accept=".csv,.xlsx" required></div>

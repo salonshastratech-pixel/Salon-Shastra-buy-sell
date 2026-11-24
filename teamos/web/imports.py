@@ -21,7 +21,9 @@ def index():
                    "ORDER BY i.id DESC LIMIT 30")
     for s_ in smart:
         s_["counts_d"] = json.loads(s_["counts"]) if s_["counts"] else None
-    return render_template("imports/index.html", batches=batches, smart=smart, TARGETS=I.TARGETS, REQUIRED=I.REQUIRED)
+    from ..domain import connected_sheets as CS
+    return render_template("imports/index.html", batches=batches, smart=smart, TARGETS=I.TARGETS, REQUIRED=I.REQUIRED,
+                           sheets=CS.listing(get_db()))
 
 
 @bp.route("/", methods=["POST"])
@@ -112,25 +114,43 @@ GSHEET = __import__("re").compile(r"docs\.google\.com/spreadsheets/d/([A-Za-z0-9
 
 
 def _fetch_google_sheet(url: str) -> tuple[str, bytes]:
-    """Download a Google Sheet shared as 'Anyone with the link can view' as Excel (all tabs)."""
-    import urllib.error
-    import urllib.request
-    m = GSHEET.search(url or "")
-    if not m:
-        raise ValidationError({"link": "Paste a Google Sheets link (docs.google.com/spreadsheets/…)."})
-    export = f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=xlsx"
+    from ..domain import connected_sheets as CS
+    return CS.fetch(url)
+
+
+@bp.route("/sheets", methods=["POST"])
+@require("crm.import")
+def sheet_connect():
+    from ..domain import connected_sheets as CS
+    db = get_db()
     try:
-        with urllib.request.urlopen(urllib.request.Request(export, headers={"User-Agent": "TeamOS-import"}),
-                                    timeout=30) as r:
-            data, ctype = r.read(8 * 1024 * 1024 + 1), r.headers.get("Content-Type", "")
-    except (urllib.error.URLError, TimeoutError) as e:
-        raise ValidationError({"link": f"Could not download the sheet ({getattr(e, 'code', '') or e}). "
-                                       "Share it as 'Anyone with the link can view', or download it as Excel "
-                                       "(File → Download → .xlsx) and upload the file."})
-    if "spreadsheetml" not in ctype and not data.startswith(b"PK"):
-        raise ValidationError({"link": "Google asked for a sign-in, so the sheet is private. Share it as 'Anyone with "
-                                       "the link can view', or download it as Excel and upload the file."})
-    return f"google-sheet-{m.group(1)[:8]}.xlsx", data
+        sid = CS.add(db, g.user, request.form.get("name"), request.form.get("link"))
+        res = CS.check(db, db.one("SELECT * FROM connected_sheets WHERE id = ?", (sid,)), g.user)
+        flash("Sheet connected. First check: " + res, "ok")
+    except ValidationError as e:
+        flash(" ".join(str(v) for v in e.errors.values()), "error")
+    return redirect(url_for("imports.index") + "#sheets")
+
+
+@bp.route("/sheets/<int:sheet_id>/check", methods=["POST"])
+@require("crm.import")
+def sheet_check(sheet_id):
+    from ..domain import connected_sheets as CS
+    db = get_db()
+    s = db.one("SELECT * FROM connected_sheets WHERE id = ? AND active = 1", (sheet_id,))
+    if not s:
+        abort(404)
+    flash(f"{s['name']}: " + CS.check(db, s, g.user), "ok")
+    return redirect(url_for("imports.index") + "#sheets")
+
+
+@bp.route("/sheets/<int:sheet_id>/remove", methods=["POST"])
+@require("crm.import")
+def sheet_remove(sheet_id):
+    from ..domain import connected_sheets as CS
+    CS.remove(get_db(), g.user, sheet_id)
+    flash("Sheet disconnected. Records already imported stay as they are.", "ok")
+    return redirect(url_for("imports.index") + "#sheets")
 
 
 @bp.route("/smart", methods=["POST"])

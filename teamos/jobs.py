@@ -50,6 +50,7 @@ def schedule_periodic(db) -> None:
     enqueue(db, "daily_digest", dedupe_key="daily_digest:" + n.strftime("%Y%m%d%H"))  # hourly; sends once/user/day
     enqueue(db, "stuck_sweep", dedupe_key="stuck_sweep:" + n.strftime("%Y%m%d"))  # daily; one alert per person
     enqueue(db, "learning_propose", dedupe_key="learning_propose:" + n.strftime("%G%V"))  # weekly
+    enqueue(db, "sheet_watch", dedupe_key="sheet_watch:" + n.strftime("%Y%m%d%H"))  # hourly
 
 
 def run_once(db, limit: int = 20) -> int:
@@ -189,6 +190,13 @@ def lead_ads(db, payload) -> str:
     from .domain import leadads
     done = [leadads.process(db, i)["status"] for i in payload.get("ids") or []]
     return f"{len(done)} lead(s): " + ", ".join(done)
+
+
+@handler("sheet_watch")
+def sheet_watch(db, payload) -> str:
+    """Hourly: connected Google Sheets with new people become an import preview to approve."""
+    from .domain import connected_sheets
+    return connected_sheets.check_all(db)
 
 
 @handler("noop")
