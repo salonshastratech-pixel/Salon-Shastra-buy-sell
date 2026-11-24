@@ -164,3 +164,11 @@ def test_database_password_with_special_characters_is_encoded():
     assert safe_pg_url("postgresql://postgres.abc:Plain123" + host) == "postgresql://postgres.abc:Plain123" + host
     assert safe_pg_url("postgresql://u:pa%40ss@h/db") == "postgresql://u:pa%40ss@h/db"       # already encoded: same
     assert safe_pg_url("sqlite:///x.db") == "sqlite:///x.db"
+
+
+def test_database_move_bad_address_shows_failed_not_stuck(app, db, login, monkeypatch):
+    monkeypatch.setenv("MOVE_TARGET_URL", "postgresql://u:p@no-such-host.invalid:5432/x")
+    a = login("admin@t.test")
+    a.post("/admin/database-move")
+    page = a.get("/admin/database-move").data.decode()
+    assert "The copy stopped" in page and "Copy now" in page

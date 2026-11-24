@@ -10,7 +10,9 @@ from ..permissions import CAPABILITIES, MATRIX_VERSION, ROLE_CAPABILITIES, ROLE_
 TEAM_LABELS = {"general": "Both", "seller": "Salon owners", "buyer": "Buyers & investors", "finance": "Finance",
                "admin": "Admin"}
 from ..security import hash_password, require, revoke_user_sessions, validate_password_strength
-from ..timeutil import now_iso, parse_local_input
+from datetime import timedelta
+
+from ..timeutil import now_iso, now_utc, parse_local_input, to_iso
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -426,15 +428,17 @@ def _run_move(db, target_url):
     from ..db import Database
     from ..dbmove import copy
     _save_move_status(db, {"state": "copying", "at": now_iso()})
-    target = Database(target_url)
+    target = None
     try:
+        target = Database(target_url)  # inside try: a bad address must show as failed, not "copying" forever
         res = copy(db, target)
         _save_move_status(db, {"state": "done" if not res["mismatch"] else "mismatch", "at": now_iso(),
                                "tables": res["tables"], "rows": res["rows"], "mismatch": res["mismatch"]})
     except Exception as e:  # noqa: BLE001 — shown on the page; the old database is untouched
         _save_move_status(db, {"state": "failed", "at": now_iso(), "error": str(e)[:400]})
     finally:
-        target.close()
+        if target is not None:
+            target.close()
 
 
 @bp.route("/database-move", methods=["GET", "POST"])
@@ -457,6 +461,8 @@ def database_move():
                   "for a few minutes.", "ok")
         return redirect(url_for("admin.database_move"))
     st = _move_status(db)
+    if st.get("state") == "copying" and (st.get("at") or "") < to_iso(now_utc() - timedelta(minutes=15)):
+        st = {"state": "failed", "error": "the copy did not finish (the server may have restarted)"}  # allow retry
     from ..dbmove import counts
     resp = make_response(render_template("admin/dbmove.html", current_host=_host(current), target_host=_host(target),
                                          status=st, counts=counts(db) if st.get("state") != "copying" else {}))
