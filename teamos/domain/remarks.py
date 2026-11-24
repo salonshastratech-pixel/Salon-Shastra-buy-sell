@@ -28,7 +28,13 @@ MEANINGS = {
     "switched_off": ("Switched off / not reachable", "outcome"),
     "callback": ("Asked us to call back", "outcome"),
     "they_will_call": ("Said they will call us", "outcome"),
+    "hung_up": ("Cut the call", "outcome"),
     "connected": ("Spoke with them", "outcome"),
+    "cold": ("Cold lead", "interest"),
+    "asked_details": ("Asked for details", "action"),
+    "details_shared": ("Details shared with them", "action"),
+    "salon_visit": ("Will visit a salon", "action"),
+    "low_budget": ("Budget too low", "money"),
     "not_interested": ("Not interested", "outcome"),
     "wrong_number": ("Wrong number", "outcome"),
     "interested": ("Interested", "interest"),
@@ -54,6 +60,29 @@ MEANINGS = {
 # Built-in phrases: (regex, meaning). English, Tenglish (Telugu in English letters, with common spellings) and Telugu.
 _B = r"(?:^|[^\w])"           # word start that also works next to Telugu letters
 PHRASES: list[tuple[str, str]] = [
+    # the team's own status words and spellings (seen in the real sheets)
+    (r"not\s*connected|not\s*respo\w*|no+\s*respo\w*|respom\w*|respondig|not\s*reachable\s*now|"
+     r"call\s*not\s*(respond\w*|lift\w*|answer\w*)", "no_answer"),
+    (r"disconnect\w*(\s*(my|the|our))?\s*call|cut\s*(the|my)?\s*call|hung\s*up|call\s*cut\s*chesaru|"
+     r"disconnected\s*after", "hung_up"),
+    (r"out\s*of+\s*(service|network|coverage)|network\s*coverage|number\s*(not\s*in\s*use|invalid)", "switched_off"),
+    (r"^\s*(connected|contacted)\b|\|\s*(connected|contacted)\b", "connected"),
+    (r"\bhot\b|(?<!dis)qualified|should\s*interest|intrested|inter?ested\b", "interested"),
+    (r"\bwarm\b", "thinking"),
+    (r"\bcold\b", "cold"),
+    (r"disqualified|no\s*want\s*to\s*invest|not\s*want\s*to\s*invest|don.?t\s*want\s*to\s*invest|"
+     r"no\s*need|not\s*required", "not_interested"),
+    (r"shared\s*(the\s*)?(details|location|info\w*|brochure)|(details|location)\s*shared|"
+     r"sent\s*(the\s*)?(details|location)", "details_shared"),
+    (r"asking\s*(for\s*)?(all\s*)?(the\s*)?(salon\s*)?(more\s*)?details|asked\s*(about|for)|inquir\w*|enquir\w*|"
+     r"wants?\s*(more\s*)?details", "asked_details"),
+    (r"(will|wants?\s*to)\s*visit\s*(the\s*)?salon|salon\s*visit", "salon_visit"),
+    (r"wants?\s*staff|want\s*(hair\s*dresser|stylist|beautician)s?|evaro\s*okaru\s*undali|okaru\s*undali|"
+     r"manishi\s*kavali|workers?\s*problem", "need_staff"),
+    (r"want\s*to\s*purchase|purchase\s*(in|a|salon)|looking\s*to\s*buy", "wants_buy"),
+    (r"(very\s*)?(less|low|small)\s*budget|budget\s*(is\s*)?(very\s*)?(less|low|takkuva)", "low_budget"),
+    (r"low\s*business|business\s*(is\s*)?(low|down|dull)", "need_consulting"),
+    (r"need\s*money|money\s*kavali|dabbu\s*kavali", "no_money"),
     # outcome
     (r"not\s*(lift|pick)\w*|no\s*(response|answer|reply)|did\s*n.?t\s*(pick|lift|answer)|not\s*answer\w*|"
      r"lift\s*(cheya|chey|chesthaled|chestaled|cheyya)\w*|ett?a?l(e|a)du|ethaledu|ettaledu|ring\s*avuth?undi|"
@@ -228,12 +257,13 @@ def read(text: str, db=None, now: datetime | None = None, learned_cache: list | 
     when, when_text = _when(t, now or now_utc())
     if when and not ({"callback", "they_will_call", "busy", "office_visit"} & found.keys()):
         found["callback"] = [when_text]  # "monday 11am" on its own means: call then
-    outcome = next((k for k in ("wrong_number", "not_interested", "switched_off", "no_answer", "busy", "they_will_call",
-                                "callback", "connected") if k in found), None)
+    outcome = next((k for k in ("wrong_number", "not_interested", "switched_off", "no_answer", "hung_up", "busy",
+                                "they_will_call", "callback", "connected") if k in found), None)
     if outcome in ("busy", "callback", "they_will_call") and ({"connected", "interested"} & found.keys()):
         pass
     needs = [k for k in found if MEANINGS[k][1] == "need"]
-    interest = ("cold" if "not_interested" in found else "hot" if "interested" in found or "office_visit" in found
+    interest = ("cold" if "not_interested" in found or "cold" in found else "hot" if "interested" in found
+                or "office_visit" in found
                 or "form_filled" in found else "warm" if "thinking" in found or "talk_vikas" in found else None)
     amount = _amount(t)
     parts = []
@@ -242,6 +272,8 @@ def read(text: str, db=None, now: datetime | None = None, learned_cache: list | 
     if when_text and outcome in ("callback", "busy", "they_will_call", "no_answer", None) or "office_visit" in found:
         parts.append(("call back " if "office_visit" not in found else "visit ") + when_text if when_text else "")
     parts += [MEANINGS[k][0] for k in found if MEANINGS[k][1] in ("need", "action", "money") and k != outcome]
+    if "cold" in found and "not_interested" not in found:
+        parts.append(MEANINGS["cold"][0])
     if "thinking" in found:
         parts.append(MEANINGS["thinking"][0])
     elif interest and "interested" not in found and interest != "cold":

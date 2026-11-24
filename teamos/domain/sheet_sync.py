@@ -651,7 +651,8 @@ def remark_text(notes: list[str]) -> str:
     return " | ".join(x.strip() for x in out if x and x.strip())
 
 
-def apply_understanding(db, actor, kind: str, opp_id: int, canon: dict, notes: list[str], raw: dict) -> list[str]:
+def apply_understanding(db, actor, kind: str, opp_id: int, canon: dict, notes: list[str], raw: dict,
+                        plan_calls: bool = True) -> list[str]:
     """Read the remarks (English / Telugu / Telugu in English letters) and the tick columns, then: plan the next call
     at the time they asked for, record what they need, mark the pilot form, and keep a plain-English summary.
     Returns what was done (empty if nothing was understood)."""
@@ -686,7 +687,7 @@ def apply_understanding(db, actor, kind: str, opp_id: int, canon: dict, notes: l
         return done
     # 2. The next call, at the time they asked for
     task = db.one("SELECT * FROM tasks WHERE entity_type = 'opportunity' AND entity_id = ? AND status = 'open' "
-                  "ORDER BY due_at LIMIT 1", (opp_id,))
+                  "ORDER BY due_at LIMIT 1", (opp_id,)) if plan_calls else None  # re-reads keep existing call times
     out = res["outcome"]
     title, due, prio = None, None, None
     if res["callback_at"] and res["callback_at"] > now_iso() and out in ("callback", "busy", "they_will_call", None):

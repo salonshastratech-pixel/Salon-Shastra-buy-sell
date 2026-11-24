@@ -123,3 +123,34 @@ def test_pilot_sheet_import_reads_remarks_ticks_and_answers(app, db, login):
                      (sita["id"],))
     assert "Needs staff" in note and "Wants to talk to Vikas" in note and "staff problem" in note
     assert db.scalar("SELECT COUNT(*) FROM notifications WHERE kind = 'pilot_form'") == 0  # imports don't spam alerts
+
+
+def test_team_status_words_and_spellings():
+    """Phrasing seen in the team's own sheets (made-up rows, real wording patterns)."""
+    assert r("Not Connected | shared details on watsapp")["summary"] == "Didn't answer; Details shared with them"
+    assert r("Connected | disconnecting my call")["outcome"] == "hung_up"
+    assert r("call not respondig")["outcome"] == "no_answer" and r("coll noo respomdig")["outcome"] == "no_answer"
+    assert r("Not Connected | number out of service")["outcome"] == "switched_off"
+    assert r("Connected | very less budget")["meanings"].get("low_budget")
+    assert "need_staff" in r("Connected | owner of a brand salon wants staff")["needs"]
+    assert "need_staff" in r("ikkada evaro okaru undali okkarine vadhilesthe ibbandhi")["needs"]
+    cold = r("CREATED | COLD | want to purchase in konaseema | COLD")
+    assert cold["interest"] == "cold" and "wants_buy" in cold["meanings"]
+    assert r("CREATED | HOT | HOT")["interest"] == "hot"
+    assert r("WARM | Connected | WARM")["interest"] == "warm"
+    assert r("disqualified")["outcome"] == "not_interested"
+    assert r("has hotel business no want to invest in salon")["outcome"] == "not_interested"
+
+
+def test_reread_keeps_existing_call_times(db):
+    from teamos.domain import sellers as S
+    from teamos.domain import sheet_sync as SS
+    admin = user(db, "admin@t.test")
+    oid = S.create_lead(db, admin, {"full_name": "Old Lead", "phone": "9000300099", "salon_name": "Old Salon",
+                                    "city": "Hyderabad", "locality": "Ameerpet", "source": "import",
+                                    "consent_contact": "1"})["opportunity_id"]
+    before = db.one("SELECT title, due_at FROM tasks WHERE entity_id = ? AND status = 'open'", (oid,))
+    done = SS.apply_understanding(db, admin, "seller", oid, {}, ["Remarks: repu evening call cheyandi, staff problem"],
+                                  {}, plan_calls=False)
+    after = db.one("SELECT title, due_at FROM tasks WHERE entity_id = ? AND status = 'open'", (oid,))
+    assert after == before and any("help areas" in d for d in done)
