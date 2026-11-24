@@ -90,7 +90,7 @@ class Database:
                 extra["sslmode"] = "require"  # hosted databases: always encrypted
             # prepare_threshold=None: Supabase's connection pooler (and PgBouncer) do not support
             # server-side prepared statements; plain statements work everywhere.
-            self.conn = psycopg.connect(url, autocommit=True, row_factory=dict_row, prepare_threshold=None,
+            self.conn = psycopg.connect(safe_pg_url(url), autocommit=True, row_factory=dict_row, prepare_threshold=None,
                                         connect_timeout=15, application_name="teamos", **extra)
         else:
             raise ValueError("Unsupported DATABASE_URL: " + url)
@@ -178,6 +178,17 @@ _POOL: dict[str, list] = {}
 _POOL_LOCK = _threading.Lock()
 POOL_MAX = int(os.environ.get("DB_POOL_MAX", "6"))
 POOL_RECHECK_SECONDS = 60
+
+
+def safe_pg_url(url: str) -> str:
+    """Database addresses whose password contains @ : / ? # % break URL parsing. Encode the password part (between
+    '://user:' and the LAST '@'), leaving already-encoded addresses unchanged."""
+    from urllib.parse import quote, unquote
+    m = re.match(r"^(postgres(?:ql)?://)([^:/@]+):(.*)@([^@]+)$", url or "")
+    if not m:
+        return url
+    scheme, user, pw, rest = m.groups()
+    return f"{scheme}{user}:{quote(unquote(pw), safe='')}@{rest}"
 
 
 def _take_pg(url: str):

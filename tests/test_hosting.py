@@ -155,3 +155,12 @@ def test_database_move_copies_everything_and_counts_match(app, db, login, tmp_pa
     pg = login("admin@t.test").get("/admin/database-move").data.decode()
     assert "every table matches" in pg
     assert login("seller@t.test").get("/admin/database-move").status_code in (302, 403)
+
+
+def test_database_password_with_special_characters_is_encoded():
+    from teamos.db import safe_pg_url
+    host = "@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+    assert safe_pg_url("postgresql://postgres.abc:pa@ss#1/x?" + host) == "postgresql://postgres.abc:pa%40ss%231%2Fx%3F" + host
+    assert safe_pg_url("postgresql://postgres.abc:Plain123" + host) == "postgresql://postgres.abc:Plain123" + host
+    assert safe_pg_url("postgresql://u:pa%40ss@h/db") == "postgresql://u:pa%40ss@h/db"       # already encoded: same
+    assert safe_pg_url("sqlite:///x.db") == "sqlite:///x.db"
