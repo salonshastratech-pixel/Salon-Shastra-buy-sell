@@ -14,6 +14,13 @@ pause after about a week without use — open the dashboard and press *Restore* 
 
 ## Connecting TeamOS
 
+Easiest — one command, nothing to edit (asks for the database password at a hidden prompt, tests it, saves it in
+`instance/supabase.env`, brings tables up to date and loads the synthetic demo data; demo logins use `Demo@123`):
+
+    python scripts/connect_supabase.py --start     # then open http://127.0.0.1:8003
+
+By hand instead:
+
 1. Supabase dashboard → project → **Connect** → **Session pooler** → copy the URI; put the database password in place
    of `[YOUR-PASSWORD]` (forgot it: Project Settings → Database → Reset database password).
 2. Save one line in `instance/supabase.env` (the `instance/` folder is never uploaded to GitHub):
