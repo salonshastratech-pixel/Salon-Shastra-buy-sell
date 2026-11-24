@@ -16,6 +16,7 @@ Each milestone ends with: what was built, what was tested (UAT IDs), what remain
 | M10 | **Transparency & follow-through** | Automations page (see / pause each, pause everything, quiet hours), saved searches with "new since you last looked", private customer progress link (English / Telugu), results by lead source to deal won, TeamOS installable on phones | Fewer "any update?" calls; channel decisions from deals, not lead counts | **Done** (awaiting founder review) |
 | M11 | **Salon Owners pilot program** | Needs from the first call, the 45-question pilot form (+5 extras), automatic SWOT report with branded PDF, private report + booking link, Vikas's free times and alerts, paid consultations with the free video | Every enquiry gets a useful next step, not just sellers | **Done** (awaiting founder review) |
 | M12 | **Navigation & team** | Back button, breadcrumbs and module tabs on every page; connected-records strip; team status, working hours, leave, who's working, activity board; premium look | Nobody gets lost; leads know who is working and what got done | **Done** (awaiting founder review) |
+| M13 | **Investor journey** | 5 screening questions with a Pursue / Nurture / Not now verdict, consultant-style investor form, call with Vikas, office visit and Rs 5,000 registration, investor readiness report with PDF, investor pipeline | Team spends time on serious investors; investors get an honest invest / don't-invest answer | **Done** (awaiting founder review) |
 
 ## Ten improvements proposed beyond the PRD (ranked by value ÷ effort)
 

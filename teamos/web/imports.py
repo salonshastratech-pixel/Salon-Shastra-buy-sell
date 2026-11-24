@@ -156,6 +156,7 @@ def smart_upload():
 @bp.route("/smart/<int:import_id>")
 @require("crm.import")
 def smart_preview(import_id):
+    from ..domain import remarks as RM
     from ..domain import sheet_sync as SS
     db = get_db()
     imp = db.one("SELECT i.*, u.full_name AS by_name FROM sheet_imports i JOIN users u ON u.id = i.created_by "
@@ -170,11 +171,14 @@ def smart_preview(import_id):
         q += " AND r.action = ?"
         args.append(show)
     rows = db.all(q + " ORDER BY r.kind, r.id LIMIT 400", args)
+    cache = RM._learned(db)
     for r in rows:
         d = json.loads(r["data"] or "{}")
         r["u"] = d.get("understood", {})
         r["canon"] = d.get("canon", {})
         r["notes_l"] = json.loads(r["notes"] or "[]")
+        rt = SS.remark_text(r["notes_l"])
+        r["rm"] = RM.read(rt, db, learned_cache=cache) if rt else None
     return render_template("imports/smart_preview.html", imp=imp, tabs=json.loads(imp["tabs"]), rows=rows, show=show,
                            s=SS.summary(db, import_id), counts=json.loads(imp["counts"]) if imp["counts"] else None)
 
@@ -200,3 +204,30 @@ def smart_discard(import_id):
     SS.discard(get_db(), g.user, import_id)
     flash("Import discarded. Nothing was written to sellers or buyers.", "ok")
     return redirect(url_for("imports.index"))
+
+
+# -- Remark dictionary: what TeamOS understands from the team's remarks, and teaching it new phrases --------------
+@bp.route("/remarks", methods=["GET", "POST"])
+@require("crm.view")
+def remarks():
+    from ..domain import remarks as RM
+    from ..domain.errors import PermissionDenied
+    db = get_db()
+    if request.method == "POST":
+        try:
+            if request.form.get("forget"):
+                RM.forget(db, g.user, int(request.form["forget"]))
+                flash("Phrase removed.", "ok")
+            else:
+                RM.teach(db, g.user, request.form.get("phrase"), request.form.get("meaning"))
+                flash("Learned. TeamOS will understand this phrase in every import from now on.", "ok")
+        except PermissionDenied:
+            abort(403)
+        except ValidationError as e:
+            flash(" ".join(e.errors.values()) if isinstance(e.errors, dict) else str(e.errors), "error")
+        return redirect(url_for("imports.remarks", t=request.form.get("t") or None))
+    t = (request.args.get("t") or "").strip()[:500]
+    from ..permissions import user_can
+    return render_template("imports/remarks.html", t=t, res=RM.read(t, db) if t else None, RM=RM,
+                           learned=RM.learned(db), unknown=RM.not_understood(db),
+                           can_teach=user_can(db, g.user, "crm.import") or user_can(db, g.user, "crm.assign"))

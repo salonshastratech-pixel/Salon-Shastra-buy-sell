@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Investor pipeline{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Investor pipeline</h1><div class="sub">Who to spend time on: screening verdict, form, call with Vikas, office visit &amp; registration, readiness report.</div></div>
+  <div class="actions">{% if can('crm.create') %}<a class="btn primary" href="{{ url_for('buyers.new') }}">+ New buyer / investor</a>{% endif %}</div></div>
+
+<div class="kpis">
+  {% for v, l, tone in [('pursue','Pursue','ok'),('nurture','Nurture','warn'),('not_now','Not now','grey'),('unscreened','Not screened','grey')] %}
+  <a class="kpi {{ 'on' if verdict == v }}" href="{{ url_for('investor.index', verdict=v if verdict != v else None) }}"><b>{{ o.counts[v] }}</b><span>{{ l }}</span></a>{% endfor %}
+  <div class="kpi"><b>{{ o.reg.paid or 0 }}</b><span>Registrations paid · ₹{{ '{:,}'.format((o.reg.collected or 0)|int) }}</span></div>
+  <div class="kpi {{ 'bad' if o.reg.due }}"><b>{{ o.reg.due or 0 }}</b><span>Registrations due</span></div>
+</div>
+
+<div class="card flush"><div class="table-wrap"><table>
+<tr><th>Investor</th><th>Screening</th><th>Form</th><th>Vikas</th><th>Office &amp; registration</th><th>Report</th><th>Owner</th></tr>
+{% for r in o.rows %}
+<tr class="row-link">
+  <td><a href="{{ url_for('buyers.detail', opp_id=r.id, tab='investor') }}"><strong>{{ r.contact_name }}</strong></a><div class="small muted">{{ r.ref_code }}{% if r.all_in_max %} · up to {{ r.all_in_max|inr }}{% endif %}</div></td>
+  <td>{% if r.screen_verdict %}{% set v = I.VERDICTS[r.screen_verdict] %}<span class="badge {{ v[1] }}">{{ v[0] }}</span> <span class="small muted">{{ r.screen_score }}</span>{% else %}<span class="badge grey">Not screened</span>{% endif %}</td>
+  <td><span class="badge {{ 'ok' if r.form_status == 'filled' else 'warn' if r.form_status in ('sent','not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[r.form_status] }}</span></td>
+  <td class="small">{{ {'requested': 'requested', 'booked': 'booked', 'done': 'held', 'cancelled': 'cancelled', 'no_show': 'no-show'}[r.vikas_status] if r.vikas_status else '—' }}</td>
+  <td class="small">{% if r.office_visit_status and r.office_visit_status != 'not_booked' %}{{ {'booked': 'visit booked', 'done': 'visited', 'no_show': 'no-show', 'cancelled': 'cancelled'}[r.office_visit_status] }}{% else %}—{% endif %}
+    {% if r.reg_status == 'paid' %}<span class="badge ok">paid</span>{% elif r.reg_status == 'due' %}<span class="badge warn">due</span>{% endif %}</td>
+  <td class="small">{% if r.report_verdict %}{{ r.report_verdict }}{% if r.sent_at %} <span class="badge ok">sent</span>{% elif r.report_status == 'draft' %} <span class="badge warn">draft</span>{% endif %}{% else %}—{% endif %}</td>
+  <td class="small">{{ r.owner_name or '—' }}</td>
+</tr>
+{% else %}<tr><td colspan="7" class="empty">No investors match.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

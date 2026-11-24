@@ -34,6 +34,7 @@ MODULES = [
     ]},
     {"key": "buyers", "label": "Buyers & investors", "icon": "briefcase", "pages": [
         ("All buyers", "buyers.index", {}, "crm.view"),
+        ("Investor pipeline", "investor.index", {}, "crm.view"),
         ("Needs review", "buyers.index", {"queue": "criteria"}, "crm.view"),
         ("+ New buyer", "buyers.new", {}, "crm.create"),
     ]},
@@ -56,6 +57,7 @@ MODULES = [
         ("Users", "admin.users", {}, "users.manage"),
         ("Automations", "workflow.automations", {}, None),
         ("Imports", "imports.index", {}, "crm.import"),
+        ("Remark dictionary", "imports.remarks", {}, "crm.view"),
         ("Duplicates", "admin.duplicates", {}, "duplicates.resolve"),
         ("Integrations", "admin.integrations", {}, "settings.manage"),
         ("Message templates", "admin.templates", {}, "settings.manage"),
@@ -75,7 +77,7 @@ ENDPOINT_MODULE = {
     "main.digest_preview": "today", "auth.change_password": "today", "main.search": "today",
     "main.team_board": "team", "team.": "team", "improve.hand_over": "team",
     "sellers.": "owners", "pilot.": "owners", "workflow.progress_preview": "owners",
-    "buyers.": "buyers",
+    "buyers.": "buyers", "investor.": "buyers",
     "matches.": "deals", "deals.": "deals",
     "inbox.": "talk", "forms.": "talk",
     "reports.": "reports", "workflow.sources": "reports", "improve.learning": "reports",
@@ -89,6 +91,7 @@ PARENT = {
     "tasks.detail": "tasks.index", "inbox.thread": "inbox.index", "inbox.batch": "inbox.batches",
     "forms.review": "forms.inbox", "imports.preview": "imports.index", "imports.smart_preview": "imports.index",
     "pilot.vikas": "pilot.index", "pilot.fill": "sellers.index", "pilot.answers": "sellers.index",
+    "investor.fill": "buyers.index", "investor.answers": "buyers.index", "investor.link": "investor.index",
     "team.week": "main.team_board", "team.activity": "main.team_board",
 }
 

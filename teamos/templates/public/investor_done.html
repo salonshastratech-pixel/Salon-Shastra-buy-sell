@@ -1,0 +1,12 @@
+{% extends "public/layout.html" %}
+{% block title %}Thank you{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Thank you{% if opp.contact_name %}, {{ opp.contact_name.split(' ')[0] }}{% endif %}!</h1>
+  <p>We have your answers. The next step is a short call with our founder, <strong>Vikas Rachakonda</strong>, to talk about your plan.</p>
+</div>
+<div class="card" id="book"><h2>Pick a time to talk with {{ P.CONSULTANT_NAME }}</h2>
+  {% set slots = slots or [] %}
+  {% include "public/_pilot_slots.html" %}
+</div>
+{% endblock %}

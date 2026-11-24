@@ -76,6 +76,12 @@ def read_row(headers: list[str], mapping: dict[int, str], row: list[str]) -> tup
             if field in ("call_status", "lead_type"):
                 canon.setdefault(field, v)
             continue
+        if field.startswith("help_"):
+            if field == "help_staff" and re.fullmatch(r"\d+(\.0)?", v):
+                canon.setdefault("staff_count", v)  # a "Staff" column holding a number is a head-count
+            elif not re.fullmatch(r"(?i)no|n|false|0|-|x", v):
+                canon[field] = v                    # ticked (or a short note) → they want help with this
+            continue
         if field in ("hairdressers", "beauticians"):
             canon["staff_count"] = str((SI.first_int(canon.get("staff_count")) or 0) + (SI.first_int(v) or 0))
             continue
@@ -449,6 +455,7 @@ def commit(db, actor, import_id: int) -> dict:
     if not imp or imp["status"] != "preview":
         raise ValidationError("This import has already been committed or discarded.")
     counts = {"created_seller": 0, "created_buyer": 0, "updated": 0, "merged": 0, "skipped": 0, "failed": 0}
+    to_understand = []
     load, due = {}, _next_morning()
     src_tag = f"sheet:{import_id}"
     for r in db.all("SELECT * FROM sheet_import_rows WHERE import_id = ? ORDER BY id", (import_id,)):
@@ -476,11 +483,21 @@ def commit(db, actor, import_id: int) -> dict:
                 if notes:
                     T.add_activity(db, actor["id"], "opportunity", opp_id, "note",
                                    f"From sheet ({src_note}, row {r['row_no']}):\n" + "\n".join(notes)[:3000])
+                to_understand.append((r["kind"], opp_id, canon, json.loads(r["notes"] or "[]"),
+                                      json.loads(r["raw"] or "{}")))
         except (ValidationError, PermissionDenied) as e:
             counts["failed"] += 1
             msg = " ".join(str(v) for v in e.errors.values()) if isinstance(e, ValidationError) else str(e)
             db.update("sheet_import_rows", r["id"], {"outcome": "failed", "reason": (r["reason"] or "") + f" — {msg}"[:400]})
     _schedule_first_calls(db, import_id)
+    # after the first calls are planned: the team's remarks decide the next call (and what they need)
+    for kind, opp_id, canon, notes, raw in to_understand:
+        try:
+            with db:
+                if apply_understanding(db, actor, kind, opp_id, canon, notes, raw):
+                    counts["understood"] = counts.get("understood", 0) + 1
+        except (ValidationError, PermissionDenied):
+            pass  # understanding is a bonus; the record itself is already imported
     with db:
         db.update("sheet_imports", import_id, {"status": "committed", "counts": json.dumps(counts),
                                                "committed_by": actor["id"], "committed_at": now_iso()})
@@ -619,3 +636,85 @@ def discard(db, actor, import_id: int) -> None:
     with db:
         db.update("sheet_imports", import_id, {"status": "discarded"})
         audit.record(db, actor["id"], "import.sheet_discard", "sheet_import", import_id)
+
+
+# -- Acting on the team's remarks and tick columns --------------------------------------------------------------------
+HELP_COLUMNS = {"help_software": "chairpe", "help_consulting": "business_consulting",
+                "help_marketing": "digital_marketing", "help_staff": "staff_hiring", "help_training": "staff_training"}
+
+
+def remark_text(notes: list[str]) -> str:
+    """The remarks themselves, without the column labels ("Remarks: busy" → "busy")."""
+    out = []
+    for n in notes or []:
+        out.append(n.split(": ", 1)[1] if ": " in n[:42] else n)
+    return " | ".join(x.strip() for x in out if x and x.strip())
+
+
+def apply_understanding(db, actor, kind: str, opp_id: int, canon: dict, notes: list[str], raw: dict) -> list[str]:
+    """Read the remarks (English / Telugu / Telugu in English letters) and the tick columns, then: plan the next call
+    at the time they asked for, record what they need, mark the pilot form, and keep a plain-English summary.
+    Returns what was done (empty if nothing was understood)."""
+    import json as _json
+
+    from . import pilot as P
+    from . import remarks as RM
+    done: list[str] = []
+    text = remark_text(notes)
+    res = RM.read(text, db) if text else {"understood": False, "meanings": {}, "needs": []}
+    # 1. Salon owners: help areas from tick columns + remarks; pilot form answers from a Google-Form sheet
+    if kind == "seller":
+        areas = [HELP_COLUMNS[k] for k in HELP_COLUMNS if canon.get(k)]
+        areas += [RM.NEED_TO_HELP[n] for n in res["needs"] if n in RM.NEED_TO_HELP]
+        if areas:
+            prof = P.profile(db, opp_id)
+            merged = list(dict.fromkeys(prof["help_areas"] + areas))
+            if merged != prof["help_areas"]:
+                P._upsert(db, opp_id, actor["id"], {"help_areas": _json.dumps(merged)})
+                done.append("help areas: " + ", ".join(P.HELP_LABELS[a] for a in merged if a in P.HELP_LABELS))
+        answers = P.answers_from_sheet(raw)
+        if answers and not db.scalar("SELECT id FROM pilot_responses WHERE opportunity_id = ?", (opp_id,)):
+            opp = db.one("SELECT o.*, c.full_name AS contact_name, b.name AS salon_name FROM opportunities o JOIN "
+                         "contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id "
+                         "WHERE o.id = ?", (opp_id,))
+            P.save_response(db, opp, answers, "import", actor["id"], quiet=True)
+            done.append(f"pilot form answers ({len(answers)}) → SWOT draft")
+        elif "form_sent" in res["meanings"] and P.profile(db, opp_id)["form_status"] == "not_sent":
+            P._upsert(db, opp_id, actor["id"], {"form_status": "sent", "form_sent_at": now_iso()})
+            done.append("pilot form marked sent")
+    if not res["understood"]:
+        return done
+    # 2. The next call, at the time they asked for
+    task = db.one("SELECT * FROM tasks WHERE entity_type = 'opportunity' AND entity_id = ? AND status = 'open' "
+                  "ORDER BY due_at LIMIT 1", (opp_id,))
+    out = res["outcome"]
+    title, due, prio = None, None, None
+    if res["callback_at"] and res["callback_at"] > now_iso() and out in ("callback", "busy", "they_will_call", None):
+        title = f"Call back — they asked ({res['callback_text']})"
+        due, prio = res["callback_at"], "high"
+    elif "office_visit" in res["meanings"]:
+        title = "Confirm the office visit" + (f" ({res['callback_text']})" if res["callback_text"] else "")
+        due, prio = res["callback_at"] if res["callback_at"] and res["callback_at"] > now_iso() else None, "high"
+    elif out in ("no_answer", "busy", "switched_off"):
+        title = f"Try again — last time: {RM.MEANINGS[out][0].lower()}"
+    elif out == "they_will_call":
+        title = "They said they'd call — call them if they haven't"
+    elif out == "not_interested":
+        title, prio = "Remarks say not interested — confirm and close", "low"
+    elif out == "wrong_number":
+        title, prio = "Wrong number in the sheet — find the right number", "low"
+    if task and title:
+        vals = {"title": title[:200]}
+        if due:
+            vals["due_at"] = due
+        if prio:
+            vals["priority"] = prio
+        sets = ", ".join(f"{k} = ?" for k in vals)
+        db.execute(f"UPDATE tasks SET {sets} WHERE id = ?", (*vals.values(), task["id"]))
+        done.append("next call: " + title)
+    # 3. A plain-English summary on the record, with the words it came from
+    ev = "; ".join(f"{label} ← “{', '.join(words)[:60]}”" for label, words in res["evidence"])
+    T.add_activity(db, actor["id"], "opportunity", opp_id, "note",
+                   f"TeamOS read the remarks ({res['language']}): {res['summary']}\nFrom: {ev}"[:1500])
+    done.append(res["summary"])
+    return done

@@ -22,6 +22,13 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 13 — investor journey, what to try
+1. **Buyers & investors → Investor pipeline**: who is Pursue / Nurture / Not now, and where each investor is.
+2. Open **Arjun Rao (demo)** → **Investor journey**: screened Pursue, form filled, call with Vikas held,
+   registration paid, readiness report approved and sent. **Download PDF** to see what the investor gets.
+3. Open **Deepa Iyer (demo)**: form filled, call requested, report still a draft — add Vikas's note and approve.
+4. On another buyer, answer the 5 screening questions and see the verdict; then **Send the form link**.
+
 ## Milestone 12 — navigation and team, what to try
 1. Open any record from a list, then press **Back** (top left) — you return to the list. The breadcrumb and the
    tabs under it show where you are and the other pages of that module.

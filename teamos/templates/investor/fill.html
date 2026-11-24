@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "pilot/_questions.html" import sections %}
+{% set crumbs = [(url_for('buyers.detail', opp_id=opp.id, tab='investor'), opp.ref_code ~ ' · ' ~ (opp.contact_name or ''))] %}
+{% block title %}Investor form{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Investor form for {{ opp.contact_name }}</h1><div class="sub">Use this while on the call. Required questions have a *.</div></div></div>
+{% if errors %}<div class="flash error">Please check the highlighted answers ({{ errors|length }}).</div>{% endif %}
+<form method="post" novalidate>{{ csrf() }}
+  {{ sections(I, answers, errors) }}
+  <div class="card"><button class="btn primary">Save answers and draft the readiness report</button>
+    <a class="btn" href="{{ url_for('buyers.detail', opp_id=opp.id, tab='investor') }}">Cancel</a></div>
+</form>
+{% endblock %}

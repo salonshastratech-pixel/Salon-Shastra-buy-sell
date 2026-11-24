@@ -1,0 +1,131 @@
+{% from "macros.html" import csrf %}
+{% set rep = inv_report %}
+<ol class="pilot-steps" aria-label="Investor steps">
+  <li class="{{ 'done' if inv.screen_verdict }}"><a href="#screen">1 · Screening</a></li>
+  <li class="{{ 'done' if inv.form_status == 'filled' else 'now' if inv.form_status == 'sent' }}"><a href="#form">2 · Investor form</a></li>
+  <li class="{{ 'done' if inv_bookings and inv_bookings[0].status == 'done' else 'now' if inv_bookings }}"><a href="#vikas">3 · Call with Vikas</a></li>
+  <li class="{{ 'done' if inv.reg_status in ('paid', 'waived') else 'now' if inv.office_visit_status == 'booked' or inv.reg_status == 'due' }}"><a href="#office">4 · Office visit &amp; registration</a></li>
+  <li class="{{ 'done' if rep and rep.sent_at else 'now' if rep }}"><a href="#report">5 · Readiness report</a></li>
+</ol>
+
+<div class="split">
+<div>
+  {# 1. Screening ------------------------------------------------------------------------------------------- #}
+  <form method="post" action="{{ url_for('investor.screen', opp_id=opp.id) }}" class="card" id="screen" data-screen>{{ csrf() }}
+    <div class="card-h"><h2>First-call screening</h2>
+      {% if inv.screen_verdict %}{% set v = I.VERDICTS[inv.screen_verdict] %}<span class="badge {{ v[1] if v[1] != 'grey' else 'grey' }} big-badge">{{ v[0] }} · {{ inv.screen_score }}/100</span>{% endif %}</div>
+    {% if inv.screen_verdict %}{% set res = I.screen_result(inv.screen) %}
+    <div class="verdict-box tone-{{ I.VERDICTS[inv.screen_verdict][1] }}"><strong>{{ I.VERDICTS[inv.screen_verdict][2] }}</strong>
+      {% if res.gaps %}<ul>{% for gp in res.gaps %}<li>{{ gp }}</li>{% endfor %}</ul>{% endif %}</div>{% else %}
+    <p class="small muted">Ask these 5 questions on the first call. TeamOS tells you whether to spend more time now.</p>{% endif %}
+    {% for key, q, opts, hint in I.SCREEN %}
+    <div class="field"><label>{{ loop.index }}. {{ q }}</label><div class="help">{{ hint }}</div>
+      <div class="chips" role="radiogroup">{% for v, l, pts in opts %}<label class="chip"><input type="radio" name="{{ key }}" value="{{ v }}" data-pts="{{ pts }}" {{ 'checked' if inv.screen.get(key) == v }} required><span>{{ l }}</span></label>{% endfor %}</div></div>
+    {% endfor %}
+    <div class="field"><label for="sc-note">Notes from the call</label><textarea id="sc-note" name="screen_note" rows="2" maxlength="1000">{{ inv.screen_note or '' }}</textarea></div>
+    <div class="live-verdict" data-screen-live hidden aria-live="polite"></div>
+    <button class="btn primary">{{ 'Update screening' if inv.screen_verdict else 'Save & get verdict' }}</button>
+    {% if inv.screened_at %}<span class="small muted"> Last screened {{ inv.screened_at|rel }}</span>{% endif %}
+  </form>
+
+  {# 2. Investor form ----------------------------------------------------------------------------------------- #}
+  <div class="card" id="form">
+    <div class="card-h"><h2>Investor form</h2>
+      <span class="badge {{ 'ok' if inv.form_status == 'filled' else 'warn' if inv.form_status in ('sent', 'not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[inv.form_status] }}</span></div>
+    <p class="small muted">About 10 minutes: plan, experience, money (savings or loan, EMI, 6 months of running money), time, expectations and risk. No prices are shown.</p>
+    <div class="inline">
+      <form method="post" action="{{ url_for('investor.link', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="purpose" value="form"><button class="btn primary">{{ 'Send the form again' if inv.form_status in ('sent', 'filled') else 'Send the form link' }}</button></form>
+      <a class="btn" href="{{ url_for('investor.fill', opp_id=opp.id) }}">{{ 'Edit answers' if inv_response else 'Fill it for them' }}</a>
+      {% if inv_response %}<a class="btn" href="{{ url_for('investor.answers', opp_id=opp.id) }}">See answers</a>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('investor.form_status', opp_id=opp.id) }}" class="inline mark-status">{{ csrf() }}
+      <span class="small muted">Mark as:</span>{% for v, l in P.FORM_STATUS if v != inv.form_status %}<button class="btn sm" name="status" value="{{ v }}">{{ l }}</button>{% endfor %}</form>
+  </div>
+
+  {# 5. Report ---------------------------------------------------------------------------------------------------- #}
+  <div class="card" id="report">
+    <div class="card-h"><h2>Investor readiness report</h2>
+      {% if rep %}<span class="badge {{ 'ok' if rep.status == 'approved' else 'warn' }}">v{{ rep.version }} · {{ 'Approved' if rep.status == 'approved' else 'Draft — finish after the call with Vikas' }}</span>{% endif %}</div>
+    {% if not rep %}<p class="muted">Drafted automatically when the investor form is filled. Finish and send it after the call with Vikas.</p>
+    {% else %}{% set c = rep.c %}
+    <div class="inline report-actions">
+      <a class="btn" href="{{ url_for('investor.report_pdf', opp_id=opp.id) }}">Download PDF{{ ' (draft)' if rep.status != 'approved' }}</a>
+      {% if rep.status == 'approved' %}<form method="post" action="{{ url_for('investor.link', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="purpose" value="report"><button class="btn primary">Send to the investor</button></form>{% endif %}
+      <form method="post" action="{{ url_for('investor.redraft', opp_id=opp.id) }}">{{ csrf() }}<button class="btn sm">Re-draft from answers</button></form>
+    </div>
+    {% if rep.sent_at %}<p class="small ok-text">Sent {{ rep.sent_at|rel }}.</p>{% endif %}
+    <div class="scores">{% for label, s in c.scores %}<div class="score"><span>{{ label }}</span><b class="{{ 'good' if s >= 7 else 'mid' if s >= 5 else 'low' }}">{{ s }}/10</b></div>{% endfor %}</div>
+    <form method="post" action="{{ url_for('investor.save_report', opp_id=opp.id, rid=rep.id) }}" class="report-edit">{{ csrf() }}
+      <div class="form-grid">
+        <div class="field"><label for="iv-v">Verdict</label><select id="iv-v" name="verdict">{% for k, t in I.VERDICT_TEXT.items() %}<option value="{{ k }}" {{ 'selected' if c.verdict == k }}>{{ t[0] }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="iv-p">Recommended path</label><input id="iv-p" name="path" value="{{ c.path }}" maxlength="80"></div>
+        <div class="field full"><label for="iv-pt">Why this path</label><textarea id="iv-pt" name="path_text" rows="2" maxlength="400">{{ c.path_text }}</textarea></div>
+        <div class="field full"><label for="iv-s">In short</label><textarea id="iv-s" name="summary" rows="2" maxlength="800">{{ c.summary }}</textarea></div>
+        <div class="field full"><label for="iv-sp">How to split the money</label><textarea id="iv-sp" name="split" rows="2" maxlength="400">{{ c.split or '' }}</textarea></div>
+        <div class="field full"><label for="iv-vn">Vikas's note <span class="muted small">(after the call)</span></label><textarea id="iv-vn" name="vikas_note" rows="3" maxlength="800" placeholder="What Vikas advised on the call">{{ c.vikas_note or '' }}</textarea></div>
+        <div class="field swot-edit swot-strengths"><label for="iv-st">What works for them <span class="muted small">one per line</span></label><textarea id="iv-st" name="strengths" rows="5">{{ c.strengths|join('\n') }}</textarea></div>
+        <div class="field swot-edit swot-weaknesses"><label for="iv-r">Risks <span class="muted small">one per line</span></label><textarea id="iv-r" name="risks" rows="5">{{ c.risks|join('\n') }}</textarea></div>
+        <div class="field full"><label for="iv-c">Before they put money in <span class="muted small">one per line</span></label><textarea id="iv-c" name="conditions" rows="4">{{ c.conditions|join('\n') }}</textarea></div>
+      </div>
+      <h3>Next steps</h3>
+      {% for i in range(((c.steps|length) + 2) if (c.steps|length) < 6 else 8) %}{% set st = c.steps[i] if i < c.steps|length else {} %}
+      <div class="step-edit"><span class="step-no">{{ i + 1 }}</span><div class="form-grid">
+        <div class="field"><label for="is-t{{ i }}">Step</label><input id="is-t{{ i }}" name="step_title_{{ i }}" value="{{ st.title or '' }}" maxlength="140"></div>
+        <div class="field"><label for="is-w{{ i }}">When</label><input id="is-w{{ i }}" name="step_when_{{ i }}" value="{{ st.when or '' }}" maxlength="40"></div>
+        <div class="field full"><label for="is-y{{ i }}">Why</label><input id="is-y{{ i }}" name="step_why_{{ i }}" value="{{ st.why or '' }}" maxlength="240"></div>
+      </div></div>{% endfor %}
+      <div class="inline"><button class="btn" name="action" value="save">Save changes</button>
+        <button class="btn primary" name="action" value="approve">{{ 'Save and keep approved' if rep.status == 'approved' else 'Approve report' }}</button></div>
+      <p class="small muted">The report never shows fees. Editing an approved report makes a new draft version.</p>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div>
+  {# 3. Call with Vikas ------------------------------------------------------------------------------------------ #}
+  <div class="card" id="vikas">
+    <div class="card-h"><h2>Call with {{ P.CONSULTANT_NAME }}</h2><a class="small" href="{{ url_for('pilot.vikas') }}">His free times →</a></div>
+    <p class="small muted">A few minutes with Vikas after the form is filled — before the office visit.</p>
+    {% for b in inv_bookings %}
+    <div class="booking {{ b.status }}">
+      <div><strong>{% if b.starts_at %}{{ b.starts_at|ist('%a %d %b, %I:%M %p') }}{% else %}Requested: {{ b.preferred_time }}{% endif %}</strong>
+        <span class="badge {{ 'ok' if b.status == 'done' else 'warn' if b.status in ('requested', 'booked') else 'grey' }}">{{ {'requested': 'Requested', 'booked': 'Booked', 'done': 'Held', 'cancelled': 'Cancelled', 'no_show': 'No-show'}[b.status] }}</span></div>
+      {% if b.outcome_note %}<div class="small"><strong>Outcome:</strong> {{ b.outcome_note }}</div>{% endif %}
+      {% if b.status in ('requested', 'booked') %}
+      <details class="disclose"><summary>Update this call</summary>
+        <form method="post" action="{{ url_for('investor.booking', opp_id=opp.id, bid=b.id) }}" class="form-grid">{{ csrf() }}
+          {% if b.status == 'requested' %}<div class="field"><label>Confirmed time (IST)</label><input type="datetime-local" name="starts_at"></div>{% endif %}
+          <div class="field"><label>Status</label><select name="status">{% if b.status == 'requested' %}<option value="booked">Confirm the time</option>{% endif %}<option value="done">Held</option><option value="no_show">Didn't join</option><option value="cancelled">Cancelled</option></select></div>
+          <div class="field full"><label>What Vikas advised</label><textarea name="outcome" rows="2" maxlength="1000"></textarea></div>
+          <div class="full"><button class="btn primary">Save</button></div>
+        </form></details>{% endif %}
+    </div>{% endfor %}
+    {% if not inv_bookings or inv_bookings[0].status not in ('requested', 'booked') %}
+    <details class="disclose" {{ 'open' if inv.form_status == 'filled' and not inv_bookings }}><summary>Book a call with Vikas</summary>
+      <form method="post" action="{{ url_for('investor.book', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        {% if inv_slots %}<div class="field full"><label>Free time</label><select name="slot_id"><option value="">— none suits; note a preferred time below —</option>{% for s in inv_slots %}<option value="{{ s.id }}">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} · {{ s.mode }}</option>{% endfor %}</select></div>
+        {% else %}<p class="small muted full">No free times listed. <a href="{{ url_for('pilot.vikas') }}">Add Vikas's free times</a>, or note what the investor prefers.</p>{% endif %}
+        <div class="field full"><label>Preferred time (if no slot)</label><input name="preferred" maxlength="200" placeholder="e.g. Saturday after 3 pm"></div>
+        <div class="field full"><label>Note for Vikas</label><input name="note" maxlength="500" placeholder="e.g. Pursue — 30L savings, wants a running salon in Kondapur"></div>
+        <div class="full"><button class="btn primary">Book — alert Vikas</button></div>
+      </form></details>{% endif %}
+  </div>
+
+  {# 4. Office visit & registration ----------------------------------------------------------------------------- #}
+  <form method="post" action="{{ url_for('investor.office', opp_id=opp.id) }}" class="card form-grid" id="office">{{ csrf() }}
+    <div class="card-h full"><h2>Office visit &amp; registration</h2>
+      <span class="badge {{ 'ok' if inv.reg_status == 'paid' else 'warn' if inv.reg_status == 'due' else 'grey' }}">₹{{ '{:,}'.format(inv.reg_fee) }} · {{ {'not_due': 'not due yet', 'due': 'due', 'paid': 'paid', 'waived': 'waived'}[inv.reg_status] }}</span></div>
+    <p class="small muted full">After the call with Vikas the investor visits the office and pays the registration fee so Salon Shastra starts working for them. Staff only — never shown on the form or report.</p>
+    <div class="field"><label for="of-at">Visit date &amp; time (IST)</label><input id="of-at" type="datetime-local" name="office_visit_at"></div>
+    <div class="field"><label for="of-st">Visit</label><select id="of-st" name="office_visit_status">{% for v, l in [('not_booked','Not booked'),('booked','Booked'),('done','Visited'),('no_show','Did not come'),('cancelled','Cancelled')] %}<option value="{{ v }}" {{ 'selected' if inv.office_visit_status == v }}>{{ l }}</option>{% endfor %}</select>
+      {% if inv.office_visit_at %}<div class="help">{{ inv.office_visit_at|ist('%a %d %b, %I:%M %p') }}</div>{% endif %}</div>
+    <div class="field"><label for="of-reg">Registration fee</label><select id="of-reg" name="reg_status">{% for v, l in [('not_due','Not due yet'),('due','Due'),('paid','Paid'),('waived','Waived')] %}<option value="{{ v }}" {{ 'selected' if inv.reg_status == v }}>{{ l }}</option>{% endfor %}</select></div>
+    {% if inv.reg_status != 'paid' %}<div class="field"><label for="of-mode">Paid by</label><select id="of-mode" name="reg_paid_mode"><option value="">—</option>{% for v, l in P.PAY_MODES %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+      <input name="reg_paid_ref" maxlength="80" placeholder="UPI / bank reference" aria-label="Payment reference"></div>
+    {% else %}<div class="field"><label>Paid</label><div class="small">{{ dict(P.PAY_MODES).get(inv.reg_paid_mode, inv.reg_paid_mode) }}{% if inv.reg_paid_ref %} · {{ inv.reg_paid_ref }}{% endif %} · {{ inv.reg_paid_at|ist('%d %b %Y') }}</div></div>{% endif %}
+    <div class="field full"><label for="of-note">Note</label><input id="of-note" name="reg_note" maxlength="300" value="{{ inv.reg_note or '' }}"></div>
+    <div class="full"><button class="btn primary">Save</button></div>
+  </form>
+</div>
+</div>

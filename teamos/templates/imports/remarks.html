@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Remark dictionary{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Remark dictionary</h1>
+  <div class="sub">How TeamOS reads the team's call remarks — English, Telugu, or Telugu typed in English letters — when a sheet is imported.</div></div></div>
+
+<div class="split">
+<div>
+  <form method="get" class="card">
+    <div class="card-h"><h2>Try a remark</h2><span class="small muted">Nothing is saved</span></div>
+    <div class="field"><label for="t">Type or paste a remark exactly as the team wrote it</label>
+      <textarea id="t" name="t" rows="2" maxlength="500" placeholder="e.g. busy ga unnaru, repu evening call cheyandi">{{ t }}</textarea></div>
+    <button class="btn primary">Read it</button>
+    <div class="chips try-chips">{% for ex in ['busy ga unnaru, repu evening call cheyandi', 'staff problem, vikas anna tho matladali', 'salon ammali anukuntunnaru 15L', 'lift cheyaledu', 'monday office ki vastanu annaru', 'రేపు సాయంత్రం కాల్ చేయండి'] %}<a class="chip-link" href="{{ url_for('imports.remarks', t=ex) }}">{{ ex }}</a>{% endfor %}</div>
+  </form>
+  {% if res %}
+  <div class="card verdict-box tone-{{ 'ok' if res.understood else 'warn' }}">
+    <div class="small muted">{{ res.language }}</div>
+    {% if res.understood %}<h2>{{ res.summary }}</h2>
+      <ul>{% for label, words in res.evidence %}<li><strong>{{ label }}</strong> <span class="muted">← “{{ words|join('”, “') }}”</span></li>{% endfor %}</ul>
+      {% if res.callback_at %}<p class="small">Next call would be planned for <strong>{{ res.callback_at|ist('%a %d %b, %I:%M %p') }}</strong>.</p>{% endif %}
+    {% else %}<h2>Not understood yet</h2><p class="small">Teach TeamOS the words below and it will understand them from now on. The remark itself is always kept on the record.</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if can_teach %}
+  <form method="post" class="card form-grid" id="teach">{{ csrf() }}<input type="hidden" name="t" value="{{ t }}">
+    <h2 class="full">Teach a phrase</h2>
+    <div class="field"><label for="ph">Words, as the team writes them</label><input id="ph" name="phrase" maxlength="60" required placeholder="e.g. nenu chusi chepta"></div>
+    <div class="field"><label for="mn">They mean</label><select id="mn" name="meaning" required><option value="">Choose…</option>
+      {% for k, (label, grp) in RM.MEANINGS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="full"><button class="btn primary">Teach TeamOS</button></div>
+  </form>
+  {% endif %}
+</div>
+<div>
+  <div class="card"><h2>Remarks not understood yet</h2>
+    <p class="small muted">From recent imports. Click one to try it, then teach the words.</p>
+    {% for u in unknown %}<div class="list-row"><a href="{{ url_for('imports.remarks', t=u) }}">{{ u }}</a></div>{% else %}<p class="muted small">Everything imported so far was understood (or nothing has been imported yet).</p>{% endfor %}
+  </div>
+  <div class="card"><h2>Taught by the team</h2>
+    {% for p in learned %}<div class="list-row"><div><strong>{{ p.phrase }}</strong> → {{ RM.MEANINGS[p.meaning][0] if p.meaning in RM.MEANINGS else p.meaning }}<div class="small muted">{{ p.full_name or '—' }} · {{ p.created_at|rel }}</div></div>
+      {% if can_teach %}<form method="post">{{ csrf() }}<button class="btn sm" name="forget" value="{{ p.id }}">Remove</button></form>{% endif %}</div>
+    {% else %}<p class="muted small">Nothing taught yet. TeamOS already knows common English, Telugu and Tenglish phrases for: didn't answer, busy, call back (with day and time — repu, monday, evening, after 5pm, in 10 mins), not interested, wrong number, interested, thinking, office visit, form sent / filled, talk to Vikas, needs staff / training / marketing / software / consulting, wants to sell / buy / open a new salon, loan / savings / no money.</p>{% endfor %}
+  </div>
+</div>
+</div>
+{% endblock %}

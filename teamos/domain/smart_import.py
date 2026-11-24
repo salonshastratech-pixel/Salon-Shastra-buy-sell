@@ -97,12 +97,18 @@ COLUMNS = [
     ("intent", "b", [r"why are you interested|investment intent"]),
     ("experience", "b", [r"experience in the salon|beauty industry"]),
     ("visit_willing", "b", [r"willing to visit"]),
+    # pilot-sheet tick columns the team fills after the call ("software", "business consulting", "marketing", "staff")
+    ("help_software", "s", [r"^software$", r"^chair\s*pe$"]),
+    ("help_consulting", "s", [r"^business\s*consult\w*$", r"^consulting$"]),
+    ("help_marketing", "s", [r"^(digital\s*)?marketing$"]),
+    ("help_staff", "s", [r"^staff$", r"^staff\s*(hiring|support)$"]),
+    ("help_training", "s", [r"^(staff\s*)?training$"]),
     ("lead_type", "n", [r"^lead\s*type$", r"lead temp", r"^priority$", r"lead\s*status"]),
     ("call_status", "n", [r"call\s*status"]),
     ("notes", "n", [r"remark", r"notes?$", r"comment", r"follow\s*up", r"consultation|consultaion", r"payment collected",
                     r"assigned to", r"impact", r"price\?|this price|valuation", r"liabilit.*explain|nature of",
                     r"next step", r"pending amount|outstanding value", r"seriously thinking|does not sell in",
-                    r"parking .*visibility", r"instagram"]),
+                    r"parking .*visibility", r"instagram", r"^column\s*\d+\s+\d+$"]),
 ]
 # These headers on their own mean the tab is NOT about buying/selling salons (staff, students, products, HR…).
 OFF_TOPIC_HEADERS = re.compile(r"\b(stylist role|role|salary|resume|qualification|course|student|trainer|"

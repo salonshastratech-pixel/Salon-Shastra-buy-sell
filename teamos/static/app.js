@@ -222,3 +222,24 @@
   });
 })();
 
+
+// Investor screening: live estimate while the team clicks the 5 answers (the saved verdict also checks red flags).
+(function () {
+  var f = document.querySelector('form[data-screen]');
+  if (!f) return;
+  var out = f.querySelector('[data-screen-live]');
+  var upd = function () {
+    var picked = f.querySelectorAll('input[data-pts]:checked');
+    var total = 0;
+    picked.forEach(function (i) { total += parseInt(i.getAttribute('data-pts'), 10) || 0; });
+    if (!out) return;
+    if (!picked.length) { out.hidden = true; return; }
+    out.hidden = false;
+    var v = total >= 65 ? ['Pursue', 'ok'] : total >= 40 ? ['Nurture', 'warn'] : ['Not now', 'grey'];
+    out.className = 'live-verdict tone-' + v[1];
+    out.textContent = (picked.length < 5 ? 'So far: ' : 'Estimate: ') + v[0] + ' · ' + total + '/100' +
+      (picked.length < 5 ? ' (' + picked.length + ' of 5 answered)' : '');
+  };
+  f.addEventListener('change', upd);
+  upd();
+})();

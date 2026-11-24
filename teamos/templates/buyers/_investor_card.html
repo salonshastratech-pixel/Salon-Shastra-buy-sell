@@ -1,0 +1,12 @@
+{% if inv is defined %}
+<div class="card pilot-card">
+  <div class="card-h"><h2>Investor journey</h2><a class="small" href="{{ url_for('buyers.detail', opp_id=opp.id, tab='investor') }}">Open →</a></div>
+  <div class="inline small">
+    {% if inv.screen_verdict %}{% set v = I.VERDICTS[inv.screen_verdict] %}<span class="badge {{ v[1] }}">{{ v[0] }} · {{ inv.screen_score }}/100</span>{% else %}<span class="badge grey">Not screened — ask the 5 questions</span>{% endif %}
+    <span class="badge {{ 'ok' if inv.form_status == 'filled' else 'warn' if inv.form_status in ('sent','not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[inv.form_status] }}</span>
+    {% if inv_bookings %}{% set b = inv_bookings[0] %}<span class="badge {{ 'ok' if b.status == 'done' else 'warn' if b.status in ('requested','booked') else 'grey' }}">Vikas: {{ {'requested': 'requested', 'booked': 'booked', 'done': 'call held', 'cancelled': 'cancelled', 'no_show': 'no-show'}[b.status] }}</span>{% endif %}
+    {% if inv.reg_status != 'not_due' %}<span class="badge {{ 'ok' if inv.reg_status == 'paid' else 'warn' if inv.reg_status == 'due' else 'grey' }}">Registration {{ inv.reg_status }}</span>{% endif %}
+    {% if inv_report %}<span class="badge {{ 'ok' if inv_report.sent_at else 'warn' }}">Report: {{ inv_report.c.verdict_label }}{{ ' · sent' if inv_report.sent_at }}</span>{% endif %}
+  </div>
+</div>
+{% endif %}

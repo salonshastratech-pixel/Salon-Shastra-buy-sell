@@ -136,3 +136,12 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-78 | Default working hours | Mon–Sat 10:00–19:00 IST, Sunday off, until each person sets their own. | Founder | Proposed |
 | D-79 | Leave and new leads | Leave, sick leave and public holidays stop new leads that day; half day, field work and training do not. Anyone sets their own; team leads can set anyone's. | Founder | Proposed |
 | D-80 | Activity tracking | Team activity shows each person's logged calls, messages, tasks, new records and stage moves to everyone with CRM access (no pay or finance data). | Founder | Proposed |
+
+## Added in Milestone 13 — investor journey (proposals — pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-81 | Screening thresholds | Pursue ≥ 65/100, Nurture 40–64, Not now < 40; no funding arranged + no running money is always Not now; just exploring / support only is at most Nurture. | Founder | Proposed |
+| D-82 | Registration fee | ₹5,000, recorded by staff after the office visit (or waived); never shown on the investor form or report. | Founder | Proposed |
+| D-83 | Readiness verdict rules | Not yet when running money is short and the funding is fragile, money is not arranged, or they cannot afford any loss; Ready when every area is strong; otherwise Ready with support. Money split guidance: keep about 30% for 6 months of running costs. Staff can change the verdict before approving. | Founder | Proposed |
+| D-84 | Acting on remarks | On import, a remark with a time ("repu evening") moves the first call to that time (high priority); didn't answer / busy / switched off → "try again"; not interested / wrong number → low-priority task to confirm and close (nothing is closed automatically). The original remark is always kept. | Founder | Proposed |

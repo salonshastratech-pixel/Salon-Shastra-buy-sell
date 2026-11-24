@@ -651,3 +651,20 @@ input[type=time] { font: inherit; padding: 7px 9px; border: 1px solid var(--line
   .back span { display: none; }
   .back { padding: 5px 8px; }
 }
+
+/* Investor journey */
+.verdict-box { border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--line); background: #faf7f4; }
+.verdict-box ul { margin: 6px 0 0; padding-left: 18px; }
+.verdict-box.tone-ok { background: #eaf6ef; border-color: #bfe3cd; }
+.verdict-box.tone-warn { background: #fff4de; border-color: #f0d9a8; }
+.verdict-box.tone-grey { background: #f4f1ee; }
+.verdict-box.tone-bad { background: #fdecea; border-color: #f3c3bf; }
+.card.verdict-box h1 { margin-bottom: 6px; }
+.big-badge { font-size: 12.5px; padding: 4px 12px; }
+.understood { margin-bottom: 4px; }
+.try-chips { margin-top: 10px; }
+.try-chips .chip-link { font-size: 12px; }
+.live-verdict { margin: 4px 0 12px; padding: 8px 12px; border-radius: 10px; font-weight: 600; font-size: 13px; background: #f4f1ee; }
+.live-verdict.tone-ok { background: #e8f6ee; color: #1f6e44; }
+.live-verdict.tone-warn { background: #fdf2dd; color: #8a5a0c; }
+.live-verdict.tone-grey { background: #f4f1ee; color: var(--muted); }

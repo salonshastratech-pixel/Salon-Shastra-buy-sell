@@ -105,12 +105,12 @@ def _page(report, logo):
                 canv.drawString(M, H - 18 * mm, "SALON SHASTRA")
             canv.setFillColor(colors.white)
             canv.setFont("Helvetica", 10)
-            canv.drawRightString(W - M, H - 18 * mm, "Salon Growth Report · " + report["date"])
+            canv.drawRightString(W - M, H - 18 * mm, report.get("head", "Salon Growth Report") + " · " + report["date"])
             canv.setFont("Helvetica-Bold", 22)
-            canv.drawString(M, H - 35 * mm, _plain(report["c"]["salon_name"])[:48])
+            canv.drawString(M, H - 35 * mm, _plain(report.get("title") or report["c"].get("salon_name"))[:48])
             canv.setFont("Helvetica", 11.5)
-            sub = "SWOT analysis and next steps"
-            if report["c"].get("owner_name"):
+            sub = report.get("sub") or "SWOT analysis and next steps"
+            if report["c"].get("owner_name") and not report.get("sub"):
                 sub = f"Prepared for {_plain(report['c']['owner_name'])} · " + sub
             canv.drawString(M, H - 44 * mm, sub[:90])
         else:
@@ -120,11 +120,12 @@ def _page(report, logo):
             canv.setFont("Helvetica-Bold", 9)
             canv.drawString(M, H - 6 * mm, "SALON SHASTRA")
             canv.setFont("Helvetica", 9)
-            canv.drawRightString(W - M, H - 6 * mm, _plain(report["c"]["salon_name"])[:60] + " · SWOT report")
+            canv.drawRightString(W - M, H - 6 * mm, _plain(report.get("title") or report["c"].get("salon_name"))[:60]
+                                 + " · " + report.get("short", "SWOT report"))
         canv.setFillColor(MUTED)
         canv.setFont("Helvetica", 7.5)
-        canv.drawString(M, 9 * mm, "Prepared by Salon Shastra from the owner's own answers. Confidential — for the "
-                                   "salon owner only.")
+        canv.drawString(M, 9 * mm, report.get("foot") or "Prepared by Salon Shastra from the owner's own answers. "
+                                                         "Confidential — for the salon owner only.")
         canv.drawRightString(W - M, 9 * mm, f"Page {doc.page}")
         canv.restoreState()
     return draw
@@ -270,4 +271,101 @@ def build(report: dict, booking_link: str | None = None) -> bytes:
                            S["small"]))
     doc.build(story, onFirstPage=_page(report, logo if os.path.exists(logo) else None),
               onLaterPages=_page(report, None))
+    return buf.getvalue()
+
+
+VERDICT_COLOURS = {"ready": ("#1f7a4d", "#eaf6ef"), "with_support": ("#9a6200", "#fff4de"),
+                   "not_yet": ("#b3261e", "#fdecea")}
+
+
+def build_investor(report: dict, booking_link: str | None = None) -> bytes:
+    """Investor readiness report: verdict, readiness scores, recommended path, money split, strengths, risks,
+    conditions, Vikas's note and next steps. No prices (founder's rule)."""
+    c = report["c"]
+    S = _styles()
+    buf = io.BytesIO()
+    logo = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "brand", "logo.png")
+    meta = {"c": c, "date": report["date"], "head": "Investor Readiness Report", "title": c.get("name") or "Investor",
+            "sub": "Should you invest, and how? Our assessment and next steps", "short": "Investor readiness",
+            "foot": "Prepared by Salon Shastra from your answers and your call with Vikas Rachakonda. Confidential."}
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=M, rightMargin=M, topMargin=16 * mm, bottomMargin=18 * mm,
+                            title=f"Investor readiness — {_plain(meta['title'])}", author="Salon Shastra")
+    fg, bg = (colors.HexColor(x) for x in VERDICT_COLOURS.get(c.get("verdict"), VERDICT_COLOURS["with_support"]))
+    story = [Spacer(1, 42 * mm)]
+    big = ParagraphStyle("verdict", parent=S["body"], fontName="Helvetica-Bold", fontSize=17, leading=22,
+                         textColor=fg)
+    story.append(_box([Paragraph(_t(c["verdict_label"]), big), Spacer(1, 4), Paragraph(_t(c["verdict_text"]), S["body"]),
+                       Spacer(1, 4), Paragraph(_t(c["summary"]), S["small"])], bg, pad=12, border=fg))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Your plan at a glance", S["h2"]))
+    cells = [[Paragraph(_t(k), S["label"]), Paragraph(_t(v), S["value"])] for k, v in c.get("facts") or []]
+    rows = []
+    for i in range(0, len(cells), 4):
+        chunk = cells[i:i + 4] + [[Paragraph("", S["label"]), Paragraph("", S["value"])]] * (4 - len(cells[i:i + 4]))
+        rows.append(chunk)
+    if rows:
+        t = Table(rows, colWidths=[(W - 2 * M) / 4] * 4)
+        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BOX", (0, 0), (-1, -1), 0.6, SOFT),
+                               ("INNERGRID", (0, 0), (-1, -1), 0.6, SOFT), ("TOPPADDING", (0, 0), (-1, -1), 6),
+                               ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        story.append(t)
+    story.append(Spacer(1, 6))
+    story.append(Paragraph("Readiness scores", S["h2"]))
+    story.append(Paragraph("1 = needs work before investing, 10 = strong. Based on your answers.", S["small"]))
+    story.append(Spacer(1, 4))
+    for label, score in c.get("scores") or []:
+        story.append(ScoreBar(label, score, W - 2 * M))
+    story.append(PageBreak())
+
+    story.append(Paragraph("Our recommendation", S["h1"]))
+    rec = [Paragraph(f"<b>{_t(c['path'])}</b>", S["h2"]), Paragraph(_t(c["path_text"]), S["body"])]
+    if c.get("split"):
+        rec += [Spacer(1, 4), Paragraph("<b>How to split your money:</b> " + _t(c["split"]), S["body"])]
+    story.append(_box(rec, TINT, pad=11, border=SOFT))
+    if c.get("vikas_note"):
+        story.append(Spacer(1, 8))
+        story.append(_box([Paragraph("<b>A note from Vikas Rachakonda</b>", S["body"]),
+                           Paragraph(_t(c["vikas_note"]), S["body"])], colors.white, pad=11, border=BRAND))
+    story.append(Spacer(1, 10))
+    half = (W - 2 * M - 6 * mm) / 2
+
+    def col(title, items, key):
+        fgc, bgc = QUAD[key]
+        inner = [Paragraph(f'<font color="{fgc.hexval()}"><b>{title}</b></font>', S["quad"])]
+        inner += [Paragraph(_t(x), S["bullet"], bulletText="•") for x in (items or ["—"])]
+        return inner, bgc
+    si, sb = col("What works for you", c.get("strengths"), "strengths")
+    ri, rb = col("Risks to manage", c.get("risks"), "weaknesses")
+    grid = Table([[si, "", ri]], colWidths=[half, 6 * mm, half])
+    grid.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BACKGROUND", (0, 0), (0, 0), sb),
+                              ("BACKGROUND", (2, 0), (2, 0), rb), ("LEFTPADDING", (0, 0), (-1, -1), 9),
+                              ("RIGHTPADDING", (0, 0), (-1, -1), 9), ("TOPPADDING", (0, 0), (-1, -1), 9),
+                              ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
+    story.append(grid)
+    if c.get("conditions"):
+        story.append(Spacer(1, 8))
+        story.append(Paragraph("Before you put money in", S["h2"]))
+        for x in c["conditions"]:
+            story.append(Paragraph(_t(x), S["bullet"], bulletText="•"))
+    story.append(CondPageBreak(60 * mm))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph("Your next steps", S["h2"]))
+    for i, st in enumerate(c.get("steps") or [], 1):
+        num = Table([[Paragraph(f"<b>{i}</b>", S["white"])]], colWidths=[9 * mm], rowHeights=[9 * mm])
+        num.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                                 ("ROUNDEDCORNERS", [4, 4, 4, 4]), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                 ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+        body = [Paragraph(f"<b>{_t(st['title'])}</b>&nbsp;&nbsp;<font color='{BRAND.hexval()}' size='8.5'>"
+                          f"{_t(st.get('when'))}</font>", S["body"])]
+        if st.get("why"):
+            body.append(Paragraph(_t(st["why"]), S["small"]))
+        row = Table([[num, body]], colWidths=[12 * mm, W - 2 * M - 12 * mm])
+        row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, -1), 0.5, SOFT),
+                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 7), ("TOPPADDING", (0, 0), (-1, -1), 5),
+                                 ("LEFTPADDING", (0, 0), (0, 0), 0)]))
+        story.append(KeepTogether(row))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("Salon Shastra · www.salonshastra.com · +91 86868 78090 · support@salonshastra.com",
+                           S["small"]))
+    doc.build(story, onFirstPage=_page(meta, logo if os.path.exists(logo) else None), onLaterPages=_page(meta, None))
     return buf.getvalue()

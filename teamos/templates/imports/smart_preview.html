@@ -38,7 +38,8 @@
     <td>{{ r.kind }}</td>
     <td>{% if r.u.city or r.u.area %}<div>{{ r.u.area ~ ', ' if r.u.area }}{{ r.u.city or '' }}</div>{% endif %}
       {% for k, v in (r.u.fields or {}).items() if k not in ('sale_reason_note', 'inclusions_note', 'top_services', 'booking_software') %}<span class="badge grey">{{ k|replace('_',' ') }}: {{ v|inr if k in ('asking_price','all_in_max','budget_min','monthly_rent','rent_deposit','avg_monthly_sales','avg_monthly_expenses') else v }}</span> {% endfor %}</td>
-    <td>{% if r.notes_l %}<details><summary>{{ r.notes_l|length }}</summary>{% for n in r.notes_l %}<div>{{ n[:200] }}</div>{% endfor %}</details>{% endif %}</td>
+    <td>{% if r.rm and r.rm.understood %}<div class="understood"><span class="badge info">{{ r.rm.language }}</span> {{ r.rm.summary }}</div>{% elif r.rm %}<div class="small muted">Remark not understood — <a href="{{ url_for('imports.remarks', t=r.rm.text[:300]) }}">teach TeamOS</a></div>{% endif %}
+      {% if r.notes_l %}<details><summary>{{ r.notes_l|length }} note{{ 's' if r.notes_l|length > 1 }}</summary>{% for n in r.notes_l %}<div>{{ n[:200] }}</div>{% endfor %}</details>{% endif %}</td>
     <td>{% if r.outcome %}<span class="badge {{ 'ok' if r.outcome in ('created','updated') else 'bad' if r.outcome == 'failed' else 'grey' }}">{{ r.outcome }}</span>{% if r.ref_code %} <a href="{{ opp_url(r.kind, r.opportunity_id) }}">{{ r.ref_code }}</a>{% endif %}{% else %}<span class="badge {{ 'ok' if r.action == 'create' else 'info' if r.action == 'update' else 'grey' }}">{{ r.action }}</span>{% endif %}
       {% if r.reason %}<div class="muted">{{ r.reason }}</div>{% endif %}</td></tr>
   {% else %}<tr><td colspan="6" class="empty">Nothing in this list.</td></tr>{% endfor %}

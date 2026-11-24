@@ -37,7 +37,7 @@ SEEDS = ["/", "/team", "/tasks/", "/tasks/?view=all", "/sellers/", "/sellers/?st
          "/inbox/", "/inbox/batches", "/reports/", "/reports/sources", "/reports/learning", "/calendar", "/tools",
          "/automations", "/install", "/admin/users", "/admin/audit", "/admin/duplicates", "/admin/finance",
          "/admin/jobs", "/admin/integrations", "/admin/templates", "/admin/outbox", "/admin/lead-ads", "/me/digest",
-         "/sellers/new", "/buyers/new", "/pilot", "/pilot/vikas", "/team/availability", "/team/activity", "/team/activity?period=month", "/me/availability"]
+         "/sellers/new", "/buyers/new", "/pilot", "/pilot/vikas", "/team/availability", "/team/activity", "/team/activity?period=month", "/me/availability", "/investors", "/imports/remarks", "/imports/remarks?t=busy+ga+unnaru+repu+call+cheyandi"]
 PUBLIC = ["/login", "/f/seller", "/f/buyer", "/f/seller?lang=te", "/f/buyer?lang=te", "/offline"]
 
 
@@ -322,8 +322,15 @@ def main():
                         totals["problems"] += len(probs)
                         report.setdefault(f"{vp}/{role}", []).append({"url": u, "status": status, "problems": probs})
                 if vp in ("phone", "small-phone") and role != "public" and urls:
-                    check(cdp, "/", vp)
-                    menu = cdp.call("Runtime.evaluate", expression=MENU, returnByValue=True, awaitPromise=True)["result"].get("value")
+                    menu = None
+                    for _attempt in range(2):  # a slow machine can still be finishing the page load — try twice
+                        check(cdp, "/", vp)
+                        try:
+                            menu = cdp.call("Runtime.evaluate", expression=MENU, returnByValue=True,
+                                            awaitPromise=True)["result"].get("value")
+                            break
+                        except RuntimeError as e:
+                            menu = f"menu check interrupted ({e})"
                     if menu != "ok":
                         report.setdefault(f"{vp}/{role}", []).append({"url": "/ (menu)", "problems": [menu]})
                         totals["problems"] += 1

@@ -57,6 +57,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM time_off"):
             seed_team(db)  # demo database created before team availability
             added.append("team availability: status, field day, leave, half day")
+        if not db.scalar("SELECT COUNT(*) FROM investor_profiles"):
+            seed_investors(db)  # demo database created before the investor journey
+            added.append("investor journey: screening, forms, Vikas call, registration, readiness reports")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -201,6 +204,7 @@ def seed(db):
     seed_premises(db)
     seed_pilot(db)
     seed_team(db)
+    seed_investors(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -618,3 +622,70 @@ def seed_team(db):
                         "leave", "Family function")
     if lead:
         AV.add_time_off(db, lead, lead["id"], (today + _td(days=5)).isoformat(), None, "half_day", None)
+
+
+def seed_investors(db):
+    """Investor journey on the demo buyers: screened (pursue / nurture / not now), forms, a call with Vikas,
+    an office visit with the registration paid, and readiness reports (one approved and sent, one draft)."""
+    from teamos.domain import buyers as B
+    from teamos.domain import investor as I
+    from teamos.domain import pilot as P
+    admin = db.one("SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    team = db.one("SELECT * FROM users WHERE team = 'buyer' AND is_active = 1 ORDER BY id LIMIT 1") or admin
+    opps = [r["id"] for r in db.all("SELECT id FROM opportunities WHERE kind = 'buyer' AND is_synthetic = 1 "
+                                    "AND status <> 'closed' ORDER BY id")]
+    screens = [
+        {"goal": "buy_running", "budget": "15_30", "money": "savings_ready", "runway": "yes", "operator": "me_full"},
+        {"goal": "invest_only", "budget": "30_60", "money": "family", "runway": "partly", "operator": "manager"},
+        {"goal": "new_salon", "budget": "5_15", "money": "loan_plan", "runway": "no", "operator": "me_part"},
+        {"goal": "exploring", "budget": "unknown", "money": "unsure", "runway": "never_thought",
+         "operator": "undecided"},
+        {"goal": "franchise", "budget": "30_60", "money": "savings_soon", "runway": "yes", "operator": "me_part"},
+    ]
+    for i, oid in enumerate(opps[:len(screens)]):
+        I.save_screening(db, team, B.load(db, oid), dict(screens[i], screen_note="Demo screening"))
+    strong = {
+        "full_name": "Arjun Rao (demo)", "phone": "9000000201", "city": "Hyderabad", "age_band": "35–45",
+        "occupation": "Own business", "keep_job": "No — the salon will be my full-time work",
+        "goal": "Buy a running salon", "why_salon": "I run a salon in Miyapur and want a second one.",
+        "salon_type": ["Unisex"], "areas": "Kondapur, Gachibowli", "size": "5–8 chairs",
+        "start_when": "Within 3 months", "salon_experience": "I own / owned a salon",
+        "business_experience": "I run a business now", "managed_staff": "6–20 people",
+        "days_per_week": "Every day, full-time", "strengths": ["Managing people", "Sales & customers"],
+        "need_help": ["Choosing the right salon to buy"], "total_budget": "30L",
+        "budget_covers": ["Buying the salon / setup cost", "Running costs of the first months"],
+        "source": ["Own savings"], "money_ready": "Ready now", "runway": "Yes — 6 months or more",
+        "runway_amount": "8L", "need_income": "After about a year", "other_income": "My salary / business continues",
+        "payback": "2–3 years", "if_loss": "Keep funding — I'm in for the long run", "max_loss": "10–25%",
+        "decision": "Only me", "aligned": "Yes, fully"}
+    mid = dict(strong, full_name="Deepa Iyer (demo)", goal="Invest money only — someone else runs it",
+               total_budget="45L", source=["Own savings", "Family"], runway="Partly — 3 to 6 months",
+               runway_amount=None, salon_experience="No salon experience",
+               business_experience="I managed a team at work", managed_staff="1–5 people",
+               days_per_week="Only weekends / remotely", payback="Within 1 year", aligned="Not discussed yet",
+               keep_job="Yes — I'll continue it")
+    if opps:
+        o = B.load(db, opps[0])
+        I.save_response(db, o, strong, "link")
+        bid = P.book(db, o, None, "Saturday 11 am", "staff", team["id"], "Pursue — 30L savings")
+        P.update_booking(db, admin, o, bid, "done", "Strong operator; go for a running salon in Kondapur.")
+        I.save_office(db, team, o, {"office_visit_status": "done", "office_visit_at": "",
+                                    "reg_status": "paid", "reg_paid_mode": "upi", "reg_paid_ref": "DEMO-REG-1"})
+        rep = I.latest_report(db, opps[0])
+        c = rep["c"]
+        form = {"verdict": c["verdict"], "path": c["path"], "path_text": c["path_text"], "summary": c["summary"],
+                "split": c["split"] or "", "vikas_note": "Arjun is ready. Shortlist 2–3 running unisex salons in "
+                "Kondapur under 25 lakh; keep the rest for the first months.",
+                **{k: "\n".join(c[k]) for k in ("strengths", "risks", "conditions")}}
+        for j, st in enumerate(c["steps"]):
+            form.update({f"step_title_{j}": st["title"], f"step_when_{j}": st["when"], f"step_why_{j}": st["why"]})
+        I.save_report(db, admin, o, rep["id"], form, approve=True)
+        I.mark_sent(db, team, o)
+    if len(opps) > 1:
+        o = B.load(db, opps[1])
+        I.save_response(db, o, mid, "staff", team["id"])
+        P.book(db, o, None, "Weekday evening", "link")
+    if len(opps) > 4:
+        I.set_form_status(db, team, B.load(db, opps[4]), "sent")
+    db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN (SELECT id FROM opportunities "
+               "WHERE is_synthetic = 1)")

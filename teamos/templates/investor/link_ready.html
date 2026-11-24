@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% set crumbs = [(url_for('buyers.detail', opp_id=opp.id, tab='investor'), opp.ref_code ~ ' · ' ~ (opp.contact_name or ''))] %}
+{% block title %}{{ 'Send the readiness report' if purpose == 'report' else 'Send the investor form' }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ 'Send the readiness report' if purpose == 'report' else 'Send the investor form' }}</h1>
+  <div class="sub">{{ opp.contact_name }} · {{ opp.ref_code }} · this link is shown only now</div></div>
+  <div class="actions"><a class="btn" href="{{ url_for('buyers.detail', opp_id=opp.id, tab='investor') }}">Back to the record</a></div></div>
+<div class="card">
+  <h2>Message</h2>
+  <textarea class="msg-preview" rows="9" readonly aria-label="Message to send">{{ text }}</textarea>
+  <p class="inline"><a class="btn primary" href="{{ wa }}" target="_blank" rel="noopener">Open in WhatsApp</a> <code class="copy">{{ url }}</code></p>
+  {% if purpose == 'report' %}
+  <p class="small">The link opens the report on their phone with a <strong>Download PDF</strong> button. You can also <a href="{{ url_for('investor.report_pdf', opp_id=opp.id) }}">download the PDF</a> and attach it.</p>
+  <form method="post" action="{{ url_for('investor.sent', opp_id=opp.id) }}">{{ csrf() }}<button class="btn">I've sent it — mark as sent</button></form>
+  {% else %}
+  <p class="small">The form status is now <strong>Form sent</strong>; it becomes <strong>Form filled</strong> by itself. After they submit, they can book a few minutes with Vikas on the same page.</p>
+  {% endif %}
+  <p class="small muted">WhatsApp is not connected to TeamOS yet, so the button opens WhatsApp with the message ready — you press send. The link works for 90 days and only for this investor.</p>
+</div>
+{% endblock %}

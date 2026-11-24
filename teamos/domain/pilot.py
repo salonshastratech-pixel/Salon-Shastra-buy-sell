@@ -313,10 +313,10 @@ def prefill(db, opp: dict) -> dict:
             "contact_number": phone[3:] if phone.startswith("+91") else phone, "email": opp.get("contact_email") or ""}
 
 
-def parse_answers(form) -> tuple[dict, dict]:
+def parse_answers(form, questions: list | None = None) -> tuple[dict, dict]:
     """Form → clean answers + errors. Accepts the owner's own words for money ("40k", "1.8L")."""
     answers, errors = {}, {}
-    for q in QUESTIONS:
+    for q in (questions or QUESTIONS):
         k = q["key"]
         if q["kind"] == "multi":
             vals = [v for v in (form.getlist(k) if hasattr(form, "getlist") else form.get(k) or [])
@@ -359,17 +359,18 @@ def parse_answers(form) -> tuple[dict, dict]:
     return answers, errors
 
 
-def save_response(db, opp: dict, answers: dict, source: str, actor_id=None) -> int:
+def save_response(db, opp: dict, answers: dict, source: str, actor_id=None, quiet: bool = False) -> int:
     with db:
         rid = db.insert("pilot_responses", {"opportunity_id": opp["id"], "answers": json.dumps(answers,
                                                                                                ensure_ascii=False),
                                             "source": source, "created_by": actor_id, "submitted_at": now_iso()})
         _upsert(db, opp["id"], actor_id, {"form_status": "filled", "form_filled_at": now_iso()})
-        who = "Salon owner" if source == "link" else "Team (on the owner's behalf)"
+        who = {"link": "Salon owner", "import": "Salon owner (answers imported from the pilot-program sheet)"}.get(
+            source, "Team (on the owner's behalf)")
         T.add_activity(db, actor_id, "opportunity", opp["id"], "system",
                        f"{who} filled the pilot program form — SWOT report draft ready to review")
         draft_report(db, opp["id"], rid, actor_id)
-        owner = opp.get("primary_owner_id")
+        owner = None if quiet else opp.get("primary_owner_id")
         T.notify(db, owner, "pilot_form", f"Pilot form filled: {opp.get('salon_name') or opp.get('ref_code')} — "
                  "SWOT draft ready", f"/sellers/{opp['id']}?tab=pilot")
         audit.record(db, actor_id, "pilot.form_filled", "opportunity", opp["id"], {"source": source, "response": rid})
@@ -809,7 +810,7 @@ def _alert_consultant(db, opp, text: str) -> None:
 
     from .. import messaging
     c = consultant(db)
-    link = f"/sellers/{opp['id']}?tab=pilot"
+    link = (f"/buyers/{opp['id']}?tab=investor" if opp.get("kind") == "buyer" else f"/sellers/{opp['id']}?tab=pilot")
     if c:
         T.notify(db, c["id"], "vikas_booking", text, link)
         try:
@@ -891,7 +892,8 @@ def update_booking(db, actor, opp, booking_id: int, status: str, outcome: str | 
                        f"Call with Vikas {labels[status]}" + (f": {outcome.strip()[:200]}" if outcome and
                                                               outcome.strip() else ""))
         if status == "done":
-            T.create_task(db, actor, title="Call back: does the owner want a paid consultation?",
+            T.create_task(db, actor, title=("Book the office visit and registration" if opp.get("kind") == "buyer"
+                                            else "Call back: does the owner want a paid consultation?"),
                           entity_type="opportunity", entity_id=opp["id"],
                           assignee_id=opp.get("primary_owner_id") or actor["id"],
                           due_at=to_iso(now_utc() + timedelta(days=1)), task_type="call", priority="high",
@@ -1105,3 +1107,45 @@ def set_chairpe(db, actor, opp, data) -> None:
 def chairpe_trial_end(prof: dict) -> str | None:
     start = parse_iso(prof.get("chairpe_trial_start")) if prof.get("chairpe_trial_start") else None
     return to_iso(start + timedelta(days=CHAIRPE_TRIAL_DAYS)) if start else None
+
+
+# -- Pilot answers from an imported Google-Form sheet -----------------------------------------------------------------
+def _norm_label(s) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(s or "").lower())
+
+
+_LABEL_KEYS = {_norm_label(q["label"]): q["key"] for q in QUESTIONS}
+
+
+def answers_from_sheet(raw: dict) -> dict:
+    """The Google Form's columns → pilot answers (needs at least 15 recognised questions, else {})."""
+    answers = {}
+    for header, value in (raw or {}).items():
+        key = _LABEL_KEYS.get(_norm_label(header))
+        v = re.sub(r"\s+", " ", str(value or "")).strip()
+        if not key or not v or v.lower() in ("-", "na", "n/a", "nil"):
+            continue
+        q = Q_BY_KEY[key]
+        if re.fullmatch(r"\d+\.0", v):
+            v = v[:-2]
+        if q["kind"] == "multi":
+            picked = [o for o in q["options"] if o.lower().replace("’", "'") in v.lower().replace("’", "'")
+                      .replace("\ufffd", "'")]
+            rest = v
+            for o in picked:
+                rest = re.sub(re.escape(o), "", rest, flags=re.I)
+            rest = re.sub(r"(^[,\s]+|[,\s]+$)|other:?\s*\(short answer\)", "", rest, flags=re.I).strip(" ,")
+            if rest and len(rest) > 2:
+                picked.append("Other: " + rest[:200])
+            if picked:
+                answers[key] = picked
+        elif q["kind"] == "choice":
+            match = next((o for o in q["options"] if _norm_label(o) == _norm_label(v)), None)
+            answers[key] = match or (("Other: " + v[:200]) if q["other"] else v[:200])
+        elif q["kind"] in ("scale5", "scale10"):
+            m = re.search(r"\d+", v)
+            if m:
+                answers[key] = m.group(0)
+        else:
+            answers[key] = v[:2000]
+    return answers if len(answers) >= 15 else {}

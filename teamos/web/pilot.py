@@ -323,6 +323,8 @@ def form(token):
     opp = P.resolve(db, token)
     if not opp:
         return _public("public/pilot_gone.html", 404)
+    if opp["kind"] == "buyer":
+        return _investor_form(db, token, opp)
     answers, errors = P.prefill(db, opp), {}
     if request.method == "POST":
         if request.form.get("website"):  # honeypot
@@ -341,6 +343,10 @@ def report_page(token):
     opp = P.resolve(db, token)
     if not opp:
         return _public("public/pilot_gone.html", 404)
+    if opp["kind"] == "buyer":
+        from ..domain import investor as I
+        return _public("public/investor_report.html", token=token, opp=opp,
+                       rep=I.latest_report(db, opp["id"], approved_only=True))
     rep = P.latest_report(db, opp["id"], approved_only=True)
     return _public("public/pilot_report.html", token=token, opp=opp, rep=rep, slots=P.open_slots(db),
                    booked=_live_booking(db, opp["id"]))
@@ -350,10 +356,30 @@ def report_page(token):
 def public_pdf(token):
     db = get_db()
     opp = P.resolve(db, token)
+    if opp and opp["kind"] == "buyer":
+        from ..domain import investor as I
+        from .investor import investor_pdf
+        irep = I.latest_report(db, opp["id"], approved_only=True)
+        return investor_pdf(irep) if irep else _public("public/pilot_gone.html", 404)
     rep = P.latest_report(db, opp["id"], approved_only=True) if opp else None
     if not rep:
         return _public("public/pilot_gone.html", 404)
     return _pdf(rep, opp, f"{messaging.public_base(request)}/s/{token}/book")
+
+
+def _investor_form(db, token, opp):
+    from ..domain import investor as I
+    answers, errors = I.prefill(db, opp), {}
+    if request.method == "POST":
+        if request.form.get("website"):  # honeypot
+            return _public("public/investor_done.html", token=token, opp=opp)
+        answers, errors = I.parse_answers(request.form)
+        if not errors:
+            I.save_response(db, opp, answers, "link")
+            return _public("public/investor_done.html", token=token, opp=opp, slots=P.open_slots(db),
+                           booked=_live_booking(db, opp["id"]))
+    return _public("public/investor_form.html", token=token, opp=opp, answers=answers, errors=errors, I=I,
+                   filled=I.profile(db, opp["id"])["form_status"] == "filled")
 
 
 def _live_booking(db, opp_id):

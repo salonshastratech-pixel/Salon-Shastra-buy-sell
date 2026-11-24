@@ -1,0 +1,22 @@
+{% extends "public/layout.html" %}
+{% block title %}Your investor readiness report{% endblock %}
+{% block content %}
+{% if not rep %}
+<div class="card"><h1>Your report is being prepared</h1><p>We'll message you as soon as it's ready — usually right after your call with Vikas.</p></div>
+{% else %}{% set c = rep.c %}
+<div class="card verdict-box tone-{{ {'ready': 'ok', 'with_support': 'warn', 'not_yet': 'bad'}[c.verdict] }}">
+  <h1>{{ c.verdict_label }}</h1>
+  <p>{{ c.verdict_text }}</p>
+  <p><a class="btn primary" href="{{ url_for('public_pilot.public_pdf', token=token) }}">Download the full report (PDF)</a></p>
+</div>
+<div class="card"><h2>Our recommendation: {{ c.path }}</h2><p>{{ c.path_text }}</p>
+  {% if c.split %}<p><strong>How to split your money:</strong> {{ c.split }}</p>{% endif %}
+  {% if c.vikas_note %}<p class="small"><strong>Vikas Rachakonda:</strong> {{ c.vikas_note }}</p>{% endif %}</div>
+<div class="swot-grid">
+  <div class="card swot-q swot-strengths"><h2>What works for you</h2><ul>{% for x in c.strengths %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  <div class="card swot-q swot-weaknesses"><h2>Risks to manage</h2><ul>{% for x in c.risks %}<li>{{ x }}</li>{% else %}<li>No major risks found.</li>{% endfor %}</ul></div>
+</div>
+{% if c.conditions %}<div class="card"><h2>Before you put money in</h2><ul>{% for x in c.conditions %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+<div class="card"><h2>Your next steps</h2><ol class="steps-list">{% for s in c.steps %}<li><strong>{{ s.title }}</strong> <span class="badge">{{ s.when }}</span>{% if s.why %}<div class="small muted">{{ s.why }}</div>{% endif %}</li>{% endfor %}</ol></div>
+{% endif %}
+{% endblock %}
