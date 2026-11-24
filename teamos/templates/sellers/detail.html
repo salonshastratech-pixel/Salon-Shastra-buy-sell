@@ -3,7 +3,6 @@
 {% block content %}
 <div class="ph">
   <div>
-    <div class="small muted"><a href="{{ url_for('sellers.index') }}">Salon Owners</a> / {{ opp.ref_code }}</div>
     <h1>{{ opp.salon_name }}</h1>
     <div class="inline sub">{{ stage_badge(opp.stage, STAGE_LABELS) }} {{ approval_badge(listing.approval_state) }}
       <span>{{ opp.locality }}, {{ opp.city }}</span> · <span>Owner: <strong>{{ opp.owner_name or 'Unassigned' }}</strong></span>
@@ -19,6 +18,7 @@
   {% for k, l in [('overview','Overview'),('pilot','Pilot program'),('intake','Detailed intake'),('financials','Financials'),('assessment','Assessment & SWOT'),('approval','Listing approval'),('matches','Matches'),('teaser','Teaser'),('history','History')] %}
   <a href="{{ url_for('sellers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
 </nav>
+{% include "_related.html" %}
 {% include "_stuck_banner.html" %}
 
 {% if tab == 'pilot' %}

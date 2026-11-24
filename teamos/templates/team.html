@@ -12,7 +12,7 @@
     <td class="right">{{ u.open }}</td>
     <td class="right">{% if u.overdue %}<span class="badge bad">{{ u.overdue }}</span>{% else %}0{% endif %}</td>
     <td class="right">{{ u.today }}</td><td class="right">{{ u.first_calls }}</td>
-    <td>{% if u.away %}<span class="badge grey">Away till {{ u.away_until }}</span>{% else %}<span class="badge ok">Available</span>{% endif %}</td>
+    <td>{% if u.on_leave %}<span class="badge grey">On leave today</span>{% elif u.away %}<span class="badge grey">Away till {{ u.away_until }}</span>{% else %}<span class="badge ok">Available</span>{% endif %}</td>
     <td class="right nowrap"><a class="btn sm" href="{{ url_for('main.team_board', who=u.id) }}">Tasks</a>
       {% if can('crm.assign') or u.id == current_user.id %}<details class="pop"><summary class="btn sm">More</summary><div class="pop-body">
         <form method="post" action="{{ url_for('improve.set_away') }}">{{ csrf() }}<input type="hidden" name="user_id" value="{{ u.id }}">

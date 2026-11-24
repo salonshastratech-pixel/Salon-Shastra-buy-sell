@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.11.0-m11"
+__version__ = "0.12.0-m12"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -127,14 +127,23 @@ def create_app(overrides: dict | None = None) -> Flask:
             ctx["unread_count"] = get_db().scalar(
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL", (g.user["id"],))
             ctx["nav_counts"] = _nav_counts(get_db(), g.user)
+            from .domain import availability as _AV
+            from .web import navigation as _NAV
+            try:
+                ctx.update(_NAV.context(get_db()))
+                ctx["my_state"] = _AV.state(get_db(), g.user)
+                ctx["WORK_STATUSES"] = _AV.STATUSES
+            except Exception:  # noqa: BLE001 — navigation must never break a page
+                current_app_logger = app.logger
+                current_app_logger.exception("navigation context failed")
         return ctx
 
-    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, pilot,
+    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, pilot, team,
                       public, sellers, tasks, workflow)
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
                matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp,
                channels.bp, channels.feed_bp, workflow.bp, workflow.public_bp, workflow.pwa_bp,
-               pilot.bp, pilot.public_bp):
+               pilot.bp, pilot.public_bp, team.bp):
         app.register_blueprint(bp)
     return app
 

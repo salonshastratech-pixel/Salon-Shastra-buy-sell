@@ -15,6 +15,7 @@ Each milestone ends with: what was built, what was tested (UAT IDs), what remain
 | M9 | **Calls, calendar & lead ads** | Tap-to-call with log-a-call shortcut, week calendar of calls / call-backs / visits with a private subscribe link for Google Calendar or phones (no customer details), Facebook / Instagram lead ads → leads through the smart import (test-only until switched on) | Lead → first call same day | **Done**, approved 24 Nov 2026 (lead ads test-only) |
 | M10 | **Transparency & follow-through** | Automations page (see / pause each, pause everything, quiet hours), saved searches with "new since you last looked", private customer progress link (English / Telugu), results by lead source to deal won, TeamOS installable on phones | Fewer "any update?" calls; channel decisions from deals, not lead counts | **Done** (awaiting founder review) |
 | M11 | **Salon Owners pilot program** | Needs from the first call, the 45-question pilot form (+5 extras), automatic SWOT report with branded PDF, private report + booking link, Vikas's free times and alerts, paid consultations with the free video | Every enquiry gets a useful next step, not just sellers | **Done** (awaiting founder review) |
+| M12 | **Navigation & team** | Back button, breadcrumbs and module tabs on every page; connected-records strip; team status, working hours, leave, who's working, activity board; premium look | Nobody gets lost; leads know who is working and what got done | **Done** (awaiting founder review) |
 
 ## Ten improvements proposed beyond the PRD (ranked by value ÷ effort)
 

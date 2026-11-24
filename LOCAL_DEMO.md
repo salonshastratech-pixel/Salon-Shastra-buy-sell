@@ -22,6 +22,14 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 12 — navigation and team, what to try
+1. Open any record from a list, then press **Back** (top left) — you return to the list. The breadcrumb and the
+   tabs under it show where you are and the other pages of that module.
+2. On a salon owner, the **Connected** strip jumps to its tasks, WhatsApp chat, matches, deals, forms and pilot program.
+3. Click the green dot in the top bar to set your status (e.g. *Out on a salon visit*).
+4. **Today → My availability**: set your hours and add a leave day. **Team → Who's working** shows everyone;
+   **Team → Activity** shows calls, messages and tasks per person.
+
 ## Milestone 11 — pilot program, what to try
 1. Menu → **Pilot program**: counts by form status, filter by help area, upcoming calls with Vikas.
 2. Open **Mane Street Men's Salon** → **Pilot program** tab: needs ticked, form filled, SWOT approved and sent, call with

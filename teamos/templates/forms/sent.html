@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% set crumbs = [(back, opp.ref_code)] %}
 {% block title %}Link created{% endblock %}
 {% block content %}
-<div class="ph"><div><div class="small muted"><a href="{{ back }}">{{ opp.ref_code }}</a> / form link</div>
+<div class="ph"><div>
   <h1>Personal link created for {{ opp.contact_name }}</h1>
   <div class="sub">{{ inv.template_version }} · expires {{ inv.expires_at|ist('%d %b %Y') }}</div></div></div>
 

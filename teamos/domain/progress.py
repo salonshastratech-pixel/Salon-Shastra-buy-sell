@@ -186,10 +186,12 @@ def workload(db) -> list[dict]:
         "SUM(CASE WHEN due_at IS NOT NULL AND due_at >= ? AND due_at <= ? THEN 1 ELSE 0 END) AS today, "
         "SUM(CASE WHEN task_type = 'first_contact' THEN 1 ELSE 0 END) AS first_calls "
         "FROM tasks WHERE status = 'open' GROUP BY assignee_id", (now, now, today_end))}
+    from .availability import away_ids
+    on_leave = away_ids(db)
     out = []
     for u in users:
         o, t = opp.get(u["id"]) or {}, tk.get(u["id"]) or {}
-        out.append({**u, "away": is_away(u), "records": o.get("n") or 0, "sellers": o.get("sellers") or 0,
+        out.append({**u, "away": is_away(u) or u["id"] in on_leave, "on_leave": u["id"] in on_leave, "records": o.get("n") or 0, "sellers": o.get("sellers") or 0,
                     "buyers": o.get("buyers") or 0, "open": t.get("open") or 0, "overdue": t.get("overdue") or 0,
                     "today": t.get("today") or 0, "first_calls": t.get("first_calls") or 0})
     active = [w for w in out if not w["away"] and w["role"] != "super_admin"]
@@ -252,8 +254,10 @@ def hand_over(db, actor: dict, from_id: int, to_ids: list[int], kind: str = "all
 def pick_owner(db, team: str, load: dict | None = None) -> int | None:
     """Least-busy available person in a team (people marked away are skipped)."""
     load = {} if load is None else load
+    from .availability import away_ids
+    on_leave = away_ids(db)
     people = [p for p in db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND team = ? AND role IN "
-                                "('team_member','team_lead') ORDER BY id", (team,)) if not is_away(p)]
+                                "('team_member','team_lead') ORDER BY id", (team,)) if not is_away(p) and p["id"] not in on_leave]
     if not people:
         return None
     for p in people:

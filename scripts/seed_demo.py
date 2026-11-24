@@ -54,6 +54,9 @@ def seed(db):
         if not db.scalar("SELECT COUNT(*) FROM pilot_profiles"):
             seed_pilot(db)  # demo database created before the pilot program
             added.append("pilot program: needs, forms, SWOT reports, Vikas call, consultation")
+        if not db.scalar("SELECT COUNT(*) FROM time_off"):
+            seed_team(db)  # demo database created before team availability
+            added.append("team availability: status, field day, leave, half day")
         db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN "
                    "(SELECT id FROM opportunities WHERE is_synthetic = 1)")
         print("Synthetic demo data added: " + ", ".join(added) if added else "Demo data already present — skipping.")
@@ -197,6 +200,7 @@ def seed(db):
     seed_inbox(db)
     seed_premises(db)
     seed_pilot(db)
+    seed_team(db)
     db.execute("UPDATE tasks SET is_synthetic = 1")
     print(f"Synthetic demo data created. Users (password: {DEMO_PASSWORD}):")
     for email, name, role, _ in USERS:
@@ -595,3 +599,22 @@ def seed_pilot(db):
         pass
     db.execute("UPDATE tasks SET is_synthetic = 1 WHERE entity_id IN (SELECT id FROM opportunities "
                "WHERE is_synthetic = 1)")
+
+
+def seed_team(db):
+    """Team availability: a live status, a field day, an upcoming leave and a Saturday half day."""
+    from datetime import timedelta as _td
+
+    from teamos.domain import availability as AV
+    from teamos.timeutil import IST, now_utc
+    today = now_utc().astimezone(IST).date()
+    people = {r["team"]: r for r in db.all("SELECT * FROM users WHERE is_synthetic = 1 AND is_active = 1")}
+    s, b, lead = people.get("seller"), people.get("buyer"), people.get("general")
+    if s:
+        AV.set_status(db, s, "in_field", "Kondapur salon visits till 4 pm")
+        AV.add_time_off(db, s, s["id"], (today + _td(days=1)).isoformat(), None, "field", "Salon visits")
+    if b:
+        AV.add_time_off(db, b, b["id"], (today + _td(days=3)).isoformat(), (today + _td(days=4)).isoformat(),
+                        "leave", "Family function")
+    if lead:
+        AV.add_time_off(db, lead, lead["id"], (today + _td(days=5)).isoformat(), None, "half_day", None)

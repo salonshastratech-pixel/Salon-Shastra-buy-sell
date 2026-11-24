@@ -1,7 +1,8 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}{% from "pilot/_questions.html" import sections %}
+{% set crumbs = [(url_for('sellers.detail', opp_id=opp.id, tab='pilot'), opp.ref_code ~ ' · ' ~ (opp.salon_name or ''))] %}
 {% block title %}Pilot form · {{ opp.salon_name }}{% endblock %}
 {% block content %}
-<div class="ph"><div><div class="small muted"><a href="{{ url_for('sellers.detail', opp_id=opp.id, tab='pilot') }}">{{ opp.ref_code }}</a> / Pilot form</div>
+<div class="ph"><div>
   <h1>Fill the pilot form for {{ opp.salon_name }}</h1><div class="sub">Use this while on the call. Required questions have a *.</div></div></div>
 {% if errors %}<div class="flash error">Please check the highlighted answers ({{ errors|length }}).</div>{% endif %}
 <form method="post" novalidate class="pilot-fill">{{ csrf() }}

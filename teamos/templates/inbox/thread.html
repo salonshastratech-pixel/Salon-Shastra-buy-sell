@@ -2,7 +2,6 @@
 {% block title %}{{ conv.contact_name or conv.phone }} · Inbox{% endblock %}
 {% block content %}
 <div class="ph"><div>
-  <div class="small muted"><a href="{{ url_for('inbox.index') }}">WhatsApp Inbox</a> / conversation</div>
   <h1>{{ conv.contact_name or 'Unknown number' }}</h1>
   <div class="inline sub"><span class="mono">{{ conv.phone }}</span> · {{ 'Assigned to ' ~ conv.assignee_name if conv.assignee_name else 'Unassigned' }} · <span class="badge {{ 'ok' if conv.status == 'open' else 'grey' }}">{{ conv.status }}</span>
     {% if not wa.live %}<span class="badge warn">test mode — nothing is really sent</span>{% endif %}</div>

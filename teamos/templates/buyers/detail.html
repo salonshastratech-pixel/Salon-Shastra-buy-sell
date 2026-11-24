@@ -16,7 +16,6 @@
 {% block content %}
 <div class="ph">
   <div>
-    <div class="small muted"><a href="{{ url_for('buyers.index') }}">Buyers / Investors</a> / {{ opp.ref_code }}</div>
     <h1>{{ opp.contact_name }}</h1>
     <div class="inline sub">{{ stage_badge(opp.stage, STAGE_LABELS) }}
       {% if mandate.need_type %}<span class="badge {{ 'warn' if mandate.need_type == 'new_salon' else 'info' }}">{{ BF.option_label('need_type', mandate.need_type) }}</span>{% endif %}
@@ -33,6 +32,7 @@
   {% for k, l in [('overview','Overview'),('requirements','Requirements & mandate'),('qualification','Qualification'),('matches','Matches'),('history','History')] %}
   <a href="{{ url_for('buyers.detail', opp_id=opp.id, tab=k) }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
 </nav>
+{% include "_related.html" %}
 {% include "_stuck_banner.html" %}
 
 {% if tab == 'overview' %}

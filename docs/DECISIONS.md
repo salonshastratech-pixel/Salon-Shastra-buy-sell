@@ -128,3 +128,11 @@ Unapproved proposals are implemented as **configurable defaults**, never as hard
 | D-75 | Booking alerts | Bookings alert the chosen consultant user (in-app + e-mail) and the record owner. Times within the next 2 hours can't be booked online. | Founder | Proposed |
 | D-76 | Demo password | All synthetic demo logins use `Demo@123` (founder's request). Real staff accounts keep their own passwords. | Founder | Proposed |
 | D-77 | ChairPe in the pilot program | Prices and trial terms copied from chairpe.com on 24 Nov 2026 (TeamOS does not take ChairPe payments; the team records plan and months). Plan suggestion: Basic for 1-2 chairs and 2 or fewer staff, else Elite. Trial reminder 2 days before the 14-day trial ends. | Founder | Proposed |
+
+## Added in Milestone 12 (proposals — pending founder approval)
+
+| ID | Decision | Current implementation / proposal | Owner | Status |
+|---|---|---|---|---|
+| D-78 | Default working hours | Mon–Sat 10:00–19:00 IST, Sunday off, until each person sets their own. | Founder | Proposed |
+| D-79 | Leave and new leads | Leave, sick leave and public holidays stop new leads that day; half day, field work and training do not. Anyone sets their own; team leads can set anyone's. | Founder | Proposed |
+| D-80 | Activity tracking | Team activity shows each person's logged calls, messages, tasks, new records and stage moves to everyone with CRM access (no pay or finance data). | Founder | Proposed |

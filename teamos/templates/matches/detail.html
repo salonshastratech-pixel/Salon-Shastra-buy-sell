@@ -3,7 +3,6 @@
 {% block content %}
 {% set back = request.path %}
 <div class="ph"><div>
-  <div class="small muted"><a href="{{ url_for('matches.desk') }}">Match Desk</a> / {{ c.buyer_ref }} ↔ {{ c.seller_ref }}</div>
   <h1><a href="{{ url_for('buyers.detail', opp_id=c.buyer_opp_id) }}">{{ c.buyer_name }}</a> <span class="muted">↔</span> <a href="{{ url_for('sellers.detail', opp_id=c.seller_opp_id) }}">{{ c.salon_name }}</a></h1>
   <div class="inline sub">{{ outcome_badge(c) }} {{ gate_badge(c) }} <span class="badge grey">{{ M.readiness_label(c) }}</span> <span class="badge info">{{ M.STAGES[c.stage] }}</span>
     {% if c.stale %}<span class="badge warn">Facts changed since scoring</span>{% endif %}

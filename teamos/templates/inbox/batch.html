@@ -1,7 +1,8 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
+{% set crumbs = [(url_for('inbox.batches'), 'Bulk messages')] %}
 {% block title %}{{ b.name }} · batch{% endblock %}
 {% block content %}
-<div class="ph"><div><div class="small muted"><a href="{{ url_for('inbox.batches') }}">Message batches</a> / {{ b.name }}</div>
+<div class="ph"><div>
   <h1>{{ b.name }}</h1><div class="inline sub"><span class="badge {{ 'ok' if b.status == 'sent' else 'info' if b.status == 'approved' else 'grey' }}">{{ b.status }}</span>
   {{ AUDIENCES[aud.key][0] }} · template "{{ t.name }}" ({{ t.category }})</div></div></div>
 <div class="flash {{ 'ok' if wa.live else 'warn' }} small"><strong>{{ wa.label }}.</strong> {{ wa.note }}</div>

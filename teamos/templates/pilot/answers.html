@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% set crumbs = [(url_for('sellers.detail', opp_id=opp.id, tab='pilot'), opp.ref_code ~ ' · ' ~ (opp.salon_name or ''))] %}
 {% block title %}Pilot answers · {{ opp.salon_name }}{% endblock %}
 {% block content %}
-<div class="ph"><div><div class="small muted"><a href="{{ url_for('sellers.detail', opp_id=opp.id, tab='pilot') }}">{{ opp.ref_code }}</a> / Pilot answers</div>
+<div class="ph"><div>
   <h1>Pilot form answers — {{ opp.salon_name }}</h1>
   {% if resp %}<div class="sub">{{ 'Filled by the owner' if resp.source == 'link' else 'Filled by the team' if resp.source == 'staff' else 'Imported' }} · {{ resp.submitted_at|ist }}</div>{% endif %}</div>
   <div class="actions"><a class="btn" href="{{ url_for('pilot.fill', opp_id=opp.id) }}">Edit answers</a></div></div>

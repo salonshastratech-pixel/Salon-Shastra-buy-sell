@@ -12,48 +12,60 @@
 </head>
 <body>
 {% set ep = request.endpoint or '' %}
+{% macro icon(name) -%}
+<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">{% if name == 'sun' %}<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>{% elif name == 'users' %}<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.4.2 4.2 1.9 5 4.9"/>{% elif name == 'store' %}<path d="M3 9l1.5-5h15L21 9"/><path d="M3 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/>{% elif name == 'briefcase' %}<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>{% elif name == 'link' %}<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>{% elif name == 'chat' %}<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>{% elif name == 'chart' %}<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>{% elif name == 'cog' %}<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>{% elif name == 'back' %}<path d="M15 5l-7 7 7 7"/>{% elif name == 'bell' %}<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>{% elif name == 'search' %}<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>{% endif %}</svg>
+{%- endmacro %}
 <div class="shell">
   <aside class="side" id="side-nav">
-    <div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Business Exchange · TeamOS</small></div>
+    <a class="wordmark" href="{{ url_for('main.my_day') }}"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>TeamOS</small></a>
     {% set nc = nav_counts or {} %}
-    {% macro item(endpoint, label, on, count=0, hot=false) %}<a href="{{ url_for(endpoint) }}" class="{{ 'on' if on }}"><span>{{ label }}</span>{% if count %}<b class="count {{ 'hot' if hot }}">{{ count }}</b>{% endif %}</a>{% endmacro %}
     <nav class="nav" aria-label="Main">
-      <div class="group">Today</div>
-      {{ item('main.my_day', 'My Day', ep == 'main.my_day') }}
-      {{ item('tasks.index', 'Tasks', ep.startswith('tasks.'), nc.tasks, true) }}
-      {{ item('channels.calendar', 'Calendar', ep == 'channels.calendar') }}
-      {% if can('crm.view') %}{{ item('main.team_board', 'Team', ep in ('main.team_board', 'improve.hand_over')) }}
-      <div class="group">People</div>
-      {{ item('sellers.index', 'Salon Owners', ep.startswith('sellers.')) }}
-      {{ item('pilot.index', 'Pilot program', ep in ('pilot.index', 'pilot.vikas')) }}
-      {{ item('buyers.index', 'Buyers & investors', ep.startswith('buyers.')) }}
-      <div class="group">Matching &amp; deals</div>
-      {{ item('matches.desk', 'Match Desk', ep.startswith('matches.')) }}
-      {{ item('deals.index', 'Deals', ep.startswith('deals.')) }}
-      <div class="group">Conversations</div>
-      {{ item('inbox.index', 'WhatsApp', ep.startswith('inbox.'), nc.whatsapp, true) }}
-      {{ item('forms.inbox', 'Forms', ep.startswith('forms.'), nc.forms) }}
-      <div class="group">Results</div>
-      {{ item('reports.index', 'Reports', ep.startswith('reports.') or ep == 'improve.learning') }}
-      {% endif %}
-      <div class="nav-foot">{{ item('improve.tools', 'Tools & admin', ep.startswith('admin.') or ep.startswith('imports.') or ep in ('main.dictionary', 'improve.tools')) }}</div>
+      {% for m in (nav.menu if nav else []) %}
+      <a href="{{ m.href }}" class="{{ 'on' if m.on }}">{{ icon(m.icon) }}<span>{{ m.label }}</span>
+        {% if m.key == 'today' and nc.tasks %}<b class="count hot">{{ nc.tasks }}</b>{% elif m.key == 'talk' and (nc.whatsapp or nc.forms) %}<b class="count hot">{{ (nc.whatsapp or 0) + (nc.forms or 0) }}</b>{% endif %}</a>
+      {% endfor %}
     </nav>
+    <div class="side-foot small">v{{ app_version }}</div>
   </aside>
   <div class="main">
-    {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} environment · {{ data_notice }} · no live integrations connected · v{{ app_version }}</div>{% endif %}
+    {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} · {{ data_notice }} · no live integrations connected</div>{% endif %}
     <header class="top">
       <button class="btn sm menu-toggle" type="button" aria-expanded="false" aria-controls="side-nav">Menu</button>
       {% if can('crm.view') %}
-      <form class="search" action="{{ url_for('main.search') }}" method="get">
-        <input type="search" name="q" placeholder="Search name, mobile, salon, locality, SL-…" value="{{ request.args.get('q', '') if ep == 'main.search' else '' }}">
+      <form class="search" action="{{ url_for('main.search') }}" method="get" role="search">
+        {{ icon('search') }}<input type="search" name="q" aria-label="Search" placeholder="Search name, mobile, salon, locality, SL-…" value="{{ request.args.get('q', '') if ep == 'main.search' else '' }}">
       </form>
       {% endif %}
       <div class="me">
-        <a class="bell" href="{{ url_for('main.my_day') }}#notifications">Alerts{% if unread_count %}<b>{{ unread_count }}</b>{% endif %}</a>
-        <a class="hide-sm me-link" href="{{ url_for('auth.change_password') }}" title="Change my password"><strong>{{ current_user.full_name }}</strong> <span class="muted small">{{ ROLE_LABELS[current_user.role] }}</span></a>
-        <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm">Sign out</button></form>
+        {% if my_state %}
+        <details class="pop status-pop"><summary class="status-pill tone-{{ my_state.tone }}" title="Your status — the team sees this"><i class="dot"></i><span class="hide-sm">{{ my_state.label }}</span></summary>
+          <div class="pop-body">
+            <div class="small muted">Your status{% if my_state.detail %} · {{ my_state.detail }}{% endif %}</div>
+            <form method="post" action="{{ url_for('team.status') }}" class="status-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ request.full_path }}">
+              {% for v, l in WORK_STATUSES %}<button class="status-opt" name="status" value="{{ v }}"><i class="dot tone-{{ 'ok' if v == 'available' else 'grey' if v == 'offline' else 'warn' }}"></i>{{ l }}</button>{% endfor %}
+              <input name="note" maxlength="120" placeholder="Note (optional), e.g. at Kondapur salon till 4">
+            </form>
+            <a class="small" href="{{ url_for('team.mine') }}">Working hours &amp; leave →</a>
+          </div></details>
+        {% endif %}
+        <a class="bell" href="{{ url_for('main.my_day') }}#notifications" aria-label="Alerts">{{ icon('bell') }}{% if unread_count %}<b>{{ unread_count }}</b>{% endif %}</a>
+        <details class="pop user-pop"><summary class="avatar" title="{{ current_user.full_name }}">{{ (current_user.full_name or '?')[:1] }}</summary>
+          <div class="pop-body"><strong>{{ current_user.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[current_user.role] }}</div>
+            <a href="{{ url_for('team.mine') }}">My availability</a><a href="{{ url_for('auth.change_password') }}">Change password</a>
+            <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm">Sign out</button></form></div></details>
       </div>
     </header>
+    {% if nav and nav.module %}
+    <div class="pagebar">
+      <div class="crumbs">
+        {% if nav.show_back and nav.back %}<a class="back" href="{{ nav.back }}">{{ icon('back') }}<span>Back</span></a>{% endif %}
+        <nav aria-label="Breadcrumb" class="trail"><a href="{{ nav.home }}">{{ nav.module_label }}</a>
+          {% for href, label in (crumbs or []) %}<span class="sep">/</span><a href="{{ href }}">{{ label }}</a>{% endfor %}
+          {% if not nav.is_home %}<span class="sep">/</span><span class="here">{{ self.title() }}</span>{% endif %}</nav>
+      </div>
+      {% if nav.sub|length > 1 %}<nav class="subnav" aria-label="{{ nav.module_label }} pages">{% for s in nav.sub %}<a href="{{ s.href }}" class="{{ 'on' if s.on }}">{{ s.label }}</a>{% endfor %}</nav>{% endif %}
+    </div>
+    {% endif %}
     <main class="content">
       {% if current_user.must_change_password and ep != 'auth.change_password' %}<div class="flash warn">You are using a temporary password. <a href="{{ url_for('auth.change_password') }}">Choose your own password now</a>.</div>{% endif %}
       {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}

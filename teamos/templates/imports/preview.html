@@ -1,9 +1,10 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
+{% set crumbs = [(url_for('imports.index'), 'Imports')] %}
 {% block title %}Import #{{ batch.id }}{% endblock %}
 {% block content %}
 {% set labels = {'new': ('ok','New'), 'duplicate_crm': ('warn','Already in CRM'), 'duplicate_file': ('warn','Repeated in file'), 'invalid': ('bad','Invalid')} %}
 {% set dec_labels = {'create': 'Create', 'skip': 'Skip', 'link': 'Add as new opportunity for existing contact', 'flag': 'Create & send to duplicate review'} %}
-<div class="ph"><div><div class="small muted"><a href="{{ url_for('imports.index') }}">Imports</a> / #{{ batch.id }}</div>
+<div class="ph"><div>
   <h1>{{ batch.filename }}</h1><div class="sub">{{ batch.total_rows }} rows · status <strong>{{ batch.status }}</strong>{% if batch.status == 'committed' %} · {{ batch.created_count }} leads created {{ batch.committed_at|ist }}{% endif %}</div></div></div>
 
 <div class="grid g4">

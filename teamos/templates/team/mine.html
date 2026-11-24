@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}{{ 'My availability' if self_edit else u.full_name ~ ' · availability' }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ 'My availability' if self_edit else u.full_name }}</h1>
+  <div class="sub">When {{ 'you are' if self_edit else u.full_name.split()[0] ~ ' is' }} working, on leave or out on visits. The team sees this on <a href="{{ url_for('team.week') }}">Who's working</a>; nobody gets new leads on a leave day.</div></div>
+  <div class="actions"><span class="status-pill tone-{{ now.tone }}"><i class="dot"></i>{{ now.label }}{% if now.detail %} · {{ now.detail }}{% endif %}</span></div></div>
+
+<div class="split">
+<div>
+  <form method="post" class="card">{{ csrf() }}<input type="hidden" name="action" value="status">{% if not self_edit %}<input type="hidden" name="user" value="{{ u.id }}">{% endif %}
+    <div class="card-h"><h2>Right now</h2><span class="small muted">Resets to Available the next day</span></div>
+    <div class="chips" role="radiogroup">{% for v, l in AV.STATUSES %}<label class="chip"><input type="radio" name="status" value="{{ v }}" {{ 'checked' if (u.work_status or 'available') == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+    <div class="field"><label for="st-note">Note</label><input id="st-note" name="note" maxlength="120" value="{{ u.work_status_note or '' }}" placeholder="e.g. at the Kondapur salon till 4 pm"></div>
+    <button class="btn primary">Update status</button>
+  </form>
+
+  <form method="post" class="card">{{ csrf() }}<input type="hidden" name="action" value="hours">{% if not self_edit %}<input type="hidden" name="user" value="{{ u.id }}">{% endif %}
+    <div class="card-h"><h2>Weekly working hours</h2><span class="small muted">Indian time</span></div>
+    <div class="hours-grid">
+      {% for h in hours %}<div class="hours-row">
+        <strong>{{ h.day }}</strong>
+        <input type="time" name="d{{ h.weekday }}_start" value="{{ h.start_time or '10:00' }}" aria-label="{{ h.day }} start">
+        <span class="muted">to</span>
+        <input type="time" name="d{{ h.weekday }}_end" value="{{ h.end_time or '19:00' }}" aria-label="{{ h.day }} end">
+        <label class="check small"><input type="checkbox" name="d{{ h.weekday }}_off" value="1" {{ 'checked' if h.is_off }}> Off</label>
+      </div>{% endfor %}
+    </div>
+    <button class="btn primary">Save hours</button>
+  </form>
+</div>
+<div>
+  <form method="post" class="card form-grid">{{ csrf() }}<input type="hidden" name="action" value="time_off">{% if not self_edit %}<input type="hidden" name="user" value="{{ u.id }}">{% endif %}
+    <h2 class="full">Add leave or time away</h2>
+    <div class="field"><label for="to-kind">Type</label><select id="to-kind" name="kind">{% for v, l in AV.KINDS %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="to-start">From</label><input id="to-start" type="date" name="start" required></div>
+    <div class="field"><label for="to-end">To (inclusive)</label><input id="to-end" type="date" name="end"></div>
+    <div class="field full"><label for="to-note">Note</label><input id="to-note" name="note" maxlength="200" placeholder="e.g. family function; Harika covers my calls"></div>
+    <p class="small muted full">Leave, sick leave and public holidays: no new leads that day. Half day, field work and training show on the board but you still get leads.</p>
+    <div class="full"><button class="btn primary">Add</button></div>
+  </form>
+
+  <div class="card"><h2>Coming up</h2>
+    {% for t in offs %}<div class="list-row"><div><strong>{{ AV.KIND_LABELS[t.kind] }}</strong> · {{ t.start_date }}{% if t.end_date != t.start_date %} → {{ t.end_date }}{% endif %}{% if t.note %}<div class="small muted">{{ t.note }}</div>{% endif %}</div>
+      <form method="post">{{ csrf() }}<input type="hidden" name="action" value="cancel"><input type="hidden" name="tid" value="{{ t.id }}">{% if not self_edit %}<input type="hidden" name="user" value="{{ u.id }}">{% endif %}<button class="btn sm">Remove</button></form></div>
+    {% else %}<p class="muted small">No leave planned.</p>{% endfor %}
+  </div>
+</div>
+</div>
+{% endblock %}

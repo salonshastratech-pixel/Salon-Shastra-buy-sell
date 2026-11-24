@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Team activity{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Team activity</h1><div class="sub">What each person did — calls, WhatsApp messages, tasks closed, new records and stage moves — and when they were last active.</div></div>
+  <div class="actions seg">{% for k, l in [('today','Today'),('week','This week'),('month','This month')] %}<a class="btn sm {{ 'primary' if a.period == k }}" href="{{ url_for('team.activity', period=k) }}">{{ l }}</a>{% endfor %}</div></div>
+
+<div class="kpis">
+  <div class="kpi"><b>{{ a.totals.calls }}</b><span>Calls logged · {{ a.totals.connected }} connected</span></div>
+  <div class="kpi"><b>{{ a.totals.messages }}</b><span>WhatsApp messages sent</span></div>
+  <div class="kpi"><b>{{ a.totals.tasks_done }}</b><span>Tasks completed</span></div>
+  <div class="kpi"><b>{{ a.totals.new_records }}</b><span>New records</span></div>
+  <div class="kpi"><b>{{ a.totals.moves }}</b><span>Stage moves</span></div>
+  <div class="kpi {{ 'bad' if a.totals.overdue }}"><b>{{ a.totals.overdue }}</b><span>Overdue tasks now</span></div>
+</div>
+
+<div class="card flush"><div class="table-wrap"><table>
+  <tr><th>Person</th><th>Now</th><th class="right">Calls</th><th class="right">WhatsApp</th><th class="right">Tasks done</th><th class="right">New</th><th class="right">Moves</th><th class="right">Overdue</th><th>First / last activity</th><th>Last seen</th></tr>
+  {% for r in a.rows|sort(attribute='score', reverse=true) %}<tr>
+    <td class="nowrap"><a href="{{ url_for('main.team_board', who=r.id) }}"><strong>{{ r.full_name }}</strong></a><div class="small muted">{{ ROLE_LABELS[r.role] }}</div></td>
+    <td><span class="status-pill sm tone-{{ r.now.tone }}"><i class="dot"></i>{{ r.now.label }}</span></td>
+    <td class="right">{{ r.calls }}{% if r.calls %}<div class="small muted">{{ r.connected }} connected</div>{% endif %}</td>
+    <td class="right">{{ r.messages }}</td><td class="right">{{ r.tasks_done }}</td><td class="right">{{ r.new_records }}</td><td class="right">{{ r.moves }}</td>
+    <td class="right">{% if r.overdue %}<span class="badge bad">{{ r.overdue }}</span>{% else %}0{% endif %}</td>
+    <td class="small nowrap">{% if r.first_at %}{{ r.first_at|ist('%I:%M %p' if a.period == 'today' else '%d %b %I:%M %p') }} – {{ r.last_at|ist('%I:%M %p' if a.period == 'today' else '%d %b %I:%M %p') }}{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="small nowrap">{{ r.seen_at|rel if r.seen_at else '—' }}</td>
+  </tr>{% endfor %}
+</table></div></div>
+<p class="small muted">Counted from what is recorded in TeamOS. A call that wasn't logged doesn't appear — log every call so the numbers are fair.</p>
+{% endblock %}

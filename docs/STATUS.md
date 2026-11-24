@@ -1,3 +1,17 @@
+# Milestone 12 — navigation, connected records, team availability, premium look (24 Nov 2026, v0.12.0)
+
+| Area | Status | How it works |
+|---|---|---|
+| Back button | **Built** | Every staff page has **Back** at the top: it returns to the TeamOS page you came from, or (if you opened the page directly) to the page above it — e.g. a salon owner record goes back to the Salon Owners list. Not shown on My Day (home). |
+| Breadcrumbs | **Built** | Module / parent / this page on every page (e.g. Salon Owners / SL-00002 · Mane Street / Pilot form). Built from one map of the app, so every page is covered. |
+| Module tabs | **Built** | Each module shows its own pages as tabs under the breadcrumb, only those you may open: Today (My Day, Tasks, Calendar, My availability) · Team (Workload, Who's working, Activity) · Salon Owners (All, Pilot program, Vikas's free times, New) · Buyers (All, Needs review, New) · Matching & deals · Conversations (WhatsApp, Bulk messages, Forms) · Reports (Overview, Lead sources, Learning) · Tools & admin (users, automations, imports, integrations, templates, finance, jobs, audit…). |
+| Connected records | **Built** | Salon owner and buyer records start with a **Connected** strip: open tasks, the WhatsApp chat (with unread count), matches, deals, form answers, pilot program, next visit/call on the calendar and the same person's other records — one tap to each module. |
+| Team status | **Built** | Top bar status pill: Available / Busy / Out on a salon visit / On a break / Off for the day, with a note; resets to Available next day. |
+| Working hours & leave | **Built** | Today → **My availability**: weekly hours (default Mon–Sat 10:00–19:00), leave, sick leave, half day, field work, training, public holiday. Full-day leave stops new leads that day (same as away). Team leads can edit anyone's. |
+| Who's working | **Built** | Team → **Who's working**: everyone's status now (working, off duty, on leave, back when) and a 7-day grid of hours, weekly offs and leave. |
+| Team activity | **Built** | Team → **Activity** (today / week / month): calls logged and connected, WhatsApp sent, tasks completed, new records, stage moves, overdue now, first and last activity, last seen — like relationship-manager tracking in leading CRMs. Counted only from what is logged in TeamOS. |
+| Look | **Built** | Dark warm sidebar with icons, refined top bar with search, avatar menu and status, softer cards and tables, branded buttons; phone layout checked at 320 / 375 / 768 / 1366 px. |
+
 # Milestone 11 — Salon Owners pilot program (24 Nov 2026, v0.11.0)
 
 Most people who answer the ad want help growing their salon, not to sell it. "Sellers" is now **Salon Owners**, and every

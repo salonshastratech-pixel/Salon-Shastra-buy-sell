@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Who's working{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Who's working</h1><div class="sub">Right now and the next 7 days — working hours, weekly offs, leave and field days.</div></div>
+  <div class="actions"><a class="btn" href="{{ url_for('team.mine') }}">My availability</a></div></div>
+
+<div class="people-grid">
+  {% for r in w.rows %}<div class="person-card">
+    <div class="avatar lg">{{ r.full_name[:1] }}</div>
+    <div class="person-main"><strong>{{ r.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[r.role] }}{% if r.team %} · {{ r.team }}{% endif %}</div>
+      <span class="status-pill sm tone-{{ r.now.tone }}"><i class="dot"></i>{{ r.now.label }}</span>{% if r.now.detail %}<span class="small muted"> {{ r.now.detail }}</span>{% endif %}</div>
+    {% if can_edit_others or r.id == current_user.id %}<a class="btn sm" href="{{ url_for('team.mine', user=r.id if r.id != current_user.id else None) }}">Edit</a>{% endif %}
+  </div>{% endfor %}
+</div>
+
+<div class="card flush"><div class="card-h pad"><h2>Next 7 days</h2></div><div class="table-wrap"><table class="week-table">
+  <tr><th>Person</th>{% for d in w.dates %}<th class="{{ 'today' if loop.first }}">{{ d.strftime('%a') }}<div class="small muted">{{ d.strftime('%d %b') }}</div></th>{% endfor %}</tr>
+  {% for r in w.rows %}<tr><td class="nowrap"><strong>{{ r.full_name }}</strong></td>
+    {% for c in r.cells %}<td class="wcell {{ c.tone }}">{{ c.text }}{% if c.note %}<div class="small">{{ c.note }}</div>{% endif %}</td>{% endfor %}</tr>{% endfor %}
+</table></div></div>
+
+{% if offs %}<div class="card"><h2>Planned leave &amp; time away</h2>
+  {% for t in offs %}<div class="list-row"><div><strong>{{ t.full_name }}</strong> · {{ AV.KIND_LABELS[t.kind] }} · {{ t.start_date }}{% if t.end_date != t.start_date %} → {{ t.end_date }}{% endif %}{% if t.note %}<div class="small muted">{{ t.note }}</div>{% endif %}</div></div>{% endfor %}
+</div>{% endif %}
+{% endblock %}

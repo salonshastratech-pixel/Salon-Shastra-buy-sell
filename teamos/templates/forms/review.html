@@ -1,8 +1,8 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
+{% set crumbs = [(url_for('forms.inbox'), 'Forms & requests')] %}
 {% block title %}Review form · {{ sub.contact_name }}{% endblock %}
 {% block content %}
 <div class="ph"><div>
-  <div class="small muted"><a href="{{ url_for('forms.inbox') }}">Forms &amp; Requests</a> / submission #{{ sub.id }}</div>
   <h1>{{ sub.contact_name }} — {{ sub.template_version }}</h1>
   <div class="inline sub"><a href="{{ opp_url(opp.kind, opp.id) }}">{{ opp.ref_code }}</a> · {{ opp.kind }} ·
     {% if sub.invitation_id %}personal link{% if sub.channel == 'whatsapp_mock' %} (sent via mock WhatsApp){% endif %}{% else %}public quick form{% endif %}

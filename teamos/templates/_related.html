@@ -1,0 +1,4 @@
+{% if related_links %}<nav class="related" aria-label="Connected to this record">
+  <span class="related-h">Connected</span>
+  {% for r in related_links %}<a class="rel-chip {{ r.tone }}" href="{{ r.href }}">{{ r.label }}{% if r.n %} <b>{{ r.n }}</b>{% endif %}{% if r.note %} <span class="muted">{{ r.note|ist('%d %b') }}</span>{% endif %}</a>{% endfor %}
+</nav>{% endif %}

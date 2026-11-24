@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}{{ P.CONSULTANT_NAME }} · free times{% endblock %}
 {% block content %}
-<div class="ph"><div><div class="small muted"><a href="{{ url_for('pilot.index') }}">Pilot program</a> / Free times</div>
+<div class="ph"><div>
   <h1>{{ P.CONSULTANT_NAME }} — free times</h1><div class="sub">Salon owners pick one of these from their report link. Bookings alert {{ consultant.full_name if consultant else 'the consultant' }}.</div></div></div>
 
 {% if requested %}<div class="card"><h2>Waiting for a time</h2><p class="small muted">No free time suited these owners — confirm a time on their record.</p><ul class="plain">{% for b in requested %}
