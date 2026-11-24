@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ph"><div><h1>Reports</h1><div class="sub">{{ p.label }} · counted from the records themselves; the export contains exactly these numbers.</div></div>
   <div class="actions"><a class="btn" href="{{ url_for('reports.index', period=p.key, start=p.start_date, end=p.end_date, format='csv') }}">Export CSV</a></div></div>
-<nav class="tabs"><a href="{{ url_for('reports.index') }}" class="on">Numbers</a><a href="{{ url_for('improve.learning') }}">Match learning</a></nav>
+<nav class="tabs"><a href="{{ url_for('reports.index') }}" class="on">Numbers</a><a href="{{ url_for('workflow.sources') }}">Lead sources</a><a href="{{ url_for('improve.learning') }}">Match learning</a></nav>
 
 <form class="card inline" method="get">
   {% for k, l in PERIODS if k != 'custom' %}<a class="btn sm {{ 'primary' if p.key == k }}" href="{{ url_for('reports.index', period=k) }}">{{ l }}</a>{% endfor %}

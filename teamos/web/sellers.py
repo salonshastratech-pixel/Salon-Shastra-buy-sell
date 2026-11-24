@@ -30,32 +30,12 @@ def _opp_or_404(db, opp_id):
 @require("crm.view")
 def index():
     db = get_db()
-    where, params = ["o.kind = 'seller'"], []
+    from ..domain import saved_searches as SS
+    where, params = SS.where("seller", request.args, g.user["id"])
     q = (request.args.get("q") or "").strip()
     stage = request.args.get("stage") or ""
     owner = request.args.get("owner") or ""
     status = request.args.get("status") or "active"
-    if q:
-        like = f"%{q.lower()}%"
-        digits = "".join(ch for ch in q if ch.isdigit())
-        clause = "(lower(c.full_name) LIKE ? OR lower(b.name) LIKE ? OR lower(b.locality) LIKE ? OR lower(o.ref_code) LIKE ?"
-        params += [like, like, like, like]
-        if len(digits) >= 4:
-            clause += " OR c.phone_normalized LIKE ?"
-            params.append(f"%{digits[-10:]}%")
-        where.append(clause + ")")
-    if stage:
-        where.append("o.stage = ?")
-        params.append(stage)
-    if owner == "me":
-        where.append("o.primary_owner_id = ?")
-        params.append(g.user["id"])
-    elif owner.isdigit():
-        where.append("o.primary_owner_id = ?")
-        params.append(int(owner))
-    if status in ("active", "holding", "closed"):
-        where.append("o.status = ?")
-        params.append(status)
     rows = db.all(
         "SELECT o.*, c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, b.locality, b.city, "
         "u.full_name AS owner_name, l.asking_price, l.approval_state, l.chairs, l.gender_format "
@@ -64,7 +44,9 @@ def index():
         "WHERE " + " AND ".join(where) + " ORDER BY CASE WHEN o.next_action_due IS NULL THEN 1 ELSE 0 END, "
         "o.next_action_due LIMIT 300", params)
     return render_template("sellers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage,
-                           owner=owner, status=status, STAGES=S.STAGES + S.HOLDING, STAGE_LABELS=S.STAGE_LABELS)
+                           owner=owner, status=status, STAGES=S.STAGES + S.HOLDING, STAGE_LABELS=S.STAGE_LABELS,
+                           saved=SS.mine(db, g.user["id"], "seller"), list_kind="seller",
+                           current_qs=SS.query_string("seller", request.args))
 
 
 @bp.route("/new", methods=["GET", "POST"])

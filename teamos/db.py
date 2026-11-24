@@ -11,6 +11,7 @@ import hashlib
 import os
 import re
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -27,6 +28,29 @@ def _log_sql(url, sql, params):
     import json
     with open(_SQL_LOG, "a", encoding="utf-8") as fh:
         fh.write(json.dumps({"db": url, "sql": sql, "params": list(params)}, default=str) + "\n")
+
+
+# Portability audit: when TEAMOS_SQL_SHAPES is set, each distinct statement is written once (with sample
+# parameters), and any result with two columns of the same name is flagged — SQLite keeps the first such
+# column and PostgreSQL the last, so those queries must use distinct names (scripts/qa/pg_check.py).
+_SQL_SHAPES = os.environ.get("TEAMOS_SQL_SHAPES")
+_seen_shapes: set = set()
+
+
+def _shape(sql, params, cursor=None):
+    import json
+    key = sql
+    dup = None
+    if cursor is not None and cursor.description:
+        names = [d[0] for d in cursor.description]
+        dups = sorted({n for n in names if names.count(n) > 1})
+        dup = dups or None
+        key = sql + ("|DUP" if dup else "")
+    if key in _seen_shapes:
+        return
+    _seen_shapes.add(key)
+    with open(_SQL_SHAPES, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"sql": sql, "params": list(params), "dup": dup}, default=str) + "\n")
 
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
@@ -50,13 +74,21 @@ class Database:
             self.conn.execute("PRAGMA foreign_keys = ON")
             self.conn.execute("PRAGMA journal_mode = WAL")
             self.conn.execute("PRAGMA busy_timeout = 5000")
-        elif url.startswith("postgresql://"):
-            # PostgreSQL path — UNTESTED here (driver not installable offline). See docs/STATUS.md.
+        elif url.startswith(("postgresql://", "postgres://")):
+            # PostgreSQL (e.g. Supabase). Every query the app runs is checked against PostgreSQL by
+            # scripts/qa/pg_check.py; see docs/SUPABASE.md.
             import psycopg  # type: ignore
             from psycopg.rows import dict_row  # type: ignore
 
             self.dialect = "postgres"
-            self.conn = psycopg.connect(url, autocommit=True, row_factory=dict_row)
+            extra = {}
+            local = any(h in url for h in ("@localhost", "@127.0.0.1", "@[::1]"))
+            if "sslmode=" not in url and not local:
+                extra["sslmode"] = "require"  # hosted databases: always encrypted
+            # prepare_threshold=None: Supabase's connection pooler (and PgBouncer) do not support
+            # server-side prepared statements; plain statements work everywhere.
+            self.conn = psycopg.connect(url, autocommit=True, row_factory=dict_row, prepare_threshold=None,
+                                        connect_timeout=15, application_name="teamos", **extra)
         else:
             raise ValueError("Unsupported DATABASE_URL: " + url)
         self._tx_depth = 0
@@ -64,27 +96,39 @@ class Database:
     # -- SQL helpers -------------------------------------------------------
     def _sql(self, sql: str) -> str:
         if self.dialect == "postgres":
-            return sql.replace("?", "%s")
+            # psycopg uses %s placeholders, so a literal % (e.g. LIKE 'x%') must be doubled first.
+            return sql.replace("%", "%%").replace("?", "%s")
         return sql
 
     def execute(self, sql: str, params: Iterable[Any] = ()):
         params = tuple(params)
         if _SQL_LOG:
             _log_sql(self.url, sql, params)
-        return self.conn.execute(self._sql(sql), params)
+        cur = self.conn.execute(self._sql(sql), params)
+        if _SQL_SHAPES:
+            _shape(sql, params, cur)
+        return cur
+
+    def _row(self, r) -> dict:
+        d = dict(r)
+        if self.dialect == "postgres":  # SUM/AVG come back as Decimal on PostgreSQL; the app works in int/float
+            for k, v in d.items():
+                if isinstance(v, Decimal):
+                    d[k] = int(v) if v == v.to_integral_value() else float(v)
+        return d
 
     def all(self, sql: str, params: Iterable[Any] = ()) -> list[dict]:
-        return [dict(r) for r in self.execute(sql, params).fetchall()]
+        return [self._row(r) for r in self.execute(sql, params).fetchall()]
 
     def one(self, sql: str, params: Iterable[Any] = ()) -> dict | None:
         row = self.execute(sql, params).fetchone()
-        return dict(row) if row is not None else None
+        return self._row(row) if row is not None else None
 
     def scalar(self, sql: str, params: Iterable[Any] = ()):
         row = self.execute(sql, params).fetchone()
         if row is None:
             return None
-        return list(dict(row).values())[0]
+        return list(self._row(row).values())[0]
 
     def insert(self, table: str, values: dict) -> int:
         cols = ", ".join(values.keys())

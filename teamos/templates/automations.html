@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Automations{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Automations</h1><div class="sub">Everything TeamOS does by itself. It only creates tasks, alerts and drafts — it never approves disclosures, moves money or messages customers on its own.</div></div>
+  {% if can('settings.manage') %}<div class="actions"><form method="post">{{ csrf() }}<input type="hidden" name="key" value="_all"><input type="hidden" name="on" value="{{ '1' if o.all_paused else '0' }}">
+    <button class="btn {{ 'primary' if o.all_paused else 'danger' }}">{{ 'Resume everything' if o.all_paused else 'Pause everything' }}</button></form></div>{% endif %}</div>
+
+{% if o.all_paused %}<div class="flash error"><strong>Everything is paused</strong>{% if o.all_by %} by {{ o.all_by }} {{ o.all_at|rel }}{% endif %}{% if o.all_note %} — “{{ o.all_note }}”{% endif %}. No automatic alerts, form chasing, re-scoring or bulk messages until it is resumed. Incoming lead ads wait and are brought in afterwards.</div>{% endif %}
+
+<div class="card flush auto-list">
+  {% for a in o.autos %}{% set live = a.fixed or (a.on and not o.all_paused) %}
+  <div class="auto-row">
+    <span class="auto-dot {{ 'on' if live else 'off' }}" aria-hidden="true"></span>
+    <div class="auto-main"><strong>{{ a.name }}</strong> <span class="small muted">· {{ a.when }}</span>
+      <div class="small muted">{{ a.what }}</div>
+      <div class="small auto-last">{% if a.last %}Last: {{ a.last.finished_at|rel }}{% if a.last.outcome == 'error' %} — <span class="unknown">failed, will retry</span>{% elif a.last.outcome == 'skipped' %} — skipped (paused){% elif a.last.message %} — {{ a.last.message[:120] }}{% endif %}{% else %}Not run yet{% endif %} · {{ a.runs_week }} run{{ 's' if a.runs_week != 1 }} this week{% if a.errors %} · <a class="badge bad" href="{{ url_for('admin.jobs') }}">{{ a.errors }} failed</a>{% endif %}</div>
+      {% if not a.on and not a.fixed %}<div class="small unknown">Paused{% if a.changed_by %} by {{ a.changed_by }} {{ a.changed_at|rel }}{% endif %}{% if a.note %} — “{{ a.note }}”{% endif %}</div>{% endif %}</div>
+    <div class="auto-act">{% if a.fixed %}<span class="badge ok">always on</span>
+      {% elif can('settings.manage') %}{% if a.on %}<details class="pause-box"><summary class="btn sm">Pause</summary>
+        <form method="post">{{ csrf() }}<input type="hidden" name="key" value="{{ a.key }}"><input type="hidden" name="on" value="0">
+          <input name="note" maxlength="200" placeholder="Why? (optional)" aria-label="Reason for pausing {{ a.name }}"><button class="btn sm danger">Pause it</button></form></details>
+        {% else %}<form method="post">{{ csrf() }}<input type="hidden" name="key" value="{{ a.key }}"><input type="hidden" name="on" value="1"><button class="btn sm primary">Switch on</button></form>{% endif %}
+      {% else %}<span class="badge {{ 'ok' if live else 'bad' }}">{{ 'on' if live else 'paused' }}</span>{% endif %}</div>
+  </div>{% endfor %}
+</div>
+
+<div class="split">
+  <div class="card"><div class="card-h"><h2>Quiet hours</h2>{% if o.quiet_on %}<span class="badge ok">on</span>{% else %}<span class="badge grey">off</span>{% endif %}</div>
+    <p class="small">No bulk WhatsApp between <strong>{{ o.quiet_label }}</strong> (India time). One-to-one messages your team sends by hand are not affected.{% if o.quiet_now and o.quiet_on %} <span class="badge warn">quiet now</span>{% endif %}</p>
+    {% if can('settings.manage') %}<form method="post">{{ csrf() }}<input type="hidden" name="key" value="quiet_hours"><input type="hidden" name="on" value="{{ '0' if o.quiet_on else '1' }}"><button class="btn sm">{{ 'Switch quiet hours off' if o.quiet_on else 'Switch quiet hours on' }}</button></form>{% endif %}</div>
+  <div class="card"><h2>Always true</h2><ul class="small plain-list">
+    <li>Each alert is sent once — no reminder storms.</li>
+    <li>Customers are messaged only by a person, or by a bulk send a second person approved.</li>
+    <li>Consent and opt-outs are re-checked at the moment of sending.</li>
+    <li>Every pause and resume is in the <a href="{{ url_for('admin.audit_log') if can('audit.view') else '#' }}">audit log</a>.</li></ul></div>
+</div>
+{% endblock %}

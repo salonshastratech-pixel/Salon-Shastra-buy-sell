@@ -1,0 +1,14 @@
+{# Saved searches strip for a list page. Needs `saved`, `list_kind`, `current_qs`. #}
+{% if saved or current_qs %}
+<div class="saved-strip">
+  {% for s in saved %}<span class="saved-chip {{ 'on' if s.query == current_qs }}"><a href="{{ url_for('workflow.open_search', sid=s.id) }}">{{ s.name }}{% if s.new %} <b class="count hot" title="{{ s.new }} new since you last looked">{{ s.new }} new</b>{% endif %}</a><form method="post" action="{{ url_for('workflow.delete_search', sid=s.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="x" aria-label="Delete saved search {{ s.name }}" title="Delete">×</button></form></span>{% endfor %}
+  {% if current_qs and current_qs not in saved|map(attribute='query')|list %}
+  <details class="save-search"><summary class="btn sm">☆ Save this search</summary>
+    <form method="post" action="{{ url_for('workflow.save_search') }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="kind" value="{{ list_kind }}"><input type="hidden" name="query" value="{{ current_qs }}">
+      <input name="name" maxlength="60" required placeholder="Name, e.g. Kondapur under 40 lakh" aria-label="Name for this search">
+      <button class="btn sm primary">Save</button></form>
+    <p class="small muted">You'll see how many new {{ 'sellers' if list_kind == 'seller' else 'buyers' }} match it each time you come back.</p></details>
+  {% endif %}
+</div>
+{% endif %}

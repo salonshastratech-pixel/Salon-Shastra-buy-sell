@@ -72,6 +72,9 @@ def process(db, event_id: int) -> dict:
         status, detail = "imported", "Already known — empty details filled in, nothing overwritten."
     else:
         status, detail = "imported", "New lead created with a first-call task."
+        if row.get("opportunity_id"):  # M10: count it as a lead-ad lead (not a spreadsheet import) in reports
+            db.execute("UPDATE opportunities SET source = 'meta_lead', source_detail = ? WHERE id = ?",
+                       (f"Lead ad: {ev['form_name'] or 'form'}"[:200], row["opportunity_id"]))
     db.update("lead_ad_events", event_id, {"status": status, "detail": detail, "import_id": iid,
                                            "opportunity_id": row.get("opportunity_id"), "processed_at": now_iso()})
     return db.one("SELECT * FROM lead_ad_events WHERE id = ?", (event_id,))

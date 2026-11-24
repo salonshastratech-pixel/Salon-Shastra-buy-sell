@@ -2,7 +2,19 @@
 (function () {
   // Mobile menu
   var t = document.querySelector('.menu-toggle');
-  if (t) t.addEventListener('click', function () { document.querySelector('.side').classList.toggle('open'); });
+  if (t) t.addEventListener('click', function () {
+    var open = document.querySelector('.side').classList.toggle('open');
+    t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  // Phone menu: tap outside it or press Escape to close
+  function closeSide() {
+    var s = document.querySelector('.side');
+    if (s && s.classList.contains('open')) { s.classList.remove('open'); if (t) t.setAttribute('aria-expanded', 'false'); }
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSide(); });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.side') && !e.target.closest('.menu-toggle')) closeSide();
+  });
 
   // Confirm dangerous actions: <form data-confirm="...">
   document.querySelectorAll('form[data-confirm]').forEach(function (f) {
@@ -193,3 +205,20 @@
     sel.addEventListener('change', function () { sel.form.submit(); });
   });
 })();
+
+// -- M10: install TeamOS on a phone (staff pages only; customer pages never register the app) ------------------
+(function () {
+  if (!('serviceWorker' in navigator) || document.body.classList.contains('public') || !window.isSecureContext) return;
+  window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {}); });
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e;
+    document.querySelectorAll('[data-install-hint]').forEach(function (el) { el.hidden = false; });
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-install]');
+    if (!b || !deferred) return;
+    deferred.prompt(); deferred = null;
+  });
+})();
+

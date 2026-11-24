@@ -1,0 +1,30 @@
+-- Indexes for the links the app follows often (found by the Supabase / PostgreSQL performance check, 24 Nov 2026).
+-- Same on SQLite and PostgreSQL; no data changes.
+CREATE INDEX IF NOT EXISTS ix_deals_buyer ON deals(buyer_opp_id);
+CREATE INDEX IF NOT EXISTS ix_deals_seller ON deals(seller_opp_id);
+CREATE INDEX IF NOT EXISTS ix_deals_owner ON deals(owner_id);
+CREATE INDEX IF NOT EXISTS ix_deal_visits_deal ON deal_visits(deal_id);
+CREATE INDEX IF NOT EXISTS ix_task_events_task ON task_events(task_id);
+CREATE INDEX IF NOT EXISTS ix_tasks_parent ON tasks(parent_task_id);
+CREATE INDEX IF NOT EXISTS ix_job_runs_job ON job_runs(job_id);
+CREATE INDEX IF NOT EXISTS ix_swot_listing ON swot_items(listing_id);
+CREATE INDEX IF NOT EXISTS ix_listing_approvals_listing ON listing_approvals(listing_id);
+CREATE INDEX IF NOT EXISTS ix_fee_agreements_deal ON fee_agreements(deal_id);
+CREATE INDEX IF NOT EXISTS ix_fee_agreements_opp ON fee_agreements(opportunity_id);
+CREATE INDEX IF NOT EXISTS ix_fee_invoices_agreement ON fee_invoices(agreement_id);
+CREATE INDEX IF NOT EXISTS ix_fee_receipts_agreement ON fee_receipts(agreement_id);
+CREATE INDEX IF NOT EXISTS ix_submissions_invitation ON form_submissions(invitation_id);
+CREATE INDEX IF NOT EXISTS ix_submissions_contact ON form_submissions(contact_id);
+CREATE INDEX IF NOT EXISTS ix_invitations_contact ON form_invitations(contact_id);
+CREATE INDEX IF NOT EXISTS ix_documents_submission ON documents(submission_id);
+CREATE INDEX IF NOT EXISTS ix_opps_business ON opportunities(business_id);
+CREATE INDEX IF NOT EXISTS ix_messages_opp ON messages(opportunity_id);
+CREATE INDEX IF NOT EXISTS ix_conversation_links_opp ON conversation_links(opportunity_id);
+CREATE INDEX IF NOT EXISTS ix_lead_ad_events_opp ON lead_ad_events(opportunity_id);
+CREATE INDEX IF NOT EXISTS ix_teaser_shares_teaser ON teaser_shares(teaser_id);
+CREATE INDEX IF NOT EXISTS ix_mfa_codes_user ON mfa_recovery_codes(user_id);
+CREATE INDEX IF NOT EXISTS ix_dup_reviews_contact ON duplicate_reviews(contact_id);
+CREATE INDEX IF NOT EXISTS ix_collaborators_user ON opportunity_collaborators(user_id);
+CREATE INDEX IF NOT EXISTS ix_batch_recipients_contact ON batch_recipients(contact_id);
+CREATE INDEX IF NOT EXISTS ix_sheet_rows_opp ON sheet_import_rows(opportunity_id);
+CREATE INDEX IF NOT EXISTS ix_import_rows_opp ON import_rows(opportunity_id);

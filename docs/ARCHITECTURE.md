@@ -126,7 +126,7 @@ credentials pass an end-to-end check.
 
 ## 8. Known trade-offs
 
-* SQLite in dev vs PostgreSQL in prod: SQL is portable and the PG adapter is written, but **untested here** (the
+* SQLite in dev vs PostgreSQL in prod: schema applied to Supabase PostgreSQL (24 Nov 2026) and every query checked with scripts/qa/pg_check.py — see docs/SUPABASE.md (the
   driver could not be installed in this offline build environment). Running the suite against PostgreSQL is the first task of M2.
 * Server-rendered UI means some interactions reload the page. Acceptable for M1; partial updates can be added.
 * Brand tokens are taken from salonshastra.com's live CSS variables; confirm against an official brand kit.

@@ -1,0 +1,31 @@
+{% extends "public/layout.html" %}
+{% block title %}{{ _('Your progress') }}{% endblock %}
+{% block content %}
+{% if preview %}<div class="flash warn small">Staff preview — this is what the customer sees. Opening it here is not counted. <a href="{{ back }}">Back to the record</a> · <a href="?lang={{ 'en' if lang == 'te' else 'te' }}">{{ 'English' if lang == 'te' else 'తెలుగు' }}</a></div>{% endif %}
+{% if v.state == 'missing' %}
+<div class="card"><h1>{{ _('Link not recognised') }}</h1><p>{{ _('This link is not valid or has expired. Please ask your Salon Shastra contact for a new one.') }}</p></div>
+{% elif v.state == 'inactive' %}
+<div class="card"><h1>{{ _('This link is no longer active') }}</h1><p>{{ _('Please contact Salon Shastra if you would like to start again.') }}</p></div>
+{% else %}
+<div class="card progress-page">
+  <h1>{% if v.first_name %}{{ _('Hello') }} {{ v.first_name }}{% else %}{{ _('Your progress') }}{% endif %}</h1>
+  <p class="small muted">{{ _('Reference') }} <strong class="mono">{{ v.ref }}</strong></p>
+  {% if v.state == 'done' %}<p class="done-note">{{ _('Completed. Thank you for working with Salon Shastra.') }}</p>
+  {% elif v.state == 'paused' %}<p>{{ _('Your enquiry is on hold for now. Message us any time and we will pick it up again.') }}</p>{% endif %}
+  <ol class="journey">{% for s in v.steps %}
+    <li class="j-{{ s.state }}"><span class="dot" aria-hidden="true">{{ '✓' if s.state == 'done' else loop.index }}</span><div><strong>{{ _(s.label) }}</strong>{% if s.state == 'now' %} <span class="badge">{{ _('Now') }}</span><div class="small muted">{{ _(s.note) }}</div>{% endif %}</div></li>{% endfor %}
+  </ol>
+</div>
+{% if v.need or v.open_form %}
+<div class="card"><h2>{{ _('What we still need from you') }}</h2>
+  {% if v.open_form %}<p>{{ _('Please finish the form we sent you on WhatsApp — you can skip anything you are not sure about.') }}</p>{% endif %}
+  {% if v.need %}<ul class="need-list">{% for n in v.need %}<li>{{ _(n) }}</li>{% endfor %}</ul>
+  <p class="small muted">{{ _('Not sure about something? That is fine — we can go through it on a call.') }}</p>{% endif %}
+</div>
+{% endif %}
+<div class="card"><h2>{{ _('Your contact') }}</h2>
+  <p>{% if v.contact %}{{ v.contact }}, Salon Shastra{% else %}{{ _('The Salon Shastra team') }}{% endif %}{% if v.next_contact %}<br><span class="small">{{ _('We will be in touch by') }} {{ v.next_contact.strftime('%d %b') }}</span>{% endif %}</p>
+  <p class="small muted">{{ _('Your name, phone number and salon details are never shared without your permission.') }}</p>
+</div>
+{% endif %}
+{% endblock %}

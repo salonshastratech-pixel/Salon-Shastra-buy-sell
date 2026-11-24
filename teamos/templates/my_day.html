@@ -15,6 +15,7 @@
   <span class="stat-chip ok"><b>{{ done_today|length }}</b> done today</span>
   <span class="stat-chip"><b>{{ conversations }}</b> conversations · {{ calls_today }} calls</span>
   {% if stuck %}<a class="stat-chip warn" href="#stuck"><b>{{ stuck|length }}</b> not moving</a>{% endif %}
+  {% for s in saved_new %}<a class="stat-chip info" href="{{ url_for('workflow.open_search', sid=s.id) }}" title="New since you last looked"><b>{{ s.new }}</b> new · {{ s.name }}</a>{% endfor %}
 </div>
 
 <div class="split">

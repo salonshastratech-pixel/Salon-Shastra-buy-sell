@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Install on your phone{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>TeamOS on your phone</h1><div class="sub">Add TeamOS to your home screen — it opens full-screen like an app. No app store needed.</div></div></div>
+<div class="split">
+  <div class="card"><h2>Android (Chrome)</h2><ol class="small steps">
+    <li>Open TeamOS in Chrome and sign in.</li>
+    <li>Tap the <strong>⋮</strong> menu (top right).</li>
+    <li>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</li></ol>
+    <p class="small muted" data-install-hint hidden>Or tap here: <button class="btn sm primary" type="button" data-install>Install TeamOS</button></p></div>
+  <div class="card"><h2>iPhone (Safari)</h2><ol class="small steps">
+    <li>Open TeamOS in Safari and sign in.</li>
+    <li>Tap the <strong>Share</strong> button (square with an arrow).</li>
+    <li>Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li></ol></div>
+</div>
+<div class="card small"><h2>Good to know</h2><ul class="plain-list">
+  <li>Customer details are never stored on the phone — every screen comes fresh from TeamOS, so a lost phone doesn't leak data. Sign out if you share the phone.</li>
+  <li>Tapping a customer's number dials it; after the call, the page jumps to <strong>Log a call</strong>.</li>
+  <li>Without internet you'll see a short "you're offline" notice instead of old information.</li></ul></div>
+{% endblock %}

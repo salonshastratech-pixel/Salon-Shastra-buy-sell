@@ -1,0 +1,16 @@
+{# Customer progress link on a seller / buyer page. Needs `opp`; `progress_link` from the context processor. #}
+{% if can('crm.log_activity') %}
+<div class="card" id="progress">
+  <div class="card-h"><h2>Customer progress link</h2>{% if progress_link %}<span class="badge ok">on</span>{% endif %}</div>
+  {% if progress_link %}
+  <p class="small">Shared {{ progress_link.created_at|rel }} · {% if progress_link.opens %}opened {{ progress_link.opens }} time{{ 's' if progress_link.opens != 1 }}, last {{ progress_link.last_opened_at|rel }}{% else %}not opened yet{% endif %}.</p>
+  {% else %}
+  <p class="small muted">A private page where the customer sees where things stand and what we still need — so fewer "any update?" calls.</p>
+  {% endif %}
+  <div class="inline">
+    <form method="post" action="{{ url_for('workflow.progress_link', opp_id=opp.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm {{ '' if progress_link else 'primary' }}">{{ 'Make a new link' if progress_link else 'Make a link' }}</button></form>
+    {% if progress_link %}<form method="post" action="{{ url_for('workflow.progress_link_off', opp_id=opp.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm">Switch off</button></form>{% endif %}
+    <a class="btn sm ghost" href="{{ url_for('workflow.progress_preview', opp_id=opp.id) }}" target="_blank" rel="noopener">Preview</a>
+  </div>
+</div>
+{% endif %}

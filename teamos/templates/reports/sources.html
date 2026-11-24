@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Lead sources{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Reports</h1><div class="sub">{{ p.label }} · leads that arrived in this period, followed all the way to a deal</div></div></div>
+<nav class="tabs"><a href="{{ url_for('reports.index') }}">Numbers</a><a href="{{ url_for('workflow.sources') }}" class="on">Lead sources</a><a href="{{ url_for('improve.learning') }}">Match learning</a></nav>
+
+<form class="card inline" method="get">
+  {% for k, l in PERIODS if k != 'custom' %}<a class="btn sm {{ 'primary' if p.key == k }}" href="{{ url_for('workflow.sources', period=k) }}">{{ l }}</a>{% endfor %}
+  <input type="hidden" name="period" value="custom"><input type="date" name="start" value="{{ p.start_date }}" aria-label="From"> to <input type="date" name="end" value="{{ p.end_date }}" aria-label="To"><button class="btn sm {{ 'primary' if p.key == 'custom' }}">Custom</button>
+</form>
+
+{% macro cells(x) %}{% for k in r.STEPS %}<td class="right">{{ x[k] }}{% if k != 'leads' and x.leads %}<div class="small muted">{{ x.pct[k] }}%</div>{% endif %}</td>{% endfor %}
+  <td class="right nowrap">{{ (x.median_hours|string ~ ' h') if x.median_hours is not none else '—' }}</td>{% if r.fees %}<td class="right nowrap">{{ x.fees|inr if x.fees else '—' }}</td>{% endif %}{% endmacro %}
+
+{% if not r.rows %}<div class="card"><p class="empty">No leads arrived in this period.</p></div>{% else %}
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Where good leads come from</h2></div><div class="table-wrap"><table class="funnel">
+  <tr><th>Source</th>{% for k in r.STEPS %}<th class="right">{{ r.LABELS[k] }}</th>{% endfor %}<th class="right">Time to first talk</th>{% if r.fees %}<th class="right">Fees earned <span class="badge warn">admin</span></th>{% endif %}</tr>
+  {% for x in r.rows %}<tr><td><strong>{{ x.channel }}</strong><div class="small muted">{{ 'sellers' if x.kind == 'seller' else 'buyers' }}</div></td>{{ cells(x) }}</tr>{% endfor %}
+  <tr class="total"><td><strong>All sources</strong></td>{{ cells(r.total) }}</tr>
+</table></div></div>
+<p class="small muted">Each column counts people who reached at least that step, so you can see where each channel loses people. Percentages are of that row's leads. "Time to first talk" is the median from arrival to the first real conversation.</p>
+
+{% if r.campaigns %}<details class="card disclose"><summary>By campaign, ad form or sheet ({{ r.campaigns|length }})</summary><div class="table-wrap"><table class="funnel small">
+  <tr><th>Campaign / form / sheet</th>{% for k in r.STEPS %}<th class="right">{{ r.LABELS[k] }}</th>{% endfor %}<th class="right">Time to first talk</th>{% if r.fees %}<th class="right">Fees</th>{% endif %}</tr>
+  {% for x in r.campaigns %}<tr><td>{{ x.campaign }}<div class="small muted">{{ x.channel }} · {{ 'sellers' if x.kind == 'seller' else 'buyers' }}</div></td>{{ cells(x) }}</tr>{% endfor %}
+</table></div></details>{% endif %}
+{% endif %}
+{% endblock %}

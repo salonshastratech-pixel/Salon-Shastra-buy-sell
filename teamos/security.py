@@ -126,7 +126,7 @@ MFA_EXEMPT = {"auth.mfa", "auth.mfa_setup", "auth.logout", "static", "main.healt
 
 def enforce_mfa():
     """Until the second factor is passed, the session can do nothing except complete MFA or sign out."""
-    if g.get("mfa_pending") and request.endpoint not in MFA_EXEMPT and not (request.endpoint or "").startswith(("public.", "public_teaser.", "public_webhook.", "public_calendar.")):
+    if g.get("mfa_pending") and request.endpoint not in MFA_EXEMPT and not (request.endpoint or "").startswith(("public.", "public_teaser.", "public_webhook.", "public_calendar.", "public_status.", "pwa.")):
         target = "auth.mfa" if g.user.get("mfa_enabled_at") else "auth.mfa_setup"
         return redirect(url_for(target))
     return None

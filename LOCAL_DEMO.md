@@ -22,6 +22,13 @@ The virtualenv lives at `C:\Users\user\.venvs\teamos-m2` because this folder's p
 
 Two-step sign-in is switched off for the demo (`MFA_REQUIRED_ROLES=` empty in `.env`). Enrol any user at /mfa/setup to try it.
 
+## Milestone 10 — what to try
+* **Tools & admin → Automations**: see what runs by itself; as Founder, pause one and switch it back on.
+* **Sellers**: filter (e.g. search "Kondapur"), **☆ Save this search**; new matching sellers show as "N new" here and on My Day.
+* Open a seller → **Customer progress link → Preview** (switch to తెలుగు at the top), then **Make a link** and open it in a private window.
+* **Reports → Lead sources**: which channels turn into deals.
+* On your phone, open TeamOS and use **Install app** / **Add to Home Screen** (see Tools & admin → Install on your phone).
+
 ## Milestone 9 — what to try
 * Open any seller or buyer: tap the phone number or **Call** (on a phone it dials), then the page jumps to **Log a call**.
 * **Calendar** in the menu; **Get my calendar link** to add your work to Google Calendar (no customer details in it).

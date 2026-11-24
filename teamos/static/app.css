@@ -404,3 +404,60 @@ a.tel { color: var(--brand-dark); }
 .ev-empty { color: var(--muted); font-size: 12px; text-align: center; padding-top: 30px; }
 code.copy { user-select: all; word-break: break-all; }
 @media (max-width: 960px) { .week { grid-template-columns: 1fr; } .day { min-height: 0; } .ev-empty { display: none; } }
+
+/* ---- M10: saved searches, automations, progress page, lead sources ---- */
+.saved-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -4px 0 14px; }
+.saved-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); padding: 2px 4px 2px 12px; font-size: 13px; }
+.saved-chip.on { border-color: var(--brand); background: var(--brand-tint); }
+.saved-chip a { color: var(--text); text-decoration: none; }
+.saved-chip .count { margin-left: 4px; }
+.saved-chip form { display: inline; margin: 0; }
+.saved-chip .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1;
+  padding: 2px 6px; border-radius: 999px; }
+.saved-chip .x:hover { background: var(--bad-soft); color: var(--bad); }
+.save-search { display: inline-block; }
+.save-search summary { list-style: none; cursor: pointer; }
+.save-search summary::-webkit-details-marker { display: none; }
+.save-search[open] { flex-basis: 100%; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 10px 12px; }
+.save-search[open] summary { margin-bottom: 8px; }
+.save-search input[name=name] { min-width: 260px; }
+.stat-chip.info { background: var(--info-soft); color: var(--info); }
+.sm-input { width: 170px; padding: 4px 8px; font-size: 13px; }
+.plain-list { margin: 0; padding-left: 18px; }
+.plain-list li { margin: 4px 0; }
+.big-link { display: block; word-break: break-all; font-size: 15px; padding: 10px 12px; }
+.btn.ghost { background: none; border-color: transparent; }
+.journey { list-style: none; margin: 18px 0 4px; padding: 0; }
+.journey li { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; position: relative; }
+.journey li:not(:last-child)::after { content: ""; position: absolute; left: 13px; top: 36px; bottom: -6px; width: 2px;
+  background: var(--line); }
+.journey .dot { flex: 0 0 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px;
+  font-weight: 600; background: var(--surface-2); border: 2px solid var(--line); color: var(--muted); }
+.journey .j-done .dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.journey .j-done::after { background: var(--ok) !important; }
+.journey .j-now .dot { background: var(--brand); border-color: var(--brand); color: #fff; }
+.journey .j-next strong { color: var(--muted); font-weight: 500; }
+.need-list { margin: 8px 0; padding-left: 20px; }
+.need-list li { margin: 4px 0; }
+.done-note { color: var(--ok); font-weight: 600; }
+.funnel td { white-space: nowrap; }
+.funnel th { white-space: normal; min-width: 70px; vertical-align: bottom; }
+.funnel tr.total td { border-top: 2px solid var(--line); background: var(--surface-2); }
+.steps { padding-left: 20px; }
+.steps li { margin: 6px 0; }
+@media (max-width: 640px) { .save-search input[name=name] { min-width: 0; width: 100%; } .sm-input { width: 120px; } }
+.auto-row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.auto-row:last-child { border-bottom: 0; }
+.auto-dot { flex: 0 0 10px; height: 10px; border-radius: 50%; margin-top: 6px; }
+.auto-dot.on { background: var(--ok); } .auto-dot.off { background: var(--bad); }
+.auto-main { flex: 1; min-width: 0; }
+.auto-last { margin-top: 4px; color: var(--muted); }
+.auto-act { flex: 0 0 auto; text-align: right; }
+.pause-box summary { list-style: none; cursor: pointer; }
+.pause-box summary::-webkit-details-marker { display: none; }
+.pause-box[open] form { display: flex; gap: 6px; margin-top: 8px; }
+.pause-box input[name=note] { width: 170px; padding: 4px 8px; font-size: 13px; }
+@media (max-width: 640px) { .auto-row { flex-wrap: wrap; } .auto-act { flex-basis: 100%; text-align: left; padding-left: 22px; } }
+

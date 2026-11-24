@@ -157,3 +157,123 @@ def to_csv(r: dict) -> str:
         for k, v in r["finance"].items():
             w.writerow(["finance", k, v])
     return buf.getvalue()
+
+
+# -- Milestone 10: results by lead source ------------------------------------------------------------------------
+SELLER_QUALIFIED = {"listing_approved", "active_matching", "negotiation", "handover", "closed_won"}
+BUYER_QUALIFIED = {"qualified_shortlist", "shortlist_shared", "viewing_offer", "transaction", "closed_won"}
+DETAIL_STAGES = {"form_received", "assessment_review", "verification_pending", "basic_qualified",
+                 "requirements_captured", "funding_review"} | SELLER_QUALIFIED | BUYER_QUALIFIED
+STEPS = ["leads", "reached", "details", "qualified", "matched", "deals", "won"]
+STEP_LABELS = {"leads": "Leads", "reached": "Spoke with us", "details": "Gave details",
+               "qualified": "Qualified", "matched": "Shortlisted in a match", "deals": "Introduced (deal opened)",
+               "won": "Deal won"}
+
+
+def sources(db, user, p: dict) -> dict:
+    """Which channels bring people who go all the way — not just how many leads (PRD §2.2 channel ROI)."""
+    from . import sellers as S
+    s, e = p["start"], p["end"]
+    opps = db.all("SELECT id, kind, source, source_detail, created_at, stage FROM opportunities WHERE created_at >= ? "
+                  "AND created_at < ?", (s, e))
+    ids = [o["id"] for o in opps]
+    if not ids:
+        return {"rows": [], "campaigns": [], "total": None, "STEPS": STEPS, "LABELS": STEP_LABELS, "fees": False}
+
+    def ids_in(sql, extra=()):
+        out = set()
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            out |= {list(r.values())[0] for r in db.all(sql.replace("{IDS}", ",".join("?" * len(chunk))),
+                                                        (*chunk, *extra))}
+        return out
+
+    first_talk = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        for r in db.all("SELECT entity_id AS oid, MIN(at) AS t FROM activities WHERE entity_type = 'opportunity' "
+                        "AND kind = 'call' AND call_outcome IN ('connected','callback_requested') AND entity_id IN (" +
+                        ",".join("?" * len(chunk)) + ") GROUP BY entity_id", chunk):
+            first_talk[r["oid"]] = r["t"]
+    stages_seen = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        for r in db.all("SELECT opportunity_id, to_stage FROM stage_history WHERE opportunity_id IN (" +
+                        ",".join("?" * len(chunk)) + ")", chunk):
+            stages_seen.setdefault(r["opportunity_id"], set()).add(r["to_stage"])
+    has_form = ids_in("SELECT opportunity_id FROM form_submissions WHERE opportunity_id IN ({IDS})")
+    matched = ids_in("SELECT seller_opp_id FROM match_candidates WHERE seller_opp_id IN ({IDS}) AND stage IN "
+                     "('shortlisted','approved_to_approach','interest_confirmed')") | \
+        ids_in("SELECT buyer_opp_id FROM match_candidates WHERE buyer_opp_id IN ({IDS}) AND stage IN "
+               "('shortlisted','approved_to_approach','interest_confirmed')")
+    deal_of = {}
+    for col in ("seller_opp_id", "buyer_opp_id"):
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            for r in db.all(f"SELECT {col} AS oid, id, stage FROM deals WHERE {col} IN (" +
+                            ",".join("?" * len(chunk)) + ")", chunk):
+                deal_of.setdefault(r["oid"], []).append((r["id"], r["stage"]))
+    fees_ok = user_can(db, user, "finance.view")
+    earned_by_deal = {}
+    if fees_ok:
+        from . import finance as FN
+        for r in FN.ledger(db, user)["rows"]:
+            if r["status"] == "active":
+                earned_by_deal[r["deal_id"]] = earned_by_deal.get(r["deal_id"], 0) + (r["calc"]["earned"] or 0)
+
+    def channel(o):
+        return S.SOURCE_LABELS.get(o["source"], (o["source"] or "Unknown").replace("_", " ").capitalize())
+
+    def campaign(o):
+        d = (o["source_detail"] or "").strip()
+        return d[:80] if d and not d.startswith("{") else None
+
+    def blank():
+        return {**{k: 0 for k in STEPS}, "hours": [], "fees": 0, "deal_ids": set()}
+
+    groups, camps = {}, {}
+    total = blank()
+    for o in opps:
+        seen = stages_seen.get(o["id"], set()) | {o["stage"]}
+        qual = SELLER_QUALIFIED if o["kind"] == "seller" else BUYER_QUALIFIED
+        flags = {"leads": True, "reached": o["id"] in first_talk,
+                 "details": o["id"] in has_form or bool(seen & DETAIL_STAGES),
+                 "qualified": bool(seen & qual), "matched": o["id"] in matched or bool(deal_of.get(o["id"])),
+                 "deals": bool(deal_of.get(o["id"])),
+                 "won": any(st == "closed_won" for _, st in deal_of.get(o["id"], []))}
+        hrs = None
+        if o["id"] in first_talk:
+            try:
+                hrs = (datetime.fromisoformat(first_talk[o["id"]].replace("Z", "+00:00")) -
+                       datetime.fromisoformat(o["created_at"].replace("Z", "+00:00"))).total_seconds() / 3600
+            except ValueError:
+                hrs = None
+        keys = [(groups, (o["kind"], channel(o)))]
+        if campaign(o):
+            keys.append((camps, (o["kind"], channel(o), campaign(o))))
+        for bucket, key in keys + [(None, None)]:
+            g = total if bucket is None else bucket.setdefault(key, blank())
+            for k in STEPS:
+                g[k] += 1 if flags[k] else 0
+            if hrs is not None and hrs >= 0:
+                g["hours"].append(hrs)
+            for did, st in deal_of.get(o["id"], []):
+                if st == "closed_won" and did not in g["deal_ids"]:
+                    g["deal_ids"].add(did)
+                    g["fees"] += earned_by_deal.get(did, 0)
+
+    def finish(g):
+        h = sorted(g.pop("hours"))
+        g.pop("deal_ids")
+        g["median_hours"] = round(h[len(h) // 2], 1) if h else None
+        g["pct"] = {k: (round(100 * g[k] / g["leads"]) if g["leads"] else 0) for k in STEPS}
+        if not fees_ok:
+            g.pop("fees")
+        return g
+
+    rows = [{"kind": k[0], "channel": k[1], **finish(g)} for k, g in groups.items()]
+    rows.sort(key=lambda r: (r["kind"], -r["leads"]))
+    camp_rows = [{"kind": k[0], "channel": k[1], "campaign": k[2], **finish(g)} for k, g in camps.items()]
+    camp_rows.sort(key=lambda r: -r["leads"])
+    return {"rows": rows, "campaigns": camp_rows[:15], "total": finish(total), "STEPS": STEPS, "LABELS": STEP_LABELS,
+            "fees": fees_ok}

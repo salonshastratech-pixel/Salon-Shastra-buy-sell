@@ -54,9 +54,21 @@ def schedule_periodic(db) -> None:
 
 def run_once(db, limit: int = 20) -> int:
     """Run due jobs. Returns how many were processed."""
+    from .domain import automations as A
     processed = 0
     for job in db.all("SELECT * FROM jobs WHERE status = 'queued' AND run_after <= ? ORDER BY run_after, id LIMIT ?",
                       (now_iso(), limit)):
+        if A.paused(db, job["kind"]):  # M10: an admin paused this automation (or everything)
+            if job["kind"] in A.HOLD_WHEN_PAUSED:  # e.g. lead ads wait, nothing is lost
+                db.execute("UPDATE jobs SET run_after = ?, updated_at = ? WHERE id = ? AND status = 'queued'",
+                           (to_iso(now_utc() + timedelta(minutes=15)), now_iso(), job["id"]))
+                continue
+            if db.execute("UPDATE jobs SET status = 'done', last_error = NULL, updated_at = ? WHERE id = ? AND "
+                          "status = 'queued'", (now_iso(), job["id"])).rowcount:
+                db.insert("job_runs", {"job_id": job["id"], "started_at": now_iso(), "finished_at": now_iso(),
+                                       "outcome": "skipped", "message": "paused by an admin"})
+                processed += 1
+            continue
         claimed = db.execute("UPDATE jobs SET status = 'running', attempts = attempts + 1, updated_at = ? "
                              "WHERE id = ? AND status = 'queued'", (now_iso(), job["id"])).rowcount
         if not claimed:

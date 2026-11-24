@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ph"><div><h1>Match learning</h1><div class="sub">When good-looking matches keep getting declined for the same reason, the scoring should change. The system suggests; the founder decides.</div></div>
   {% if can_decide %}<div class="actions"><form method="post" action="{{ url_for('improve.learning_check') }}">{{ csrf() }}<button class="btn">Check for suggestions now</button></form></div>{% endif %}</div>
-<nav class="tabs"><a href="{{ url_for('reports.index') }}">Numbers</a><a href="{{ url_for('improve.learning') }}" class="on">Match learning</a></nav>
+<nav class="tabs"><a href="{{ url_for('reports.index') }}">Numbers</a><a href="{{ url_for('workflow.sources') }}">Lead sources</a><a href="{{ url_for('improve.learning') }}" class="on">Match learning</a></nav>
 
 {% for p in open_ %}
 <div class="card proposal">

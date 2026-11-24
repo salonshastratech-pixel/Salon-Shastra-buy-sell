@@ -665,6 +665,12 @@ def send_batch(db, actor, batch_id: int) -> dict:
     b = db.one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not b or b["status"] != "approved":
         raise ValidationError("Only an approved batch can be sent.")
+    from flask import current_app, has_app_context
+
+    from . import automations as A
+    held = A.bulk_send_blockers(db, current_app.config if has_app_context() else None)
+    if held:
+        raise ValidationError(" ".join(held))
     variables = json.loads(b["audience"]).get("variables", {})
     counts = {"sent": 0, "suppressed": 0, "failed": 0}
     for r in db.all("SELECT r.*, c.full_name FROM batch_recipients r JOIN contacts c ON c.id = r.contact_id "

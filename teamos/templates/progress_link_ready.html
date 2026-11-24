@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Progress link · {{ o.ref_code }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Progress link for {{ o.contact_name.split()[0] if o.contact_name else o.ref_code }}</h1><div class="sub">{{ o.ref_code }} · shown only now — copy it and send it on WhatsApp</div></div>
+  <div class="actions"><a class="btn" href="{{ back }}#progress">Back to the record</a></div></div>
+<div class="card">
+  <p><code class="copy big-link">{{ link }}</code></p>
+  <p class="small">The customer sees where things stand, what we still need from them and who their contact is — in English or తెలుగు. They don't need to sign in.</p>
+  <p class="small muted">Never shown: prices, internal notes, scores, other buyers or sellers, documents. The link works for 60 days; making a new one or switching it off stops this one.</p>
+  <p><a class="btn sm" href="{{ url_for('workflow.progress_preview', opp_id=o.id) }}" target="_blank" rel="noopener">See what they will see</a></p>
+</div>
+{% endblock %}

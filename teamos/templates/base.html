@@ -6,11 +6,14 @@
 <title>{% block title %}TeamOS{% endblock %} · Salon Shastra</title>
 {% if brand_fonts %}<link rel="stylesheet" href="{{ brand_fonts }}">{% endif %}
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#c04000">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="TeamOS">
 </head>
 <body>
 {% set ep = request.endpoint or '' %}
 <div class="shell">
-  <aside class="side">
+  <aside class="side" id="side-nav">
     <div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Business Exchange · TeamOS</small></div>
     {% set nc = nav_counts or {} %}
     {% macro item(endpoint, label, on, count=0, hot=false) %}<a href="{{ url_for(endpoint) }}" class="{{ 'on' if on }}"><span>{{ label }}</span>{% if count %}<b class="count {{ 'hot' if hot }}">{{ count }}</b>{% endif %}</a>{% endmacro %}
@@ -38,7 +41,7 @@
   <div class="main">
     {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} environment · {{ data_notice }} · no live integrations connected · v{{ app_version }}</div>{% endif %}
     <header class="top">
-      <button class="btn sm menu-toggle" type="button">Menu</button>
+      <button class="btn sm menu-toggle" type="button" aria-expanded="false" aria-controls="side-nav">Menu</button>
       {% if can('crm.view') %}
       <form class="search" action="{{ url_for('main.search') }}" method="get">
         <input type="search" name="q" placeholder="Search name, mobile, salon, locality, SL-…" value="{{ request.args.get('q', '') if ep == 'main.search' else '' }}">

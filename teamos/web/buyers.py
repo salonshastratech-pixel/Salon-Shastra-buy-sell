@@ -39,42 +39,14 @@ def _opp_or_404(db, opp_id):
 @require("crm.view")
 def index():
     db = get_db()
-    where, params = ["o.kind = 'buyer'"], []
+    from ..domain import saved_searches as SS
+    where, params = SS.where("buyer", request.args, g.user["id"])
     q = (request.args.get("q") or "").strip()
     stage = request.args.get("stage") or ""
     owner = request.args.get("owner") or ""
     need = request.args.get("need") or ""
     status = request.args.get("status") or "active"
     queue = request.args.get("queue") or ""
-    if q:
-        like = f"%{q.lower()}%"
-        digits = "".join(ch for ch in q if ch.isdigit())
-        clause = ("(lower(c.full_name) LIKE ? OR lower(o.ref_code) LIKE ? OR lower(m.preferred_city) LIKE ? OR "
-                  "EXISTS (SELECT 1 FROM buyer_localities l WHERE l.mandate_id = m.id AND lower(l.locality) LIKE ?)")
-        params += [like, like, like, like]
-        if len(digits) >= 4:
-            clause += " OR c.phone_normalized LIKE ?"
-            params.append(f"%{digits[-10:]}%")
-        where.append(clause + ")")
-    if stage:
-        where.append("o.stage = ?")
-        params.append(stage)
-    if need:
-        where.append("m.need_type = ?")
-        params.append(need)
-    if owner == "me":
-        where.append("o.primary_owner_id = ?")
-        params.append(g.user["id"])
-    elif owner.isdigit():
-        where.append("o.primary_owner_id = ?")
-        params.append(int(owner))
-    if queue == "criteria":
-        where.append("(m.criteria_reviewed_version IS NULL OR m.criteria_reviewed_version <> m.data_version)")
-    elif queue == "funding":
-        where.append("m.funding_status IN ('not_reviewed','evidence_requested')")
-    if status in ("active", "holding", "closed"):
-        where.append("o.status = ?")
-        params.append(status)
     rows = db.all(LIST_SQL + "WHERE " + " AND ".join(where) + " ORDER BY CASE WHEN o.next_action_due IS NULL "
                   "THEN 1 ELSE 0 END, o.next_action_due LIMIT 300", params)
     locs: dict[int, list[str]] = {}
@@ -89,7 +61,8 @@ def index():
                                "current" if r["criteria_reviewed_version"] == r["data_version"] else "stale")
     return render_template("buyers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage, owner=owner,
                            need=need, status=status, queue=queue, STAGES=B.STAGES + B.HOLDING,
-                           STAGE_LABELS=B.STAGE_LABELS)
+                           STAGE_LABELS=B.STAGE_LABELS, saved=SS.mine(db, g.user["id"], "buyer"), list_kind="buyer",
+                           current_qs=SS.query_string("buyer", request.args))
 
 
 @bp.route("/new", methods=["GET", "POST"])

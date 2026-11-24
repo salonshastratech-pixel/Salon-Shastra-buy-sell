@@ -19,7 +19,7 @@ from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
 from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
 
-__version__ = "0.9.0-m9"
+__version__ = "0.10.0-m10"
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -36,6 +36,7 @@ def create_app(overrides: dict | None = None) -> Flask:
         # Fernet key for encrypting uploaded documents at rest. Without it, uploads are refused.
         FILES_KEY=os.environ.get("FILES_KEY"),
         PUBLIC_BASE_URL=os.environ.get("PUBLIC_BASE_URL", ""),
+        QUIET_HOURS=os.environ.get("QUIET_HOURS", "21-8"),  # M10: no bulk WhatsApp 9 pm – 8 am IST
         # WhatsApp Cloud API — all four + WHATSAPP_LIVE_APPROVED=1 are needed before anything goes to real customers.
         WHATSAPP_PHONE_NUMBER_ID=os.environ.get("WHATSAPP_PHONE_NUMBER_ID"),
         WHATSAPP_ACCESS_TOKEN=os.environ.get("WHATSAPP_ACCESS_TOKEN"),
@@ -129,10 +130,10 @@ def create_app(overrides: dict | None = None) -> Flask:
         return ctx
 
     from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, public,
-                      sellers, tasks)
+                      sellers, tasks, workflow)
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
                matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp,
-               channels.bp, channels.feed_bp):
+               channels.bp, channels.feed_bp, workflow.bp, workflow.public_bp, workflow.pwa_bp):
         app.register_blueprint(bp)
     return app
 

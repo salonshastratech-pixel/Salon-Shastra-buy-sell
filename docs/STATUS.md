@@ -1,3 +1,19 @@
+# Milestone 10 — transparency & follow-through (24 Nov 2026, v0.10.0)
+
+| Area | Status | How it works |
+|---|---|---|
+| Automations | **Built** | Tools & admin → **Automations**: every job TeamOS runs by itself, when, what it did last and how often this week. Admins pause any one (with a reason) or **Pause everything**; incoming lead ads wait rather than being lost; retrying WhatsApp updates is always on (D-67). |
+| Quiet hours | **Built** | No bulk WhatsApp 9 pm – 8 am IST; one-to-one messages unaffected; switchable by admins (D-68). |
+| Saved searches | **Built** | On Sellers and Buyers: filter, then **☆ Save this search**. Each saved search shows "N new" since you last opened it, also on My Day. Private to each person. |
+| Customer progress link | **Built** | On each seller / buyer: **Make a link** → a private page in English or తెలుగు showing the journey step, what we still need (in plain words) and their contact. Preview before sending; switch off any time; opens are counted (D-69). |
+| Lead sources | **Built** | Reports → **Lead sources**: for each channel (and campaign / ad form / sheet), how many leads spoke with us, gave details, qualified, were shortlisted, introduced and won, plus median time to first conversation. Admins also see fees earned. Lead-ad leads are now labelled as lead ads, not spreadsheet imports. |
+| Phone app | **Built** | Tools & admin → **Install on your phone** (Android: Install app; iPhone: Add to Home Screen). Opens full-screen; no customer data is stored on the phone (D-70). |
+
+Kept as built in M1–M9: the seller and buyer list filters moved into one shared place (so saved-search counts always match
+the list) with a test that the lists filter exactly as before; nothing else was changed or removed.
+
+---
+
 # Milestone 9 — calls, calendar & lead ads (24 Nov 2026, v0.9.0)
 
 | Area | Status | How it works |
