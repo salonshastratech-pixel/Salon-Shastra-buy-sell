@@ -1,5 +1,6 @@
 """Administration: users, grants, audit log, duplicate review, finance boundary."""
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+from flask import (Blueprint, abort, current_app, flash, g, make_response, redirect, render_template, request,
+                   url_for)
 
 from .. import audit
 from ..db import get_db
@@ -390,3 +391,75 @@ def outbox():
     rows = db.all("SELECT e.*, u.full_name FROM email_outbox e LEFT JOIN users u ON u.id = e.user_id "
                   "ORDER BY e.id DESC LIMIT 50")
     return render_template("admin/outbox.html", rows=rows, provider=messaging.email_provider(current_app.config))
+
+
+# -- One-time database move (MOVE_TARGET_URL → copy → point DATABASE_URL at it) -------------------------------------
+def _host(url: str | None) -> str | None:
+    """Only the server name of a database address — never the user name or password."""
+    import re as _re
+    m = _re.search(r"@([^/:?]+)", url or "")
+    return m.group(1) if m else None
+
+
+def _no_password(url: str) -> str:
+    import re as _re
+    return _re.sub(r"://([^:@/]+):[^@]*@", lambda m: "://" + m.group(1) + "@", url or "")
+
+
+def _move_status(db) -> dict:
+    import json as _json
+    row = db.one("SELECT note FROM automation_settings WHERE key = 'dbmove'")
+    try:
+        return _json.loads(row["note"]) if row and row["note"] else {}
+    except ValueError:
+        return {}
+
+
+def _save_move_status(db, status: dict) -> None:
+    import json as _json
+    db.execute("DELETE FROM automation_settings WHERE key = 'dbmove'")
+    db.insert("automation_settings", {"key": "dbmove", "enabled": 0, "note": _json.dumps(status),
+                                      "updated_at": now_iso()})
+
+
+def _run_move(db, target_url):
+    from ..db import Database
+    from ..dbmove import copy
+    _save_move_status(db, {"state": "copying", "at": now_iso()})
+    target = Database(target_url)
+    try:
+        res = copy(db, target)
+        _save_move_status(db, {"state": "done" if not res["mismatch"] else "mismatch", "at": now_iso(),
+                               "tables": res["tables"], "rows": res["rows"], "mismatch": res["mismatch"]})
+    except Exception as e:  # noqa: BLE001 — shown on the page; the old database is untouched
+        _save_move_status(db, {"state": "failed", "at": now_iso(), "error": str(e)[:400]})
+    finally:
+        target.close()
+
+
+@bp.route("/database-move", methods=["GET", "POST"])
+@require("settings.manage")
+def database_move():
+    import os
+    from .. import background
+    db = get_db()
+    target = os.environ.get("MOVE_TARGET_URL", "")
+    current = current_app.config["DATABASE_URL"]
+    if request.method == "POST":
+        if not target:
+            flash("Add MOVE_TARGET_URL in Render first (the new database address).", "error")
+        elif _no_password(target) == _no_password(current):
+            flash("The new address points at the database already in use. Nothing to copy.", "error")
+        else:
+            audit.record(db, g.user["id"], "database.move_copy", "database", None, {"to": _host(target)})
+            background.run(current_app._get_current_object(), "dbmove", _run_move, target)
+            flash("Copying started — this page updates by itself. Please ask the team not to edit records "
+                  "for a few minutes.", "ok")
+        return redirect(url_for("admin.database_move"))
+    st = _move_status(db)
+    from ..dbmove import counts
+    resp = make_response(render_template("admin/dbmove.html", current_host=_host(current), target_host=_host(target),
+                                         status=st, counts=counts(db) if st.get("state") != "copying" else {}))
+    if st.get("state") == "copying":
+        resp.headers["Refresh"] = "4"
+    return resp

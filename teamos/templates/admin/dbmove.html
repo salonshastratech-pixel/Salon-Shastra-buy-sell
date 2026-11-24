@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Database move{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Database move</h1><div class="sub">One-time copy of everything to a new database (for example a database next to the app server, for speed). The current database is only read, never changed.</div></div></div>
+<div class="card">
+  <p>Now using: <strong class="mono">{{ current_host or '—' }}</strong></p>
+  <p>Copy to: {% if target_host %}<strong class="mono">{{ target_host }}</strong>{% else %}<span class="badge warn">not set</span> — add <span class="mono">MOVE_TARGET_URL</span> in Render → Environment (the new database address).{% endif %}</p>
+  {% if status.state == 'copying' %}<p class="flash ok"><strong>Copying…</strong> started {{ status.at|rel }}. This page updates by itself.</p>
+  {% elif status.state == 'done' %}<p class="flash ok"><strong>Copied: {{ status.rows }} rows in {{ status.tables }} tables — every table matches.</strong> Last step: in Render set <span class="mono">DATABASE_URL</span> to the new address and delete <span class="mono">MOVE_TARGET_URL</span>.</p>
+  {% elif status.state == 'mismatch' %}<p class="flash error">Copied, but some tables differ: {{ status.mismatch }}. Do not switch yet — press Copy again.</p>
+  {% elif status.state == 'failed' %}<p class="flash error">The copy stopped: {{ status.error }}. Nothing changed in the current database; you can press Copy again.</p>{% endif %}
+  {% if status.state != 'copying' %}<form method="post" data-confirm="Copy everything to {{ target_host }}? Anything already in that new database is replaced.">{{ csrf() }}<button class="btn primary" {{ 'disabled' if not target_host }}>Copy now</button></form>{% endif %}
+</div>
+{% if counts %}<div class="card"><h2>Records in the current database</h2><p class="small muted">{% for t, n in counts.items() if n %}{{ t }} {{ n }}{{ ' · ' if not loop.last }}{% endfor %}</p></div>{% endif %}
+{% endblock %}

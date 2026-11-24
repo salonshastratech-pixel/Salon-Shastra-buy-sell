@@ -130,3 +130,28 @@ def test_one_tap_call_and_whatsapp(app, db, login):
     assert db.scalar("SELECT COUNT(*) FROM activities WHERE entity_id = ? AND body LIKE 'WhatsApp opened%'", (oid,)) == 1
     db.execute("UPDATE contacts SET do_not_contact = 1")
     assert "wa.me" not in c.post(f"/inbox/wa/{oid}").headers["Location"]
+
+
+
+def test_database_move_copies_everything_and_counts_match(app, db, login, tmp_path, monkeypatch):
+    from test_pilot import _seller
+
+    from teamos.db import open_standalone
+    from teamos.dbmove import copy, counts
+    _seller(db)
+    target_url = f"sqlite:///{tmp_path}/new.db"
+    target = open_standalone(target_url)
+    res = copy(db, target)
+    assert not res["mismatch"] and res["rows"] > 10
+    assert counts(target) == counts(db)
+    assert target.scalar("SELECT salon_name FROM (SELECT b.name AS salon_name FROM salon_businesses b)") == "Glow Studio"
+    again = copy(db, target)                                  # pressing Copy twice replaces, never duplicates
+    assert counts(target) == counts(db) and not again["mismatch"]
+    target.close()
+    page = login("admin@t.test").get("/admin/database-move").data.decode()
+    assert "not set" in page and "Copy now" in page
+    monkeypatch.setenv("MOVE_TARGET_URL", target_url)
+    login("admin@t.test").post("/admin/database-move")
+    pg = login("admin@t.test").get("/admin/database-move").data.decode()
+    assert "every table matches" in pg
+    assert login("seller@t.test").get("/admin/database-move").status_code in (302, 403)
