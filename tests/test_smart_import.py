@@ -174,7 +174,7 @@ def test_seller_sheet_import_end_to_end_through_the_screens(app, db, login):
                      (two["contact_id"],)) == 1
     # a second commit is refused
     r = lead.post(f"/imports/smart/{iid}/commit", follow_redirects=True)
-    assert b"already been committed" in r.data
+    assert b"already saved" in r.data
 
 
 def test_only_import_role_and_nothing_relevant_is_refused(app, db, login):
@@ -202,3 +202,25 @@ def test_unknown_city_does_not_block_a_match(app, db):
     res = M.evaluate(M.load_buyer(db, b), M.load_seller(db, s))
     assert not any(g["text"].startswith("City") for g in res["gates"])
     assert {x["key"]: x for x in res["factors"]}["city"]["result"] == "unknown"
+
+
+def test_import_cannot_start_twice_and_resumes_without_duplicates(app, db, login):
+    from teamos.domain import sheet_sync as SS
+    lead = login("lead@t.test")
+    r = lead.post("/imports/smart", {"file": (io.BytesIO(workbook()), "leads.xlsx")}, content_type="multipart/form-data")
+    iid = int(r.headers["Location"].rstrip("/").split("/")[-1])
+    assert SS.claim(db, iid) and not SS.claim(db, iid)                       # second click is refused
+    db.execute("UPDATE sheet_imports SET counts = ? WHERE id = ?", ('{"error": "network"}', iid))
+    actor = db.one("SELECT * FROM users WHERE email = 'lead@t.test'")
+    first = db.one("SELECT * FROM sheet_import_rows WHERE import_id = ? AND action = 'create' ORDER BY id", (iid,))
+    with db:                                                                   # one row was saved before the stop
+        opp_id = SS._create(db, actor, first, json.loads(first["data"]), json.loads(first["data"])["understood"],
+                            json.loads(first["data"])["canon"], "x", {}, SS._next_morning())
+        db.update("sheet_import_rows", first["id"], {"outcome": "created", "opportunity_id": opp_id})
+    page = lead.get(f"/imports/smart/{iid}").data.decode()
+    assert "stopped part-way" in page and "Continue the import" in page
+    before = db.scalar("SELECT COUNT(*) FROM opportunities")
+    lead.post(f"/imports/smart/{iid}/commit")
+    assert db.scalar("SELECT status FROM sheet_imports WHERE id = ?", (iid,)) == "committed"
+    creates = db.scalar("SELECT COUNT(*) FROM sheet_import_rows WHERE import_id = ? AND action = 'create'", (iid,))
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == before + creates - 1   # the saved row not saved twice

@@ -39,3 +39,6 @@
 {%- endmacro %}
 
 {% macro err(errors, key) %}{% if errors and errors.get(key) %}<div class="err">{{ errors[key] }}</div>{% endif %}{% endmacro %}
+
+{# One tap: call (the phone dials) and WhatsApp (opens with a greeting; logged on the record). #}
+{% macro contact_buttons(opp_id, phone, dnc=False) -%}{% if phone and not dnc %}<span class="cbtns"><a class="cbtn call" href="{{ phone|tel }}" data-call-log title="Call {{ phone }}" aria-label="Call {{ phone }}">📞</a><form method="post" action="{{ url_for('inbox.wa_open', opp_id=opp_id) }}" target="_blank" class="cbtn-f">{{ csrf() }}<button class="cbtn wa" title="WhatsApp {{ phone }}" aria-label="WhatsApp {{ phone }}">WA</button></form></span>{% endif %}{%- endmacro %}

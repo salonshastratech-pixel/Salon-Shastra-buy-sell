@@ -116,7 +116,7 @@
     <div class="card">
       <h2>Contact</h2>
       <p><strong>{{ opp.contact_name }}</strong><br>{% if opp.phone_normalized and not opp.do_not_contact %}<a class="mono tel" href="{{ opp.phone_normalized|tel }}" data-call-log>{{ opp.phone_normalized }}</a>{% else %}<span class="mono">{{ opp.phone_normalized }}</span>{% endif %}{% if opp.email %}<br>{{ opp.email }}{% endif %}</p>
-      {% if opp.phone_normalized and not opp.do_not_contact %}<div class="inline"><a class="btn sm primary" href="{{ opp.phone_normalized|tel }}" data-call-log>Call</a><form method="post" action="{{ url_for('inbox.start', opp_id=opp.id) }}">{{ csrf() }}<button class="btn sm">WhatsApp</button></form></div>{% endif %}
+      {% if opp.phone_normalized and not opp.do_not_contact %}<div class="inline"><a class="btn sm primary" href="{{ opp.phone_normalized|tel }}" data-call-log>Call</a><form method="post" action="{{ url_for('inbox.wa_open', opp_id=opp.id) }}" target="_blank">{{ csrf() }}<button class="btn sm wa-btn">WhatsApp</button></form></div>{% endif %}
       <h3>Consent</h3>
       {% for purpose, label in [('service_contact','Service contact'),('share_teaser','Share criteria with sellers'),('marketing','Marketing')] %}{% set c = consents.get(purpose) %}
       <div class="small">{{ label }}: {% if c and c.granted %}<span class="badge ok">Granted</span> <span class="muted">{{ c.captured_at|ist('%d %b %Y') }} · {{ c.source }}</span>{% elif c %}<span class="badge bad">Refused / withdrawn</span>{% else %}<span class="badge grey">Not recorded</span>{% endif %}</div>{% endfor %}

@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import stage_badge %}
+{% extends "base.html" %}{% from "macros.html" import contact_buttons, stage_badge %}
 {% block title %}Buyers / Investors{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Buyers / Investors</h1><div class="sub">Acquisition mandates the whole team can work. Ownership shows accountability, not access.</div></div>
@@ -26,7 +26,7 @@
 {% for r in rows %}
 <tr class="row-link">
   <td class="nowrap"><a href="{{ url_for('buyers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
-  <td><a href="{{ url_for('buyers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }}</div></td>
+  <td><a href="{{ url_for('buyers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div></td>
   <td>{% if r.need_type %}<span class="badge {{ 'warn' if r.need_type == 'new_salon' else 'grey' if r.need_type == 'exploring' else 'info' }}">{{ BF.option_label('need_type', r.need_type) }}</span>{% else %}<span class="missing small">Not asked</span>{% endif %}
     {% if r.purchase_window %}<div class="small muted">{{ 'no fixed timeline' if r.purchase_window == 'later' else 'within ' ~ BF.option_label('purchase_window', r.purchase_window) }}</div>{% endif %}</td>
   <td class="right nowrap">{{ r.all_in_max|inr if r.all_in_max is not none else '—' }}</td>

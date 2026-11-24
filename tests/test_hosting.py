@@ -117,3 +117,16 @@ def test_hostinger_email_uses_ssl_465_and_waits_for_the_password(monkeypatch):
     p = MS.email_provider({**cfg, "SMTP_PASSWORD": "x"})
     assert p.name == "smtp" and p.send("a@example.com", "Hi", "Body")["status"] == "sent"
     assert seen == {"ssl": ("smtp.hostinger.com", 465), "login": "support@salonshastra.com", "to": "a@example.com"}
+
+
+def test_one_tap_call_and_whatsapp(app, db, login):
+    from test_pilot import _seller
+    oid = _seller(db)
+    c = login("seller@t.test")
+    page = c.get("/sellers/").data.decode()
+    assert 'href="tel:+919000011001"' in page and f'/inbox/wa/{oid}' in page
+    r = c.post(f"/inbox/wa/{oid}")
+    assert r.status_code == 302 and r.headers["Location"].startswith("https://wa.me/919000011001?text=Hello%20Kavya")
+    assert db.scalar("SELECT COUNT(*) FROM activities WHERE entity_id = ? AND body LIKE 'WhatsApp opened%'", (oid,)) == 1
+    db.execute("UPDATE contacts SET do_not_contact = 1")
+    assert "wa.me" not in c.post(f"/inbox/wa/{oid}").headers["Location"]

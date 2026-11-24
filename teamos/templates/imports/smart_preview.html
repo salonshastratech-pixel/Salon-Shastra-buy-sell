@@ -3,9 +3,9 @@
 {% block content %}
 <div class="ph"><div><h1>{{ imp.filename }}</h1><div class="sub">Sheet import #{{ imp.id }} by {{ imp.by_name }} · {{ imp.created_at|ist }} ·
   <span class="badge {{ 'ok' if imp.status == 'committed' else 'grey' if imp.status == 'discarded' else 'info' }}">{{ imp.status }}</span></div></div>
-  {% if imp.status == 'preview' %}<div class="actions">
+  {% if imp.status == 'preview' and not importing %}<div class="actions">
     <form method="post" action="{{ url_for('imports.smart_discard', import_id=imp.id) }}" data-confirm="Discard this import? Nothing will be saved.">{{ csrf() }}<button class="btn">Discard</button></form>
-    <form method="post" action="{{ url_for('imports.smart_commit', import_id=imp.id) }}" data-confirm="Save {{ s.new.seller }} sellers and {{ s.new.buyer }} buyers, and update {{ s.existing.seller + s.existing.buyer }} existing records?">{{ csrf() }}<button class="btn primary">Import now</button></form></div>{% endif %}</div>
+    <form method="post" action="{{ url_for('imports.smart_commit', import_id=imp.id) }}" data-confirm="Save {{ s.new.seller }} sellers and {{ s.new.buyer }} buyers, and update {{ s.existing.seller + s.existing.buyer }} existing records?">{{ csrf() }}<button class="btn primary">{{ 'Continue the import' if failed else 'Import now' }}</button></form></div>{% endif %}</div>
 
 <div class="grid g4">
   <div class="stat ok"><div class="n">{{ s.new.seller }}</div><div class="l">New sellers / salon owners</div></div>
@@ -13,6 +13,8 @@
   <div class="stat"><div class="n">{{ s.existing.seller + s.existing.buyer }}</div><div class="l">Already in TeamOS — gaps filled</div></div>
   <div class="stat"><div class="n">{{ s.merged }} / {{ s.skip }}</div><div class="l">Repeats merged / left out</div></div>
 </div>
+{% if importing %}<div class="flash ok"><strong>Importing… {{ prog.done }} of {{ prog.total }} rows saved.</strong> This page updates by itself; you can keep working in another tab.<progress class="import-progress" value="{{ prog.done }}" max="{{ prog.total or 1 }}">{{ prog.done }} / {{ prog.total }}</progress></div>{% endif %}
+{% if failed %}<p class="flash error">The import stopped part-way ({{ prog.done }} of {{ prog.total }} rows saved): {{ failed }}. Press <strong>Continue the import</strong> — rows already saved are not saved twice.</p>{% endif %}
 {% if counts %}<p class="flash ok">Saved: {{ counts.created_seller }} sellers and {{ counts.created_buyer }} buyers created, {{ counts.updated }} updated{% if counts.failed %}, {{ counts.failed }} could not be saved (shown below){% endif %}.</p>{% endif %}
 
 <div class="card"><h2>Tabs in this file</h2><div class="table-wrap"><table class="small">

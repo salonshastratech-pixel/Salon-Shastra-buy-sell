@@ -459,6 +459,13 @@ def commit(db, actor, import_id: int) -> dict:
     load, due = {}, _next_morning()
     src_tag = f"sheet:{import_id}"
     for r in db.all("SELECT * FROM sheet_import_rows WHERE import_id = ? ORDER BY id", (import_id,)):
+        if r["outcome"] in ("created", "updated"):  # resumed after an interruption: already saved
+            counts[f"created_{r['kind']}" if r["outcome"] == "created" else "updated"] += 1
+            if r["outcome"] == "created" and r["opportunity_id"]:
+                d = json.loads(r["data"])
+                to_understand.append((r["kind"], r["opportunity_id"], d["canon"], json.loads(r["notes"] or "[]"),
+                                      json.loads(r["raw"] or "{}")))
+            continue
         if r["action"] in ("skip", "merged"):
             counts["skipped" if r["action"] == "skip" else "merged"] += 1
             db.update("sheet_import_rows", r["id"], {"outcome": "skipped" if r["action"] == "skip" else "merged"})
@@ -503,6 +510,48 @@ def commit(db, actor, import_id: int) -> dict:
                                                "committed_by": actor["id"], "committed_at": now_iso()})
         audit.record(db, actor["id"], "import.sheet_commit", "sheet_import", import_id, counts)
     return counts
+
+
+def claim(db, import_id: int) -> bool:
+    """Mark an import as being saved (so it is not started twice). A run that stopped part-way can be resumed."""
+    cur = db.execute("UPDATE sheet_imports SET counts = ? WHERE id = ? AND status = 'preview' AND "
+                     "(counts IS NULL OR counts LIKE ?)", (json.dumps({"importing": now_iso()}), import_id, '%"error"%'))
+    return (cur.rowcount or 0) == 1
+
+
+def progress(db, import_id: int) -> dict:
+    row = db.one("SELECT SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) AS done, COUNT(*) AS total "
+                 "FROM sheet_import_rows WHERE import_id = ?", (import_id,))
+    return {"done": row["done"] or 0, "total": row["total"] or 0}
+
+
+def commit_in_background(app, import_id: int, actor_id: int) -> None:
+    """Saving many rows to a hosted database takes minutes (one network round trip per query), longer than a web
+    request may last — so the import runs on its own thread with its own connection; the page shows progress."""
+    import logging
+    import threading
+
+    from ..db import Database
+
+    def run():
+        with app.app_context():
+            db = Database(app.config["DATABASE_URL"])
+            try:
+                actor = db.one("SELECT * FROM users WHERE id = ?", (actor_id,))
+                commit(db, actor, import_id)
+            except Exception as e:  # noqa: BLE001 — shown on the page; the import can be resumed
+                logging.getLogger(__name__).exception("sheet import %s failed", import_id)
+                try:
+                    db.execute("UPDATE sheet_imports SET counts = ? WHERE id = ? AND status = 'preview'",
+                               (json.dumps({"error": str(e)[:300]}), import_id))
+                except Exception:  # noqa: BLE001
+                    pass
+            finally:
+                db.close()
+    if app.config.get("TESTING"):
+        run()
+    else:
+        threading.Thread(target=run, name=f"sheet-import-{import_id}", daemon=True).start()
 
 
 SELLER_QUICK = {f.key for f in SFD.FIELDS if f.quick}

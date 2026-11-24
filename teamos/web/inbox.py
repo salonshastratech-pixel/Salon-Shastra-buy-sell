@@ -8,6 +8,7 @@ from .. import messaging
 from ..db import get_db
 from ..domain import inbox as I
 from ..domain import reports as R
+from ..domain import tasks as I_T
 from ..domain.errors import ValidationError
 from ..permissions import user_can
 from ..security import login_required, require
@@ -195,6 +196,34 @@ def start(opp_id):
                    "WHERE NOT EXISTS (SELECT 1 FROM conversation_links WHERE conversation_id = ? AND opportunity_id = ?)",
                    (conv["id"], opp_id, g.user["id"], now_iso(), conv["id"], opp_id))
     return _back(conv["id"])
+
+
+@bp.route("/wa/<int:opp_id>", methods=["POST"])
+@require("crm.log_activity")
+def wa_open(opp_id):
+    """One-click WhatsApp. With the WhatsApp Business API live, open the record's conversation in TeamOS; until then
+    open WhatsApp itself (phone app or WhatsApp Web) with a ready greeting, and note it on the record."""
+    from urllib.parse import quote
+    db = get_db()
+    o = db.one("SELECT o.id, o.kind, c.do_not_contact, c.full_name, c.phone_normalized FROM opportunities o "
+               "JOIN contacts c ON c.id = o.contact_id WHERE o.id = ?", (opp_id,))
+    if not o or not o["phone_normalized"]:
+        abort(404)
+    ep = "sellers.detail" if o["kind"] == "seller" else "buyers.detail"
+    if o["do_not_contact"]:
+        flash("This person asked not to be contacted.", "error")
+        return redirect(url_for(ep, opp_id=opp_id))
+    if messaging.whatsapp_status(current_app.config)["live"]:
+        return start(opp_id)
+    digits = "".join(ch for ch in o["phone_normalized"] if ch.isdigit())
+    digits = "91" + digits if len(digits) == 10 else digits
+    first = (o["full_name"] or "").split(" ")[0] or "Sir/Madam"
+    me = (g.user.get("full_name") or "").split(" ")[0]
+    text = f"Hello {first}, this is {me} from Salon Shastra." if me else f"Hello {first}, greetings from Salon Shastra."
+    with db:
+        I_T.add_activity(db, g.user["id"], "opportunity", opp_id, "note", "WhatsApp opened from TeamOS (personal WhatsApp)")
+        db.update("opportunities", opp_id, {"last_contact_at": now_iso()})
+    return redirect(f"https://wa.me/{digits}?text={quote(text)}")
 
 
 @bp.route("/simulate", methods=["POST"])

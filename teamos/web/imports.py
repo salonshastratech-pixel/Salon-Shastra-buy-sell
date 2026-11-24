@@ -1,6 +1,6 @@
 import json
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, make_response, redirect, render_template, request, url_for
 
 from ..db import get_db
 from ..domain import imports as I
@@ -179,21 +179,31 @@ def smart_preview(import_id):
         r["notes_l"] = json.loads(r["notes"] or "[]")
         rt = SS.remark_text(r["notes_l"])
         r["rm"] = RM.read(rt, db, learned_cache=cache) if rt else None
-    return render_template("imports/smart_preview.html", imp=imp, tabs=json.loads(imp["tabs"]), rows=rows, show=show,
-                           s=SS.summary(db, import_id), counts=json.loads(imp["counts"]) if imp["counts"] else None)
+    counts = json.loads(imp["counts"]) if imp["counts"] else None
+    importing = bool(imp["status"] == "preview" and counts and counts.get("importing"))
+    failed = counts.get("error") if imp["status"] == "preview" and counts else None
+    resp = make_response(render_template("imports/smart_preview.html", imp=imp, tabs=json.loads(imp["tabs"]),
+                                         rows=rows, show=show, s=SS.summary(db, import_id),
+                                         counts=counts if imp["status"] == "committed" else None, importing=importing,
+                                         failed=failed, prog=SS.progress(db, import_id)))
+    if importing:
+        resp.headers["Refresh"] = "4"
+    return resp
 
 
 @bp.route("/smart/<int:import_id>/commit", methods=["POST"])
 @require("crm.import")
 def smart_commit(import_id):
     from ..domain import sheet_sync as SS
-    try:
-        c = SS.commit(get_db(), g.user, import_id)
-        flash(f"Imported: {c['created_seller']} new sellers, {c['created_buyer']} new buyers, {c['updated']} existing "
-              f"records updated, {c['merged']} repeats merged, {c['skipped']} rows left out"
-              + (f", {c['failed']} could not be saved (see the list)" if c["failed"] else "") + ".", "ok")
-    except ValidationError as e:
-        flash(" ".join(str(v) for v in e.errors.values()), "error")
+    from ..permissions import user_can as _can
+    db = get_db()
+    if not _can(db, g.user, "crm.import"):
+        abort(403)
+    if not SS.claim(db, import_id):
+        flash("This import is already being saved, or was already saved.", "error")
+        return redirect(url_for("imports.smart_preview", import_id=import_id))
+    SS.commit_in_background(current_app._get_current_object(), import_id, g.user["id"])
+    flash("Importing now — this page updates by itself. You can keep working meanwhile.", "ok")
     return redirect(url_for("imports.smart_preview", import_id=import_id))
 
 
