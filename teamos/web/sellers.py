@@ -46,7 +46,16 @@ def index():
         "WHERE " + " AND ".join(where) + " ORDER BY CASE WHEN o.next_action_due IS NULL THEN 1 ELSE 0 END, "
         "o.next_action_due LIMIT 300", params)
     import json
+    from ..domain import geo
     from ..domain import pilot as P
+    near = (request.args.get("near") or "").strip()
+    km = request.args.get("km") or "5"
+    km = int(km) if km.isdigit() else 5
+    near_known = bool(near and geo.coords(near))
+    if near_known:  # keep salons within km of that area, nearest first
+        for r in rows:
+            r["km"] = geo.distance_km(near, r.get("locality") or r.get("city"))
+        rows = sorted([r for r in rows if r["km"] is not None and r["km"] <= km], key=lambda r: r["km"])
     for r in rows:
         try:
             r["areas"] = [P.HELP_LABELS[a] for a in json.loads(r.get("help_areas") or "[]") if a in P.HELP_LABELS]
@@ -54,6 +63,8 @@ def index():
             r["areas"] = []
     return render_template("sellers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage,
                            owner=owner, status=status, STAGES=S.STAGES + S.HOLDING, STAGE_LABELS=S.STAGE_LABELS,
+                           near=near, km=km, near_unknown=bool(near and not near_known), RADIUS_CHOICES=geo.RADIUS_CHOICES,
+                           area_names=geo.known_area_names(),
                            saved=SS.mine(db, g.user["id"], "seller"), list_kind="seller",
                            current_qs=SS.query_string("seller", request.args),
                            FORM_STATUS_LABELS=P.FORM_STATUS_LABELS)

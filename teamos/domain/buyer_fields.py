@@ -93,7 +93,7 @@ FIELDS: list[BuyerFieldDef] = [
       help="Ranked localities and exclusions are captured below."),
     B("relocate_willing", "Willing to relocate / operate in another city?", "geography", "enum", YES_NO,
       matching=True),
-    B("max_commute_km", "Maximum acceptable commute", "geography", "int", matching=True, unit="km"),
+    B("max_commute_km", "Radius around preferred areas", "geography", "int", matching=True, unit="km"),
 
     B("chairs_min", "Minimum chairs / stations", "salon", "int", matching=True, material=True, importance=True),
     B("chairs_max", "Maximum chairs / stations", "salon", "int", matching=True),

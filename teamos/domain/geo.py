@@ -143,6 +143,8 @@ ALIASES = {
     "panjagutta": "punjagutta", "himayath nagar": "himayatnagar", "narayanaguda": "narayanguda",
 }
 
+DEFAULT_RADIUS_KM = 5  # when the buyer has not said how far is OK
+
 RADIUS_CHOICES = [(1, "Within 1–2 km"), (3, "Within 3 km"), (5, "Within 5 km"), (10, "Within 10 km"),
                   (20, "Anywhere in the city")]
 

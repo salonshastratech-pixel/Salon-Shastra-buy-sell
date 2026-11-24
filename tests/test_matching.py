@@ -185,7 +185,7 @@ def test_ex6_adjacent_locality_is_partial_with_a_confirmation_question(db):
     f = factor(db, c, "locality")
     assert f["result"] == "partial" and c["gate"] == "pass"
     qs = [q["text"] for q in M.latest_result(db, c["id"])["questions"]]
-    assert any("consider Kokapet" in q for q in qs)
+    assert any("consider Kokapet" in q for q in qs)        # ~6 km away, buyer gave no radius: ask them
     s2 = seller(db, phone="9000011003", salon="Excl", locality="Old City")
     b2 = buyer(db, phone="9100011003", excluded=("Old City",))
     assert cand(db, b2, s2)["gate"] == "blocked"
@@ -398,3 +398,20 @@ def test_incomplete_all_in_total_never_shows_headroom(db, login):
         html = login("admin@t.test").get(url).data.decode()
         assert "₹9 L+ all-in" in html and "total incomplete" in html
         assert "₹51 L headroom" not in html
+
+
+def test_distance_from_preferred_areas_within_the_buyers_radius(db, login):
+    from teamos.domain import geo
+    assert geo.distance_km("Kondapur", "Gachibowli") < 4 and geo.distance_km("Kondapur", "LB Nagar") > 20
+    assert geo.coords("Hitech City") == geo.coords("HITEC City") and geo.coords("Nowhere-pet") is None
+    b = buyer(db, localities=("Kondapur",))
+    near = seller(db, phone="9000011002", salon="Near Salon", locality="Gachibowli")
+    far = seller(db, phone="9000011003", salon="Far Salon", locality="LB Nagar")
+    f_near, f_far = factor(db, cand(db, b, near), "locality"), factor(db, cand(db, b, far), "locality")
+    assert f_near["result"] == "partial" and "km from Kondapur" in f_near["note"] and "within" in f_near["note"]
+    assert f_far["result"] == "miss" and "outside" in f_far["note"]
+    set_buyer(db, b, max_commute_km="2")                      # buyer says: only 2 km around Kondapur
+    assert factor(db, cand(db, b, near), "locality")["result"] == "miss"
+    page = login("seller@t.test").get("/sellers/?near=Kondapur&km=5").data.decode()
+    assert "Near Salon" in page and "Far Salon" not in page and " km</span>" in page
+    assert "not in the area list" in login("seller@t.test").get("/sellers/?near=Nowhere-pet").data.decode()

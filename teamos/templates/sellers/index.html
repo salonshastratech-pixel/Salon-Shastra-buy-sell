@@ -9,8 +9,12 @@
   <select name="stage"><option value="">Any stage</option>{% for c, l in STAGES %}<option value="{{ c }}" {{ 'selected' if c == stage }}>{{ l }}</option>{% endfor %}</select>
   <select name="owner"><option value="">Any owner</option><option value="me" {{ 'selected' if owner == 'me' }}>Me</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if owner == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select>
   <select name="status">{% for s in ['active','holding','closed','all'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s|title }}</option>{% endfor %}</select>
+  <input name="near" value="{{ near }}" list="area-names" placeholder="Near area, e.g. Kondapur" aria-label="Near area">
+  <select name="km" aria-label="Distance">{% for k, l in RADIUS_CHOICES %}<option value="{{ k }}" {{ 'selected' if k == km }}>{{ l }}</option>{% endfor %}</select>
+  <datalist id="area-names">{% for a in area_names %}<option value="{{ a }}">{% endfor %}</datalist>
   <button class="btn">Filter</button>
 </form>
+{% if near_unknown %}<p class="flash error">"{{ near }}" is not in the area list yet — try a nearby well-known area name.</p>{% elif near %}<p class="small muted">Salons within {{ km }} km of {{ near }}, nearest first (distances are approximate).</p>{% endif %}
 {% include "_saved_searches.html" %}
 
 <div class="card flush"><div class="table-wrap"><table>
@@ -18,7 +22,7 @@
 {% for r in rows %}
 <tr class="row-link">
   <td class="nowrap"><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}</td>
-  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a><div class="small muted">{{ r.locality }}, {{ r.city }}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}</div></td>
+  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a><div class="small muted">{% if r.km is not none and near %}<span class="badge info">{{ r.km }} km</span> {% endif %}{{ r.locality }}, {{ r.city }}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}</div></td>
   <td><a class="cell-link" href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div></td>
   <td>{{ stage_badge(r.stage, STAGE_LABELS) }}</td>
   <td class="small">{% if r.areas %}{{ r.areas|join(', ') }}{% else %}<span class="muted">—</span>{% endif %}{% if r.form_status and r.form_status != 'not_sent' %}<div><span class="badge {{ 'ok' if r.form_status == 'filled' else 'warn' }}">{{ FORM_STATUS_LABELS[r.form_status] }}</span></div>{% endif %}</td>

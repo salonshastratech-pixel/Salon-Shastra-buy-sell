@@ -114,3 +114,16 @@ def test_finance_team_task_list_hides_seller_linked_tasks(login):
     for view in ("all", "mine", "created", "done"):
         body = login("fin@t.test").get(f"/tasks/?view={view}").data
         assert b"Test Salon" not in body and b"Test Owner" not in body, view
+
+
+def test_add_team_member_form_resists_browser_autofill(login, db):
+    admin = login("admin@t.test")
+    page = admin.get("/admin/users").data.decode()
+    assert 'name="new_member_email"' in page and 'autocomplete="off"' in page
+    r = admin.post("/admin/users", {"full_name": "Shaheen", "new_member_email": "admin@t.test", "role": "team_member",
+                                    "team": "general", "password": "Temp-Password-123"}, follow_redirects=True)
+    assert "admin@t.test already belongs to Asha Admin" in r.data.decode()
+    admin.post("/admin/users", {"full_name": "Shaheen", "new_member_email": "Shaheen.New@Example.com",
+                                "role": "team_member", "team": "general", "password": "Temp-Password-123"})
+    u = db.one("SELECT * FROM users WHERE email = 'shaheen.new@example.com'")
+    assert u and u["role"] == "team_member"

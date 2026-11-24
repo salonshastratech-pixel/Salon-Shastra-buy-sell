@@ -31,7 +31,8 @@ def users():
 def create_user():
     db = get_db()
     f = request.form
-    email = (f.get("email") or "").strip().lower()
+    # a separate field name so the browser does not auto-fill the admin's own saved login into this form
+    email = (f.get("new_member_email") or f.get("email") or "").strip().lower()
     name = (f.get("full_name") or "").strip()
     role, team, pw = f.get("role"), f.get("team") or "general", f.get("password") or ""
     err = None
@@ -42,7 +43,8 @@ def create_user():
     if role in ("finance", "super_admin") and team in ("seller", "buyer", "general"):
         team = "finance" if role == "finance" else "admin"
     elif db.one("SELECT id FROM users WHERE email = ?", (email,)):
-        err = "A user with that email already exists."
+        err = f"{email} already belongs to " + (db.scalar("SELECT full_name FROM users WHERE email = ?", (email,)) or "a user") + \
+            ". If you did not type it, your browser filled in a saved login — clear the field and type their email."
     else:
         err = validate_password_strength(pw)
     if err:

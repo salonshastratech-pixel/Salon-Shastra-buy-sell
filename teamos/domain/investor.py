@@ -137,6 +137,7 @@ def save_screening(db, actor, opp, form) -> dict:
 
 # -- 2. The investor form (no prices) -------------------------------------------------------------------------------
 _q = P._q
+from .geo import RADIUS_CHOICES  # noqa: E402
 GOALS = [l for _v, l, _p in SCREEN[0][2]]
 SECTIONS = [
     ("you", "About you", "", [
@@ -157,6 +158,7 @@ SECTIONS = [
         _q("salon_type", "What kind of salon?", "multi", ["Unisex", "Men's salon", "Women's salon / beauty parlour",
            "Luxury / premium", "Family salon", "Spa / skin clinic", "Not sure yet"]),
         _q("areas", "Which areas or localities do you prefer?", hint="e.g. Kondapur, Gachibowli — or 'any good area'"),
+        _q("radius", "How far from those areas is OK?", "choice", [l for _, l in RADIUS_CHOICES], required=False),
         _q("size", "What size of salon?", "choice", ["2–4 chairs", "5–8 chairs", "9–12 chairs", "More than 12",
                                                      "Not sure"]),
         _q("start_when", "When do you want to start?", "choice", ["Within 3 months", "3–6 months", "6–12 months",
@@ -747,6 +749,7 @@ def mandate_values_from_answers(a: dict) -> dict:
     days = a.get("days_per_week") or ""
     out["involvement"] = ("absentee" if out["need_type"] == "passive_invest" or days == "Only weekends / remotely"
                           else "owner_operator" if days == "Every day, full-time" else "partly" if days else None)
+    out["max_commute_km"] = {l: k for k, l in RADIUS_CHOICES}.get(a.get("radius"))
     lo, hi = SIZE_TO_CHAIRS.get(a.get("size"), (None, None))
     out["chairs_min"], out["chairs_max"] = lo, hi
     if a.get("need_help"):

@@ -14,8 +14,8 @@
 
 <div class="card"><h2>Add team member</h2>
   <form method="post" action="{{ url_for('admin.create_user') }}" class="form-grid">{{ csrf() }}
-    <div class="field"><label>Full name</label><input name="full_name" required></div>
-    <div class="field"><label>Work email</label><input type="email" name="email" required></div>
+    <div class="field"><label for="nu-name">Full name</label><input id="nu-name" name="full_name" required autocomplete="off"></div>
+    <div class="field"><label for="nu-email">Their email</label><input id="nu-email" type="email" name="new_member_email" required autocomplete="off" data-lpignore="true" placeholder="name@example.com"><div class="help">The new person's email — not yours.</div></div>
     <div class="field"><label>Access</label><select name="role">{% for r, l in ROLE_CHOICES.items() %}<option value="{{ r }}" {{ 'selected' if r == 'team_member' }}>{{ l }}</option>{% endfor %}</select></div>
     <div class="field"><label>Mainly works on</label><select name="team">{% for t, l in TEAM_LABELS.items() if t not in ('finance', 'admin') %}<option value="{{ t }}">{{ l }}</option>{% endfor %}</select><div class="help">Used to share out new leads. They can still open every record.</div></div>
     <div class="field full"><label>Temporary password</label><input type="password" name="password" required autocomplete="new-password"><div class="help">10+ characters, mixed case and a number. They change it at first sign-in.</div></div>

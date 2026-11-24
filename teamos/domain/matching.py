@@ -28,7 +28,7 @@ from .common import format_inr
 from .errors import PermissionDenied, ValidationError
 from .seller_fields import BY_KEY as SF_BY_KEY
 
-RULES_VERSION = "match-rules v0.2 (v0.1 + floor, type of area, parking, rent incl. maintenance)"
+RULES_VERSION = "match-rules v0.3 (v0.2 + distance from preferred areas within the buyer's radius)"
 
 FAMILIES = {  # family: (label, weight)
     "A": ("Affordability & all-in cost", 20), "B": ("Location", 15), "C": ("Format & positioning", 10),
@@ -372,12 +372,29 @@ def evaluate(b: dict, s: dict) -> dict:
     elif not pref:
         ev.add("locality", "unknown", None, loc, "Buyer has not ranked any areas")
         ev.ask("buyer", "Ask the buyer to rank their preferred areas", [], 1.0)
-    elif bcity and bcity == scity:
-        ev.add("locality", "partial", ranked, loc, f"{loc} is not in the buyer's list — may be acceptable nearby",
-               ratio=0.4)
-        ev.ask("buyer", f"Ask if the buyer would consider {loc}", [], 0.8)
     else:
-        ev.add("locality", "miss", ranked, loc, "Not in the buyer's areas")
+        # Not on the list: how far is it from the nearest preferred area? (built-in area map, no paid service)
+        from . import geo
+        near, km = geo.nearest(loc or so.get("city"), [r["locality"] for r in b["locs"]["preferred"]])
+        stated = m.get("max_commute_km")  # the buyer's own radius is strict; without one, nearby is "ask them"
+        radius = stated or geo.DEFAULT_RADIUS_KM
+        if km is not None and km <= radius:
+            ev.add("locality", "partial", ranked, loc, f"{km} km from {near} — within "
+                   + (f"the buyer's {radius} km" if stated else f"{radius} km"), ratio=max(0.5, round(1 - km / (2 * radius), 2)))
+        elif km is not None and not stated and km <= 2 * radius:
+            ev.add("locality", "partial", ranked, loc, f"{km} km from {near} — buyer has not said how far is OK",
+                   ratio=0.3)
+            ev.ask("buyer", f"Ask if the buyer would consider {loc} ({km} km from {near})", [], 0.8)
+        elif km is not None:
+            ev.add("locality", "miss", ranked, loc, f"{km} km from {near} — outside the buyer's {radius} km")
+            if km <= 2 * radius:
+                ev.ask("buyer", f"Ask if the buyer would consider {loc} ({km} km from {near})", [], 0.8)
+        elif bcity and bcity == scity:
+            ev.add("locality", "partial", ranked, loc, f"{loc} is not in the buyer's list — may be acceptable nearby",
+                   ratio=0.4)
+            ev.ask("buyer", f"Ask if the buyer would consider {loc}", [], 0.8)
+        else:
+            ev.add("locality", "miss", ranked, loc, "Not in the buyer's areas")
 
     # C. Format & positioning / D. structure -----------------------------------------------
     _choice(ev, "gender_format", "gender_format", "Format")
