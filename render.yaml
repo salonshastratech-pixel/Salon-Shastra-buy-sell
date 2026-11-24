@@ -1,0 +1,40 @@
+# Render "Blueprint" for TeamOS on the FREE plan (see docs/DEPLOY_RENDER.md).
+# Render → New → Blueprint → pick this GitHub repository. Values marked sync:false are typed in by the founder.
+services:
+  - type: web
+    name: salon-shastra-teamos
+    runtime: python
+    plan: free
+    region: singapore            # closest Render region to India
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 90 --forwarded-allow-ips="*"
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: TRUST_PROXY           # Render sits in front of the app: use visitors' real addresses
+        value: "1"
+      - key: SECRET_KEY            # signs sessions — generated once by Render
+        generateValue: true
+      - key: FILES_KEY             # encrypts uploaded documents — generated once by Render
+        generateValue: true
+      - key: CRON_TOKEN            # secret for /internal/tick (cron-job.org) — generated once by Render
+        generateValue: true
+      - key: DATABASE_URL          # Supabase → Connect → Session pooler URI, with your database password
+        sync: false
+      - key: PUBLIC_BASE_URL       # e.g. https://team.salonshastra.com (used in links sent to customers)
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL # the founder's login, created on first start only
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD  # temporary; you must change it at first sign-in
+        sync: false
+      - key: BOOTSTRAP_ADMIN_NAME
+        value: Founder
+      - key: QUIET_HOURS
+        value: "21-8"

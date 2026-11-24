@@ -126,7 +126,7 @@ MFA_EXEMPT = {"auth.mfa", "auth.mfa_setup", "auth.logout", "static", "main.healt
 
 def enforce_mfa():
     """Until the second factor is passed, the session can do nothing except complete MFA or sign out."""
-    if g.get("mfa_pending") and request.endpoint not in MFA_EXEMPT and not (request.endpoint or "").startswith(("public.", "public_teaser.", "public_webhook.", "public_calendar.", "public_status.", "public_pilot.", "pwa.")):
+    if g.get("mfa_pending") and request.endpoint not in MFA_EXEMPT and not (request.endpoint or "").startswith(("public.", "public_teaser.", "public_webhook.", "public_calendar.", "public_status.", "public_pilot.", "pwa.", "ops.")):
         target = "auth.mfa" if g.user.get("mfa_enabled_at") else "auth.mfa_setup"
         return redirect(url_for(target))
     return None
@@ -174,7 +174,7 @@ def require(capability: str):
 def check_csrf() -> None:
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return
-    if request.endpoint in ("auth.login", "static", "main.healthz"):
+    if request.endpoint in ("auth.login", "static", "main.healthz", "ops.tick"):
         return  # login has no session yet; protected by SameSite=Strict cookie + lockout
     if (request.endpoint or "").startswith(("public.", "public_teaser.", "public_webhook.", "public_pilot.")):
         return  # customer forms: signed form token (quick forms) or the secret link token (personal links)

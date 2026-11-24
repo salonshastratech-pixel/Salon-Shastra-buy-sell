@@ -22,6 +22,22 @@ from .security import can, check_csrf, enforce_mfa, load_current_user, log_denie
 __version__ = "0.13.0-m13"
 
 
+def _bootstrap_admin(db) -> None:
+    """Hosting without a server console (e.g. Render free): if the database has no active users yet and
+    BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD are set, create that super admin once. They must choose a new
+    password at first sign-in (and set up the authenticator app). Does nothing once any user exists."""
+    email = (os.environ.get("BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
+    pw = os.environ.get("BOOTSTRAP_ADMIN_PASSWORD") or ""
+    if not email or not pw or db.scalar("SELECT COUNT(*) FROM users WHERE is_active = 1"):
+        return
+    from .security import hash_password
+    from .timeutil import now_iso
+    db.insert("users", {"email": email, "full_name": os.environ.get("BOOTSTRAP_ADMIN_NAME") or "Founder",
+                        "role": "super_admin", "team": "admin", "password_hash": hash_password(pw), "is_active": 1,
+                        "must_change_password": 1, "created_at": now_iso()})
+    logging.getLogger("teamos").warning("bootstrap super admin created", extra={"email": email})
+
+
 def create_app(overrides: dict | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.config.update(
@@ -57,6 +73,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     with app.app_context():
         db = open_standalone(app.config["DATABASE_URL"])
         migrate(db)
+        _bootstrap_admin(db)
         db.close()
 
     logging_setup.configure(os.environ.get("LOG_LEVEL", "INFO"))
@@ -138,12 +155,12 @@ def create_app(overrides: dict | None = None) -> Flask:
                 current_app_logger.exception("navigation context failed")
         return ctx
 
-    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, pilot, team, investor,
+    from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, pilot, team, investor, ops,
                       public, sellers, tasks, workflow)
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
                matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp,
                channels.bp, channels.feed_bp, workflow.bp, workflow.public_bp, workflow.pwa_bp,
-               pilot.bp, pilot.public_bp, team.bp, investor.bp):
+               pilot.bp, pilot.public_bp, team.bp, investor.bp, ops.bp):
         app.register_blueprint(bp)
     return app
 
