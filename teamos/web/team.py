@@ -107,3 +107,12 @@ def worklog():
                            person_week=WL.week(db, person, day) if person else None,
                            person_day=WL.day_summary(db, person, day) if person else None,
                            STATUS_LABELS=AV.STATUS_LABELS)
+
+
+
+@bp.route("/desk")
+@require("users.manage")
+def founder_desk():
+    """Everything that needs the founder today, on one page."""
+    from ..domain import advisor
+    return render_template("desk.html", d=advisor.desk(get_db()), STATUS_LABELS=AV.STATUS_LABELS)

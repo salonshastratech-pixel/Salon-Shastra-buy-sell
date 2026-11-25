@@ -282,6 +282,7 @@ RESPONDENT_LABELS = {
         "preferred_city": "City",
         "relocate_willing": "Open to another city?",
         "max_commute_km": "How far are you willing to travel daily?",
+        "consider_takeover": "Would you also consider taking over a running salon?",
         "chairs_min": "At least how many styling chairs?",
         "chairs_max": "At most how many chairs?",
         "area_min_sqft": "Minimum salon size",

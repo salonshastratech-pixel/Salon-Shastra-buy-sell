@@ -153,6 +153,9 @@ SECTIONS = [
     ]),
     ("plan", "What you want to do", "", [
         _q("goal", "What would you like to do?", "choice", GOALS),
+        _q("takeover", "If a good running salon is available, would you consider taking it over instead of starting "
+           "new?", "choice", ["Yes", "Maybe — show me options", "No — only a new salon"], required=False,
+           hint="A running salon often starts earning from day one and costs less than building a new one."),
         _q("why_salon", "Why the salon business? What attracts you to it?", "long",
            hint="A line or two is enough — e.g. 'steady cash business', 'my wife is a beautician'."),
         _q("salon_type", "What kind of salon?", "multi", ["Unisex", "Men's salon", "Women's salon / beauty parlour",
@@ -785,6 +788,8 @@ def mandate_values_from_answers(a: dict) -> dict:
     out["involvement"] = ("absentee" if out["need_type"] == "passive_invest" or days == "Only weekends / remotely"
                           else "owner_operator" if days == "Every day, full-time" else "partly" if days else None)
     out["max_commute_km"] = {l: k for k, l in RADIUS_CHOICES}.get(a.get("radius"))
+    tk = a.get("takeover") or ""
+    out["consider_takeover"] = "yes" if tk.startswith(("Yes", "Maybe")) else "no" if tk.startswith("No") else None
     lo, hi = SIZE_TO_CHAIRS.get(a.get("size"), (None, None))
     out["chairs_min"], out["chairs_max"] = lo, hi
     if a.get("need_help"):

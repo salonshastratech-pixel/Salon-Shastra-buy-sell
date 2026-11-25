@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Founder desk{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Founder desk</h1><div class="sub">Everything that needs Vikas today, on one page. {{ d.new_today }} new lead{{ 's' if d.new_today != 1 }} came in today.</div></div></div>
+
+<div class="kpis">
+  <a class="kpi" href="#calls"><b>{{ d.calls|length }}</b><span>Calls today / to confirm</span></a>
+  <a class="kpi" href="#reports"><b>{{ d.swot|length + d.inv_reports|length }}</b><span>Reports to approve</span></a>
+  <a class="kpi" href="#hot"><b>{{ d.hot|length }}</b><span>Serious investors without a call</span></a>
+  <a class="kpi" href="{{ url_for('matches.desk', queue='ready') }}"><b>{{ d.ready }}</b><span>Matches ready to approach</span></a>
+  <a class="kpi" href="{{ url_for('deals.index') }}"><b>{{ d.intros }}</b><span>Introductions to approve</span></a>
+  <a class="kpi" href="#waiting"><b class="{{ 'unknown' if d.waiting_total }}">{{ d.waiting_total }}</b><span>Leads not called in 24 h</span></a>
+</div>
+
+<div class="split"><div>
+  <div class="card" id="calls"><h2>Calls with Vikas</h2>
+    <ul class="tasks">{% for b in d.calls %}<li class="task"><div>
+      <div class="t"><a href="{{ opp_url(b.kind, b.opportunity_id, tab=('investor' if b.kind == 'buyer' else 'pilot')) }}">{{ b.salon_name or b.contact_name }}</a> <span class="small muted">{{ b.ref_code }}</span></div>
+      <div class="meta">{% if b.starts_at %}<strong>{{ b.starts_at|ist('%I:%M %p') }}</strong>{% else %}<span class="badge warn">to confirm</span> asked for: {{ b.preferred_time or '—' }}{% endif %} · {{ 'Investor' if b.kind == 'buyer' else 'Salon owner' }}{% if b.note %} · {{ b.note }}{% endif %}</div></div>
+      <div><a class="btn sm" href="{{ opp_url(b.kind, b.opportunity_id, tab=('investor' if b.kind == 'buyer' else 'pilot')) }}">Prepare</a></div></li>
+    {% else %}<li class="empty">No calls today. <a href="{{ url_for('pilot.vikas') }}">Add free times</a></li>{% endfor %}</ul></div>
+
+  <div class="card" id="reports"><h2>Reports waiting for approval</h2>
+    <ul class="tasks">{% for r in d.swot %}<li class="task"><div><div class="t"><a href="{{ url_for('sellers.detail', opp_id=r.id, tab='pilot') }}">SWOT · {{ r.salon_name or r.contact_name }}</a></div><div class="meta">{{ r.ref_code }} · {{ r.owner_name or '—' }}</div></div></li>{% endfor %}
+    {% for r in d.inv_reports %}<li class="task"><div><div class="t"><a href="{{ url_for('buyers.detail', opp_id=r.id, tab='investor') }}">Readiness · {{ r.contact_name }}</a></div><div class="meta">{{ r.ref_code }} · {{ r.owner_name or '—' }}</div></div></li>{% endfor %}
+    {% if not d.swot and not d.inv_reports %}<li class="empty">Nothing waiting.</li>{% endif %}</ul></div>
+
+  <div class="card" id="hot"><h2>Serious investors — no call with Vikas yet</h2>
+    <ul class="tasks">{% for r in d.hot %}<li class="task"><div><div class="t"><a href="{{ url_for('buyers.detail', opp_id=r.id, tab='investor') }}">{{ r.contact_name }}</a></div><div class="meta">{{ r.ref_code }} · {{ r.owner_name or '—' }}</div></div><div><a class="btn sm" href="{{ url_for('buyers.detail', opp_id=r.id, tab='investor') }}#vikas">Book</a></div></li>
+    {% else %}<li class="empty">None — every Pursue investor has a call.</li>{% endfor %}</ul></div>
+</div><div>
+  <div class="card"><h2>Owners who want to sell</h2>
+    <ul class="tasks">{% for r in d.sellers %}<li class="task"><div><div class="t"><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a></div><div class="meta">{{ r.ref_code }} · {{ r.owner_name or '—' }}</div></div></li>
+    {% else %}<li class="empty">None marked "wants to sell" yet.</li>{% endfor %}</ul></div>
+
+  <div class="card"><h2>Money to collect</h2>
+    <ul class="tasks">{% for r in d.fees_consult %}<li class="task"><div><div class="t"><a href="{{ url_for('sellers.detail', opp_id=r.id, tab='pilot') }}">Consultation · {{ r.salon_name or r.contact_name }}</a></div><div class="meta">done, not marked paid</div></div></li>{% endfor %}
+    {% for r in d.fees_reg %}<li class="task"><div><div class="t"><a href="{{ url_for('buyers.detail', opp_id=r.id, tab='investor') }}">Registration fee · {{ r.contact_name }}</a></div><div class="meta">due after the office visit</div></div></li>{% endfor %}
+    {% if not d.fees_consult and not d.fees_reg %}<li class="empty">Nothing pending.</li>{% endif %}</ul></div>
+
+  <div class="card" id="waiting"><h2>Leads not called within 24 hours</h2>
+    <ul class="tasks">{% for w in d.waiting %}<li class="task"><div><div class="t">{{ w.owner_name or 'Unassigned' }}</div></div><div><strong>{{ w.n }}</strong></div></li>
+    {% else %}<li class="empty">Everyone was called within a day. 👏</li>{% endfor %}</ul></div>
+
+  <div class="card"><h2>Team right now</h2>
+    <ul class="tasks">{% for u in d.team %}<li class="task"><div><div class="t">{{ u.full_name }}</div><div class="meta">{{ STATUS_LABELS.get(u.work_status or 'offline', u.work_status) }} · {{ u.work_status_at|rel if u.work_status_at else '' }}</div></div></li>{% endfor %}</ul>
+    <p class="small"><a href="{{ url_for('team.worklog') }}">Work log →</a></p></div>
+</div></div>
+{% endblock %}

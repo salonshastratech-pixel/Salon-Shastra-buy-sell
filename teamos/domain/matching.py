@@ -133,7 +133,10 @@ def load_seller(db, opp_id: int) -> dict | None:
 
 
 def buyer_eligible(b: dict) -> bool:
-    return b["opp"]["status"] == "active" and b["m"].get("need_type") in BFD.RESALE_NEEDS
+    """Resale buyers, and new-salon investors who said yes to taking over a running salon."""
+    need = b["m"].get("need_type")
+    return b["opp"]["status"] == "active" and (need in BFD.RESALE_NEEDS or (
+        need == "new_salon" and b["m"].get("consider_takeover") == "yes"))
 
 
 def seller_eligible(s: dict) -> bool:

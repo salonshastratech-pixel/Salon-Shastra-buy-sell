@@ -171,3 +171,25 @@ def test_work_log_hours_breaks_and_output(db, login, app):
     assert c.get("/team/worklog").status_code in (302, 403)      # admins only
     c.post("/logout")
     assert user(db, "seller@t.test")["work_status"] == "offline"
+
+
+
+def test_founder_desk_price_guide_and_takeover_matching(db, login):
+    from teamos.domain import advisor
+    g = advisor.price_guide({"avg_monthly_sales": 300000, "avg_monthly_expenses": 220000, "rent_deposit": 300000,
+                             "asking_price": 3000000})
+    assert (g["low"], g["high"], g["verdict"]) == (80000 * 12 + 300000, 80000 * 24 + 300000, "high")
+    assert advisor.price_guide({"avg_monthly_sales": 100000, "avg_monthly_expenses": 120000})["verdict"] == "loss"
+    assert advisor.price_guide({"avg_monthly_sales": None}) is None
+    page = login("admin@t.test").get("/desk").data.decode()
+    assert "Founder desk" in page and "Calls with Vikas" in page and "Money to collect" in page
+    assert login("seller@t.test").get("/desk").status_code in (302, 403)
+    # takeover: a new-salon investor is matched only after saying yes
+    from test_matching import buyer, cand, seller
+    from teamos.domain import matching as M
+    s = seller(db)
+    b = buyer(db, need_type="new_salon")
+    assert cand(db, b, s) is None
+    db.execute("UPDATE buyer_mandates SET consider_takeover = 'yes', data_version = data_version + 1")
+    M.refresh(db, force=True)
+    assert cand(db, b, s, refresh=False) is not None

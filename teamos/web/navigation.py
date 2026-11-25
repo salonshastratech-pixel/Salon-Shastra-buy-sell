@@ -17,6 +17,7 @@ from ..permissions import user_can
 MODULES = [
     {"key": "today", "label": "Today", "icon": "sun", "pages": [
         ("My Day", "main.my_day", {}, None),
+        ("Founder desk", "team.founder_desk", {}, "users.manage"),
         ("Tasks", "tasks.index", {}, None),
         ("Calendar", "channels.calendar", {}, None),
         ("My availability", "team.mine", {}, None),
@@ -74,7 +75,7 @@ BY_KEY = {m["key"]: m for m in MODULES}
 
 # endpoint (or blueprint prefix) → module key
 ENDPOINT_MODULE = {
-    "main.my_day": "today", "tasks.": "today", "channels.calendar": "today", "team.mine": "today",
+    "main.my_day": "today", "team.founder_desk": "today", "tasks.": "today", "channels.calendar": "today", "team.mine": "today",
     "main.digest_preview": "today", "auth.change_password": "today", "main.search": "today",
     "main.team_board": "team", "team.": "team", "improve.hand_over": "team",
     "sellers.": "owners", "pilot.": "owners", "workflow.progress_preview": "owners",

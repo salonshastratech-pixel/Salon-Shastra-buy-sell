@@ -348,6 +348,7 @@ TE_RAW = {
     "Amount ready today": "ఈ రోజు సిద్ధంగా ఉన్న మొత్తం",
     "Open to another city?": "వేరే నగరం అయినా సరేనా?",
     "How far are you willing to travel daily?": "రోజూ ఎంత దూరం ప్రయాణించగలరు?",
+    "Would you also consider taking over a running salon?": "నడుస్తున్న సెలూన్‌ను తీసుకోవడాన్ని కూడా పరిశీలిస్తారా?",
     "km": "కి.మీ",
     "At least how many styling chairs?": "కనీసం ఎన్ని స్టైలింగ్ కుర్చీలు?",
     "At most how many chairs?": "గరిష్ఠంగా ఎన్ని కుర్చీలు?",

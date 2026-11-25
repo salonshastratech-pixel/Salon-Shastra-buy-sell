@@ -60,6 +60,9 @@ FIELDS: list[BuyerFieldDef] = [
     B("need_type", "What does the buyer want?", "intent", "enum", NEED_TYPES, quick=True, matching=True,
       material=True, help="'Open a new salon' is a separate need: never matched to resale listings without the "
                           "buyer's explicit confirmation."),
+    B("consider_takeover", "If opening new: would they consider taking over a running salon?", "intent", "enum",
+      YES_NO, matching=True, help="Yes = also match them with salons for sale (often faster and cheaper than "
+                                   "starting new). Ask before setting it."),
     B("investor_type", "Buyer type", "intent", "enum",
       [("individual", "Individual"), ("partnership", "Partnership"), ("company", "Company"),
        ("investor_group", "Investor group")]),

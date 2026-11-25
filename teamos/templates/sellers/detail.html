@@ -107,6 +107,12 @@
       {% if other_opps %}<h3>Other opportunities for this contact</h3>{% for o in other_opps %}<div class="small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> · {{ o.kind }}{% if o.salon_name %} · {{ o.salon_name }}{% endif %} · {{ STAGE_LABELS.get(o.stage, o.stage) }}</div>{% endfor %}{% endif %}
     </div>
 
+    {% if price_guide %}{% set g = price_guide %}
+    <div class="card" id="price-guide"><div class="card-h"><h2>Price guide</h2><span class="badge {{ {'fair': 'ok', 'high': 'warn', 'low': 'info', 'loss': 'bad'}.get(g.verdict, 'grey') }}">{{ {'fair': 'Fair asking', 'high': 'Asking is high', 'low': 'Asking is low', 'loss': 'Loss-making', 'no_ask': 'No asking price'}.get(g.verdict) }}</span></div>
+      <p class="small">Monthly profit (sales − expenses): <strong>{{ g.profit|inr }}</strong>{% if g.low %} · Guide: <strong>{{ g.low|inr }} – {{ g.high|inr }}</strong> (12–24 months of profit{% if g.deposit %} + deposit {{ g.deposit|inr }}{% endif %}){% endif %}{% if g.asking %} · Asking: <strong>{{ g.asking|inr }}</strong>{% endif %}</p>
+      <p class="small">{{ g.text }}</p>
+      <p class="small muted">A rule of thumb for negotiation, not a valuation. Better if the sales and expenses are backed by bills or bank statements.</p></div>
+    {% endif %}
     {% include "_timeline.html" %}
 
     {% include "forms/_record_card.html" %}
