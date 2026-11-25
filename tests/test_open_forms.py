@@ -169,3 +169,70 @@ def test_open_form_shows_save_errors_on_the_right_question(app, db):
     body = r.data.decode()
     assert r.status_code == 200 and not db.scalar("SELECT COUNT(*) FROM opportunities")
     assert "10-digit" in body or "mobile" in body.lower()
+
+
+def test_form_is_saved_while_filling_and_finishing_keeps_the_same_record(app, db, login):
+    pub = app.test_client()
+    tok = _token(pub.get("/f/pilot").data.decode())
+    # step 1 done: name + mobile + a couple of answers → saved, record appears as "Partly filled"
+    r = pub.post("/f/pilot/save", data={"form_token": tok, "owner_name": "Kavya Reddy", "contact_number": "9000011001",
+                                        "salon_name": "Glow Studio", "location": "Kondapur", "chairs": "6"})
+    j = r.get_json()
+    assert j["ok"] and j["draft"]
+    opp = db.one("SELECT o.*, b.city, b.locality FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id")
+    assert opp["city"] == "Hyderabad" and opp["locality"] == "Kondapur"            # city worked out from the area
+    prof = P.profile(db, opp["id"])
+    assert prof["form_status"] == "sent" and prof["form_answered"] == 5 and prof["form_questions"] > 40
+    assert db.scalar("SELECT chairs FROM seller_listings") == 6                     # known facts already usable
+    task = db.one("SELECT * FROM tasks WHERE entity_id = ? AND status = 'open' AND task_type = 'review'", (opp["id"],))
+    assert task["title"].startswith("Call to complete the form") and "5 of" in task["title"]
+    team = login("seller@t.test")
+    assert "Partly filled" in team.get("/sellers/").data.decode()
+    assert "Kondapur" in team.get(f"/pilot/{opp['id']}/fill").data.decode()       # team completes from what's saved
+    # a second autosave updates the same record
+    pub.post("/f/pilot/save", data={"form_token": tok, "draft": j["draft"], "owner_name": "Kavya Reddy",
+                                    "contact_number": "9000011001", "chairs": "7", "monthly_rent": "45k"})
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 1
+    # submit with only some answers → same record, greeting page, still marked as missing some answers
+    r = pub.post("/f/pilot", data={"form_token": tok, "draft": j["draft"], "owner_name": "Kavya Reddy",
+                                   "contact_number": "9000011001", "location": "Kondapur", "consent_contact": "1"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/thanks")
+    assert "Thank you, Kavya" in pub.get(r.headers["Location"]).data.decode()
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 1
+    prof = P.profile(db, opp["id"])
+    assert prof["form_status"] == "filled" and prof["form_answered"] < prof["form_questions"]
+    assert "Review: Form submitted" in db.scalar("SELECT title FROM tasks WHERE id = ?", (task["id"],))
+
+
+def test_only_name_and_mobile_are_needed_and_location_helpers(app, db):
+    pub = app.test_client()
+    page = pub.get("/f/investor").data.decode()
+    assert 'list="area-names"' in page and "Use my location" in page and "answered" in page
+    r = pub.post("/f/investor", data={"form_token": _token(page), "consent_contact": "1", "city": "Hyd"})
+    body = r.data.decode()
+    assert r.status_code == 200 and "Please tell us your name" in body and "mobile number" in body
+    r = pub.post("/f/investor", data={"form_token": _token(page), "consent_contact": "1", "full_name": "Arjun",
+                                      "phone": "9100011001", "city": "Hyd"})
+    assert r.status_code == 302 and db.scalar("SELECT city FROM contacts") == "Hyderabad"
+    assert pub.post("/f/investor/save", data={"form_token": _token(page), "full_name": "X", "phone": "12"}).get_json()["ok"] is False
+    near = pub.get("/f/geo/near?lat=17.4605&lng=78.3645").get_json()
+    assert near["ok"] and near["label"] == "Kondapur, Hyderabad"
+    assert pub.get("/f/geo/near?lat=28.6&lng=77.2").get_json()["ok"] is False      # outside the area list: type it
+
+
+
+def test_drive_link_for_photos_and_documents(app, db, login):
+    from teamos.domain import pilot as PP
+    a, e = PP.parse_answers({"drive_link": "drive.google.com/drive/folders/abc123"}, lenient=True)
+    assert a["drive_link"] == "https://drive.google.com/drive/folders/abc123"
+    a, e = PP.parse_answers({"drive_link": "my photos"})
+    assert "drive_link" in e and "drive_link" not in a
+    pub = app.test_client()
+    page = pub.get("/f/pilot").data.decode()
+    assert "Google Drive link" in page and 'type="url"' in page
+    r = pub.post("/f/pilot", data={**FULL, "drive_link": "https://drive.google.com/drive/folders/abc123",
+                                   "form_token": _token(page), "consent_contact": "1"})
+    assert r.status_code == 302
+    oid = db.scalar("SELECT id FROM opportunities")
+    rec = login("seller@t.test").get(f"/sellers/{oid}?tab=pilot").data.decode()
+    assert "Photos &amp; documents" in rec and "drive.google.com/drive/folders/abc123" in rec

@@ -78,10 +78,10 @@ def test_owner_fills_form_by_link_and_swot_draft_appears(db, login, app):
     pub = app.test_client()
     page = pub.get(f"/s/{token}").data.decode()
     assert "Salon Shastra Pilot Program" in page and "Kavya Reddy" in page  # prefilled from the record
-    bad = pub.post(f"/s/{token}", data={"salon_name": "Glow"}).data.decode()
-    assert "Please check the highlighted answers" in bad
-    ok = pub.post(f"/s/{token}", data=FULL).data.decode()
-    assert "Thank you" in ok
+    bad = pub.post(f"/s/{token}", data={"salon_name": "Glow", "contact_number": "123"}).data.decode()
+    assert "10-digit mobile number" in bad                    # blanks are fine; a wrong mobile number is not
+    ok = pub.post(f"/s/{token}", data=FULL, follow_redirects=True).data.decode()
+    assert "Thank you" in ok and "3 quick wins" in ok
     assert P.profile(db, opp)["form_status"] == "filled"
     rep = P.latest_report(db, opp)
     assert rep["status"] == "draft" and rep["c"]["strengths"] and rep["c"]["weaknesses"] and rep["c"]["steps"]

@@ -174,6 +174,9 @@ SECTIONS = [
            required=False, other=True),
         _q("goal_12m", "What is the one thing you most want to achieve in the next 12 months?", "long",
            required=False, extra=True),
+        _q("drive_link", "Google Drive link to your salon photos & documents (optional)", "url", required=False,
+           extra=True, hint="Put photos of your salon (outside, inside, chairs), your price list and licences in a "
+                            "Google Drive folder, set sharing to 'Anyone with the link', and paste the link here."),
         _q("comments", "Any additional comments or concerns? (Short answer)", "long"),
     ]),
 ]
@@ -316,18 +319,38 @@ def latest_response(db, opp_id: int) -> dict | None:
 
 
 def prefill(db, opp: dict) -> dict:
-    """What we already know, so the owner doesn't type it twice."""
+    """What we already know, so the owner doesn't type it twice (a finished form, else the answers saved so far)."""
     last = latest_response(db, opp["id"])
     if last:
         return last["answers"]
+    part = db.scalar("SELECT partial_answers FROM pilot_profiles WHERE opportunity_id = ?", (opp["id"],))
+    if part:
+        return json.loads(part)
     phone = (opp.get("phone_normalized") or "")
     return {"salon_name": opp.get("salon_name") or "", "owner_name": opp.get("contact_name") or "",
             "location": ", ".join(x for x in (opp.get("locality"), opp.get("city")) if x),
             "contact_number": phone[3:] if phone.startswith("+91") else phone, "email": opp.get("contact_email") or ""}
 
 
-def parse_answers(form, questions: list | None = None) -> tuple[dict, dict]:
-    """Form → clean answers + errors. Accepts the owner's own words for money ("40k", "1.8L")."""
+def parse_answers(form, questions: list | None = None, lenient: bool = False) -> tuple[dict, dict]:
+    """Form → clean answers + errors. Accepts the owner's own words for money ("40k", "1.8L").
+    lenient: nothing is required and an answer in the wrong format is simply left out (the team completes it) —
+    only a mobile number in the wrong format is reported."""
+    answers, errors = _parse(form, questions)
+    if lenient:
+        qs = {q["key"]: q for q in (questions or QUESTIONS)}
+        errors = {k: v for k, v in errors.items() if qs.get(k, {}).get("kind") == "phone" and k in
+                  {kk for kk in form.keys() if (form.get(kk) or "").strip()}}
+    return answers, errors
+
+
+def progress(answers: dict, questions: list | None = None) -> tuple[int, int]:
+    """(answered, total) over the main questions."""
+    qs = [q for q in (questions or QUESTIONS) if not q["extra"]]
+    return sum(1 for q in qs if answers.get(q["key"])), len(qs)
+
+
+def _parse(form, questions: list | None = None) -> tuple[dict, dict]:
     answers, errors = {}, {}
     for q in (questions or QUESTIONS):
         k = q["key"]
@@ -365,6 +388,12 @@ def parse_answers(form, questions: list | None = None) -> tuple[dict, dict]:
         if q["kind"] == "phone" and len(re.sub(r"\D", "", v)) < 10:
             errors[k] = "Please enter a 10-digit mobile number."
             continue
+        if q["kind"] == "url":
+            if not re.match(r"https?://", v, re.I) and re.match(r"[\w-]+(\.[\w-]+)+(/\S*)?$", v):
+                v = "https://" + v  # "drive.google.com/..." pasted without https://
+            if not re.fullmatch(r"https?://[^\s<>\"']+\.[^\s<>\"']+", v, re.I):
+                errors[k] = "Please paste the full link (it starts with https://)."
+                continue
         if q["kind"] == "email" and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
             errors[k] = "Please enter a valid e-mail address."
             continue
@@ -377,7 +406,10 @@ def save_response(db, opp: dict, answers: dict, source: str, actor_id=None, quie
         rid = db.insert("pilot_responses", {"opportunity_id": opp["id"], "answers": json.dumps(answers,
                                                                                                ensure_ascii=False),
                                             "source": source, "created_by": actor_id, "submitted_at": now_iso()})
-        _upsert(db, opp["id"], actor_id, {"form_status": "filled", "form_filled_at": now_iso()})
+        got, total = progress(answers)
+        _upsert(db, opp["id"], actor_id, {"form_status": "filled", "form_filled_at": now_iso(),
+                                          "form_answered": got, "form_questions": total, "partial_answers": None})
+        _complete_followup(db, opp["id"], got, total)
         who = {"link": "Salon owner", "import": "Salon owner (answers imported from the pilot-program sheet)"}.get(
             source, "Team (on the owner's behalf)")
         T.add_activity(db, actor_id, "opportunity", opp["id"], "system",
@@ -1003,6 +1035,7 @@ def overview(db, area: str = "", status: str = "") -> dict:
     rows = db.all(
         "SELECT o.id, o.ref_code, o.stage, o.status, o.created_at, c.full_name AS contact_name, b.name AS salon_name, "
         "b.locality, b.city, u.full_name AS owner_name, p.lead_type, p.help_areas, p.form_status, "
+        "p.form_answered, p.form_questions, "
         "p.chairpe_status, p.chairpe_plan, "
         "(SELECT r.status FROM swot_reports r WHERE r.opportunity_id = o.id ORDER BY r.version DESC LIMIT 1) "
         "AS report_status, "
@@ -1172,15 +1205,21 @@ def answers_from_sheet(raw: dict) -> dict:
 
 
 # -- Public (open) Pilot Program form: anyone can fill it, e.g. from an ad --------------------------------------------
-def submit_public(db, answers: dict, consent: bool) -> int:
+def submit_public(db, answers: dict, consent: bool, final: bool = True) -> int:
     """Create the salon-owner record from the open Pilot Program form, save the answers and draft the SWOT report.
     Same safeguards as the other public forms: never merged into an existing contact (possible duplicates go to the
     review queue), owner-declared, with a high-priority review task for the team."""
     from . import sellers as S
+    from . import geo
     loc = (answers.get("location") or "").strip()
-    city, locality = (loc.split(",", 1)[1].strip(), loc.split(",", 1)[0].strip()) if "," in loc else (loc, loc)
+    if "," in loc:
+        locality, city = loc.split(",", 1)[0].strip(), loc.split(",", 1)[1].strip()
+        city = geo.city_of(city) or city  # "Hyd" → "Hyderabad", so it matches buyers' city
+    else:  # "Kondapur" → area Kondapur, city Hyderabad (built-in area list); unknown names are kept as typed
+        locality, city = loc, (geo.city_of(loc) or loc)
     payload = {"full_name": answers.get("owner_name"), "phone": answers.get("contact_number"),
-               "salon_name": answers.get("salon_name"), "city": city or loc, "locality": locality or loc,
+               "salon_name": answers.get("salon_name") or "Salon name not given",
+               "city": city or "City not given", "locality": locality or city or "Area not given",
                "email": answers.get("email"), "consent_contact": "1" if consent else ""}
     with db:
         opp_id = S.submit_respondent_form(db, payload, source="landing_page")
@@ -1188,7 +1227,10 @@ def submit_public(db, answers: dict, consent: bool) -> int:
         opp = db.one("SELECT o.*, c.full_name AS contact_name, b.name AS salon_name FROM opportunities o JOIN contacts c "
                      "ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id WHERE o.id = ?",
                      (opp_id,))
-        save_response(db, opp, answers, "link")
+        if final:
+            save_response(db, opp, answers, "link")
+        else:
+            save_partial(db, opp, answers)
     return opp_id
 
 
@@ -1285,3 +1327,61 @@ def sync_to_listing(db, opp_id: int, answers: dict | None, actor_id=None) -> lis
         T.add_activity(db, actor_id, "opportunity", opp_id, "data_update",
                        f"Filled from the pilot form (empty fields only): {labels}")
     return changed
+
+
+
+# -- Forms saved as people fill them ---------------------------------------------------------------------------------
+FOLLOWUP_PREFIX = "Call to complete the form: "
+
+
+def save_partial(db, opp: dict, answers: dict) -> None:
+    """Answers so far (the person has not pressed Submit yet). The record shows "Partly filled (n of m)", the
+    known facts fill empty fields, and the team gets one task to call / WhatsApp and complete the rest."""
+    if profile(db, opp["id"])["form_status"] == "filled":
+        return  # a finished form is never replaced by a half one
+    got, total = progress(answers)
+    with db:
+        first = not db.scalar("SELECT partial_answers FROM pilot_profiles WHERE opportunity_id = ?", (opp["id"],))
+        _upsert(db, opp["id"], None, {"form_status": "sent", "form_answered": got, "form_questions": total,
+                                      "partial_answers": json.dumps(answers, ensure_ascii=False)})
+        sync_to_listing(db, opp["id"], answers, None)
+        _followup_task(db, opp, got, total, first)
+
+
+def _followup_task(db, opp, got, total, first):
+    """Turn the record's open review task into "call to complete the form", or add one."""
+    title = (f"{FOLLOWUP_PREFIX}{opp.get('contact_name') or opp.get('ref_code')} — {got} of {total} answered "
+             "(call or WhatsApp)")
+    tid = db.scalar("SELECT id FROM tasks WHERE entity_type = 'opportunity' AND entity_id = ? AND status = 'open' "
+                    "AND task_type = 'review' ORDER BY id LIMIT 1", (opp["id"],))
+    if tid:
+        db.execute("UPDATE tasks SET title = ?, updated_at = ? WHERE id = ?", (title, now_iso(), tid))
+    elif first:
+        T.create_task(db, None, title=title, assignee_id=opp.get("primary_owner_id"),
+                      due_at=T.first_contact_due(120), task_type="review", priority="high",
+                      entity_type="opportunity", entity_id=opp["id"])
+    if first:
+        T.add_activity(db, None, "opportunity", opp["id"], "system",
+                       f"Started the form ({got} of {total} answered so far) — saved as they fill it")
+
+
+def _complete_followup(db, opp_id, got, total):
+    """The form is finished: the 'call to complete' task becomes a normal review."""
+    note = f"Form submitted ({got} of {total} answered)" + ("" if got >= total else " — some answers still missing")
+    db.execute("UPDATE tasks SET title = ?, updated_at = ? WHERE entity_type = 'opportunity' AND entity_id = ? "
+               "AND status = 'open' AND title LIKE ?", (f"Review: {note}", now_iso(), opp_id, FOLLOWUP_PREFIX + "%"))
+
+
+def form_state_label(prof: dict) -> str:
+    st, got, total = prof.get("form_status"), prof.get("form_answered"), prof.get("form_questions")
+    if st == "filled":
+        return "Form filled" + (f" ({got} of {total})" if got and total and got < total else "")
+    if got:
+        return f"Partly filled ({got} of {total})"
+    return FORM_STATUS_LABELS.get(st, st or "")
+
+
+
+def finish_public(db, opp: dict, answers: dict) -> None:
+    """Submit pressed on a form that was already being saved: same record, now a full response + report draft."""
+    save_response(db, opp, answers, "link")

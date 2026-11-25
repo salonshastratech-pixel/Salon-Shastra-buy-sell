@@ -6,7 +6,8 @@ write anything except the respondent's own submission.
 """
 import json
 
-from flask import Blueprint, abort, current_app, make_response, redirect, render_template, request, url_for
+from flask import (Blueprint, abort, current_app, jsonify, make_response, redirect, render_template, request,
+                   url_for)
 from itsdangerous import BadData, URLSafeTimedSerializer
 
 from .. import i18n
@@ -99,7 +100,8 @@ def open_form():
             return _page("public/message.html", 429, title="Too many submissions",
                          message="We have already received several forms from this connection. Please try again "
                                  "later or call us.")
-        answers, errors = mod.parse_answers(request.form)
+        answers, errors = mod.parse_answers(request.form, lenient=True)
+        errors.update(_need_name_and_mobile(kind, answers))
         phone_key = "contact_number" if kind == "pilot" else "phone"
         if answers.get(phone_key) and phone_key not in errors:
             from ..domain.common import normalize_indian_mobile
@@ -110,8 +112,12 @@ def open_form():
             errors["consent_contact"] = "Please tick this box so we can contact you about your answers."
         if not errors:
             try:
-                opp_id = mod.submit_public(db, answers, consent=True)
-                token = PIL.issue_link(db, opp_id)
+                token = request.form.get("draft") or ""
+                draft = PIL.resolve(db, token) if token else None
+                if draft and draft["kind"] == ("seller" if kind == "pilot" else "buyer"):
+                    mod.finish_public(db, draft, answers)          # the same record that was saved while filling
+                else:
+                    token = PIL.issue_link(db, mod.submit_public(db, answers, consent=True))
                 F.record_public_hit(db, ip, meta["key"], "submitted")
                 return redirect(url_for("public_pilot.thanks", token=token))
             except ValidationError as e:
@@ -121,8 +127,77 @@ def open_form():
                            "locality": "location"} if kind == "pilot" else {})
                 errors = {rename.get(k, k): v for k, v in raw.items()}
                 errors["_"] = "Please check: " + " ".join(str(v) for v in raw.values())
+    from ..domain import geo
     return _page("public/open_form.html", meta=meta, kind=kind, Q=mod, answers=answers, errors=errors,
-                 form_token=_signer().dumps(meta["key"]))
+                 form_token=_signer().dumps(meta["key"]), req_keys=REQUIRED_KEYS[kind],
+                 draft=request.form.get("draft", ""), area_names=geo.known_area_names())
+
+
+REQUIRED_KEYS = {"pilot": ("owner_name", "contact_number"), "investor": ("full_name", "phone")}
+
+
+def _need_name_and_mobile(kind: str, answers: dict) -> dict:
+    """The only two answers anyone must give: who they are and how to reach them. Everything else can be blank —
+    the team completes it by call or WhatsApp."""
+    name_key, phone_key = REQUIRED_KEYS[kind]
+    out = {}
+    if not answers.get(name_key):
+        out[name_key] = "Please tell us your name."
+    if not answers.get(phone_key):
+        out[phone_key] = "Please give your mobile number so we can reach you."
+    return out
+
+
+@bp.route("/pilot/save", methods=["POST"])
+@bp.route("/investor/save", methods=["POST"])
+def open_save():
+    """Saves the open form as it is being filled (each step), so nothing is lost if the person stops half-way.
+    Needs a name and a valid mobile number; answers nothing else. Returns the personal link token (kept in the page)."""
+    from ..domain import investor as INV
+    from ..domain import pilot as PIL
+    from ..domain.common import normalize_indian_mobile
+    kind = request.path.strip("/").split("/")[-2]
+    meta = OPEN_FORMS[kind]
+    mod = PIL if kind == "pilot" else INV
+    db = get_db()
+    try:
+        if _signer().loads(request.form.get("form_token", ""), max_age=FORM_TOKEN_MAX_AGE) != meta["key"]:
+            raise BadData("wrong form")
+    except BadData:
+        return jsonify({"ok": False}), 400
+    if request.form.get("website"):
+        return jsonify({"ok": True})
+    answers, _errors = mod.parse_answers(request.form, lenient=True)
+    name_key, phone_key = REQUIRED_KEYS[kind]
+    if not answers.get(name_key) or normalize_indian_mobile(answers.get(phone_key))[1]:
+        return jsonify({"ok": False, "why": "name and mobile first"})
+    token = request.form.get("draft") or ""
+    opp = PIL.resolve(db, token) if token else None
+    try:
+        if opp and opp["kind"] == ("seller" if kind == "pilot" else "buyer"):
+            mod.save_partial(db, opp, answers)
+        else:
+            if F.public_rate_limited(db, _ip_hash()):
+                return jsonify({"ok": False}), 429
+            token = PIL.issue_link(db, mod.submit_public(db, answers, consent=bool(request.form.get("consent_contact")),
+                                                         final=False))
+            F.record_public_hit(db, _ip_hash(), meta["key"], "started")
+    except ValidationError:
+        return jsonify({"ok": False})
+    return jsonify({"ok": True, "draft": token})
+
+
+@bp.route("/geo/near")
+def geo_near():
+    """'Use my location': the nearest known area to the phone's position (nothing is stored)."""
+    from ..domain import geo
+    try:
+        lat, lng = float(request.args.get("lat", "")), float(request.args.get("lng", ""))
+    except ValueError:
+        return jsonify({"ok": False}), 400
+    area, city = geo.nearest_area(lat, lng)
+    label = f"{area}, {city}" if area and city and city.lower() != area.lower() else (area or "")
+    return jsonify({"ok": bool(area), "area": area, "city": city, "label": label})
 
 
 @bp.route("/<kind>/done")

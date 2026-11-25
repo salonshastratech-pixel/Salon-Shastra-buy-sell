@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% extends "base.html" %}{% from "macros.html" import form_progress, csrf %}
 {% block title %}Pilot program{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Pilot program</h1><div class="sub">Salon owners who want help growing: what they need, form, SWOT report, call with {{ P.CONSULTANT_NAME }}, consultation.</div></div>
@@ -29,7 +29,7 @@
 <tr class="row-link">
   <td><a href="{{ url_for('sellers.detail', opp_id=r.id, tab='pilot') }}"><strong>{{ r.salon_name or r.ref_code }}</strong></a><div class="small muted">{{ r.contact_name }} · {{ r.locality }}{% if r.lead_type == 'investor' %} · <span class="badge info">investor</span>{% endif %}</div></td>
   <td class="small">{% for a in r.areas %}{{ P.HELP_LABELS[a] }}{{ ', ' if not loop.last }}{% else %}<span class="muted">—</span>{% endfor %}</td>
-  <td><span class="badge {{ 'ok' if r.form_status == 'filled' else 'warn' if r.form_status in ('sent','not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[r.form_status] }}</span></td>
+  <td>{{ form_progress(r.form_status, r.form_answered, r.form_questions) }}</td>
   <td class="small">{% if r.report_sent_at %}<span class="badge ok">sent</span>{% elif r.report_status == 'approved' %}<span class="badge warn">approved</span>{% elif r.report_status %}<span class="badge warn">draft</span>{% else %}—{% endif %}</td>
   <td class="small">{% if r.chairpe_status != 'not_offered' %}<span class="badge {{ 'ok' if r.chairpe_status == 'paying' else 'warn' if r.chairpe_status in ('demo','trial') else 'grey' }}">{{ {'demo': 'demo', 'trial': 'trial', 'paying': 'paying', 'not_interested': 'no'}[r.chairpe_status] }}</span>{% else %}—{% endif %}</td>
   <td class="small">{% if r.vikas_status %}{{ {'requested': 'requested', 'booked': (r.vikas_at|ist('%d %b')) if r.vikas_at else 'booked', 'done': 'held', 'cancelled': 'cancelled', 'no_show': 'no-show'}[r.vikas_status] }}{% else %}—{% endif %}</td>

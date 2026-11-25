@@ -10,7 +10,7 @@
 {% for sk, title, sub, qs in P.SECTIONS %}
 <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;{{ title }}</h2></div><div class="table-wrap"><table class="answers">
   {% for q in qs %}{% set v = resp.answers.get(q.key) %}<tr><th scope="row">{{ q.label }}{% if q.extra %} <span class="badge grey">extra</span>{% endif %}</th>
-    <td>{% if v is none or v == '' %}<span class="muted">—</span>{% elif v is string %}{{ v }}{% else %}{{ v|join(', ') }}{% endif %}</td></tr>{% endfor %}
+    <td>{% if v is none or v == '' %}<span class="muted">—</span>{% elif v is string and q.kind == 'url' %}<a href="{{ v }}" target="_blank" rel="noopener noreferrer">{{ v }}</a>{% elif v is string %}{{ v }}{% else %}{{ v|join(', ') }}{% endif %}</td></tr>{% endfor %}
 </table></div></div>
 {% endfor %}{% endif %}
 {% endblock %}

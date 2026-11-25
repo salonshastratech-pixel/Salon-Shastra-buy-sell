@@ -197,3 +197,72 @@ def known_area_names() -> list[str]:
     return sorted(n.title().replace("Lb ", "LB ").replace("Sr ", "SR ").replace("Kphb", "KPHB")
                   .replace("Ecil", "ECIL").replace("Jntu", "JNTU").replace("As Rao", "AS Rao")
                   .replace("Bn Reddy", "BN Reddy").replace("Hitec", "HITEC") for n in PLACES)
+
+
+def _city_map() -> dict[str, str]:
+    """area key → city name, from the order of PLACES (each block of areas belongs to one city)."""
+    keys = list(PLACES)
+    blocks = [("Hyderabad", None, "hyderabad"), ("Bengaluru", "koramangala", "t nagar"),
+              ("Chennai", "t nagar", "mvp colony"), ("Visakhapatnam", "mvp colony", "benz circle"),
+              ("Vijayawada", "benz circle", "kakkanad"), ("Kochi", "kakkanad", "rs puram"),
+              ("Coimbatore", "rs puram", None)]
+    out = {}
+    for city, start, stop in blocks:
+        i = keys.index(start) if start else 0
+        j = keys.index(stop) if stop else len(keys)
+        for k in keys[i:j]:
+            out[k] = city
+    for k in keys[keys.index("hyderabad"):keys.index("koramangala")]:  # city centres name themselves
+        out[k] = k.title()
+    out.update({"vizag": "Visakhapatnam", "bengaluru": "Bengaluru", "bangalore": "Bengaluru", "cochin": "Kochi",
+                "trivandrum": "Thiruvananthapuram", "calicut": "Kozhikode", "pondicherry": "Puducherry",
+                "mysuru": "Mysuru", "mysore": "Mysuru", "mangalore": "Mangaluru", "belgaum": "Belagavi",
+                "gulbarga": "Kalaburagi", "tiruchirappalli": "Tiruchirappalli", "trichy": "Tiruchirappalli"})
+    return out
+
+
+CITY_OF = _city_map()
+
+
+def _key(name) -> str | None:
+    """The PLACES key for a name as people write it (same rules as coords)."""
+    pt = coords(name)
+    if not pt:
+        return None
+    s = _norm(name)
+    if s in PLACES:
+        return s
+    for part in re.split(r"[,/]", str(name or "").lower()):
+        p = _norm(part)
+        if p in PLACES:
+            return p
+    for key in sorted(PLACES, key=len, reverse=True):
+        if re.search(r"\b" + re.escape(key) + r"\b", s):
+            return key
+    return None
+
+
+def city_of(name) -> str | None:
+    """'Kondapur' → 'Hyderabad', 'Koramangala' → 'Bengaluru', 'Vizag' → 'Visakhapatnam'; None when unknown."""
+    k = _key(name)
+    return CITY_OF.get(k) if k else None
+
+
+def nearest_area(lat: float, lng: float, max_km: float = 15) -> tuple[str | None, str | None]:
+    """The closest known area to a point (from the phone's location): (Area name, City) or (None, None)."""
+    best, best_d = None, None
+    for k, pt in PLACES.items():
+        if CITY_OF.get(k, "").lower() == k:  # skip city centres when an area is close
+            continue
+        d = distance_km((lat, lng), pt)
+        if d is not None and (best_d is None or d < best_d):
+            best, best_d = k, d
+    if best is None or best_d > max_km:
+        for k, pt in PLACES.items():  # far from any listed area: the nearest city centre
+            d = distance_km((lat, lng), pt)
+            if d is not None and (best_d is None or d < best_d):
+                best, best_d = k, d
+        if best_d is None or best_d > 60:
+            return None, None
+    title = dict((n.lower(), n) for n in known_area_names()).get(best, best.title())
+    return title, CITY_OF.get(best)

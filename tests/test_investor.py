@@ -70,8 +70,8 @@ def test_form_by_link_then_book_vikas_no_prices_shown(db, login, app):
     admin = login("admin@t.test")
     day = (now_utc().astimezone(IST) + timedelta(days=2)).strftime("%Y-%m-%d")
     admin.post("/pilot/vikas", {"day": day, "times": "11:00", "minutes": "20", "mode": "phone"})
-    done = pub.post(f"/s/{token}", data=STRONG).data.decode()
-    assert "Pick a time to talk with Vikas Rachakonda" in done and "Book this time" in done
+    done = pub.post(f"/s/{token}", data=STRONG, follow_redirects=True).data.decode()   # → personal thank-you page
+    assert "Talk to Vikas Rachakonda" in done and "Book this time" in done
     assert I.profile(db, opp)["form_status"] == "filled"
     rep = I.latest_report(db, opp)
     assert rep["c"]["verdict"] == "ready" and rep["c"]["path"] == "Buy a running salon"

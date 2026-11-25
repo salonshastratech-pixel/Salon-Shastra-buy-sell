@@ -329,10 +329,10 @@ def form(token):
     if request.method == "POST":
         if request.form.get("website"):  # honeypot
             return _public("public/pilot_done.html", token=token, opp=opp)
-        answers, errors = P.parse_answers(request.form)
+        answers, errors = P.parse_answers(request.form, lenient=True)  # answer what you can; the team helps
         if not errors:
             P.save_response(db, opp, answers, "link")
-            return _public("public/pilot_done.html", token=token, opp=opp)
+            return redirect(url_for("public_pilot.thanks", token=token))
     return _public("public/pilot_form.html", token=token, opp=opp, answers=answers, errors=errors,
                    filled=P.profile(db, opp["id"])["form_status"] == "filled")
 
@@ -403,11 +403,10 @@ def _investor_form(db, token, opp):
     if request.method == "POST":
         if request.form.get("website"):  # honeypot
             return _public("public/investor_done.html", token=token, opp=opp)
-        answers, errors = I.parse_answers(request.form)
+        answers, errors = I.parse_answers(request.form, lenient=True)
         if not errors:
             I.save_response(db, opp, answers, "link")
-            return _public("public/investor_done.html", token=token, opp=opp, slots=P.open_slots(db),
-                           booked=_live_booking(db, opp["id"]))
+            return redirect(url_for("public_pilot.thanks", token=token))
     return _public("public/investor_form.html", token=token, opp=opp, answers=answers, errors=errors, I=I,
                    filled=I.profile(db, opp["id"])["form_status"] == "filled")
 

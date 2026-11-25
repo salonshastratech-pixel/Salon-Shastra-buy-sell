@@ -42,3 +42,9 @@
 
 {# One tap: call (the phone dials) and WhatsApp (opens with a greeting; logged on the record). #}
 {% macro contact_buttons(opp_id, phone, dnc=False) -%}{% if phone and not dnc %}<span class="cbtns"><a class="cbtn call" href="{{ phone|tel }}" data-call-log title="Call {{ phone }}" aria-label="Call {{ phone }}">📞</a><form method="post" action="{{ url_for('inbox.wa_open', opp_id=opp_id) }}" target="_blank" class="cbtn-f">{{ csrf() }}<button class="cbtn wa" title="WhatsApp {{ phone }}" aria-label="WhatsApp {{ phone }}">WA</button></form></span>{% endif %}{%- endmacro %}
+
+{# Form status with a completion bar: "Partly filled · 12/45" (team pages). #}
+{% macro form_progress(st, got=none, total=none) -%}
+{%- if st == 'filled' %}<span class="badge ok">Form filled</span>{% elif got %}<span class="badge warn">Partly filled</span>{% elif st == 'sent' %}<span class="badge warn">Form sent</span>{% elif st == 'not_filled' %}<span class="badge warn">Not filled</span>{% else %}<span class="badge grey">Form not sent</span>{% endif -%}
+{%- if got and total %}<progress class="form-progress" value="{{ got }}" max="{{ total }}" title="{{ got }} of {{ total }} answered">{{ got }}/{{ total }}</progress><span class="small muted">{{ got }} of {{ total }} answered</span>{% endif -%}
+{%- endmacro %}

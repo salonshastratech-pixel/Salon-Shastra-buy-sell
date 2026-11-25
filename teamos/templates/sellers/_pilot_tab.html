@@ -1,4 +1,4 @@
-{% from "macros.html" import csrf %}
+{% from "macros.html" import form_progress, csrf %}
 {% set prof = pilot %}{% set rep = pilot_report %}
 <div class="pilot-flow">
 <ol class="pilot-steps" aria-label="Pilot program steps">
@@ -28,12 +28,13 @@
   {# 2. Pilot form ------------------------------------------------------------------------------------------ #}
   <div class="card" id="form">
     <div class="card-h"><h2>Pilot program form</h2>
-      <span class="badge {{ 'ok' if prof.form_status == 'filled' else 'warn' if prof.form_status in ('sent', 'not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[prof.form_status] }}</span></div>
+      {{ form_progress(prof.form_status, prof.form_answered, prof.form_questions) }}</div>{% if prof.form_answered and prof.form_status != 'filled' %}<p class="small">They started the form and stopped — their answers so far are saved. Call or WhatsApp them, then use <strong>Fill on their behalf</strong> to complete the rest.</p>{% endif %}
     {% if prof.form_sent_at %}<p class="small muted">Sent {{ prof.form_sent_at|rel }}{% if prof.form_filled_at %} · filled {{ prof.form_filled_at|rel }}{% endif %}</p>{% endif %}
     <div class="inline">
       <form method="post" action="{{ url_for('pilot.link', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="purpose" value="form"><button class="btn primary">{{ 'Send the form again' if prof.form_status in ('sent', 'filled') else 'Send the form link' }}</button></form>
       <a class="btn" href="{{ url_for('pilot.fill', opp_id=opp.id) }}">{{ 'Edit answers' if pilot_response else 'Fill it for them' }}</a>
       {% if pilot_response %}<a class="btn" href="{{ url_for('pilot.answers', opp_id=opp.id) }}">See answers</a>{% endif %}
+      {% set dl = pilot_response.answers.get('drive_link') if pilot_response else none %}{% if dl %}<a class="btn" href="{{ dl }}" target="_blank" rel="noopener noreferrer">📁 Photos &amp; documents</a>{% endif %}
     </div>
     <form method="post" action="{{ url_for('pilot.form_status', opp_id=opp.id) }}" class="inline mark-status">{{ csrf() }}
       <span class="small muted">Mark as:</span>{% for v, l in P.FORM_STATUS if v != prof.form_status %}<button class="btn sm" name="status" value="{{ v }}">{{ l }}</button>{% endfor %}</form>

@@ -39,7 +39,7 @@ def index():
     rows = db.all(
         "SELECT o.*, c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, b.locality, b.city, "
         "u.full_name AS owner_name, l.asking_price, l.approval_state, l.chairs, l.gender_format, "
-        "p.help_areas, p.form_status "
+        "p.help_areas, p.form_status, p.form_answered, p.form_questions "
         "FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id "
         "LEFT JOIN users u ON u.id = o.primary_owner_id LEFT JOIN seller_listings l ON l.opportunity_id = o.id "
         "LEFT JOIN pilot_profiles p ON p.opportunity_id = o.id "

@@ -230,14 +230,21 @@ def prefill(db, opp) -> dict:
     last = latest_response(db, opp["id"])
     if last:
         return last["answers"]
+    part = db.scalar("SELECT partial_answers FROM investor_profiles WHERE opportunity_id = ?", (opp["id"],))
+    if part:
+        return json.loads(part)
     phone = opp.get("phone_normalized") or ""
     return {"full_name": opp.get("contact_name") or "", "phone": phone[3:] if phone.startswith("+91") else phone,
             "email": opp.get("contact_email") or opp.get("email") or "",
             "city": opp.get("contact_city") or opp.get("city") or ""}
 
 
-def parse_answers(form) -> tuple[dict, dict]:
-    return P.parse_answers(form, QUESTIONS)
+def parse_answers(form, lenient: bool = False) -> tuple[dict, dict]:
+    return P.parse_answers(form, QUESTIONS, lenient=lenient)
+
+
+def progress(answers: dict) -> tuple[int, int]:
+    return P.progress(answers, QUESTIONS)
 
 
 def latest_response(db, opp_id: int) -> dict | None:
@@ -269,7 +276,10 @@ def save_response(db, opp, answers, source, actor_id=None) -> int:
         rid = db.insert("investor_responses", {"opportunity_id": opp["id"], "source": source,
                                                "answers": json.dumps(answers, ensure_ascii=False),
                                                "created_by": actor_id, "submitted_at": now_iso()})
-        _upsert(db, opp["id"], actor_id, {"form_status": "filled", "form_filled_at": now_iso()})
+        got, total = progress(answers)
+        _upsert(db, opp["id"], actor_id, {"form_status": "filled", "form_filled_at": now_iso(),
+                                          "form_answered": got, "form_questions": total, "partial_answers": None})
+        P._complete_followup(db, opp["id"], got, total)
         T.add_activity(db, actor_id, "opportunity", opp["id"], "system",
                        ("Investor" if source == "link" else "Team (on the investor's behalf)")
                        + " filled the investor form — readiness report draft ready; next: call with Vikas")
@@ -623,7 +633,8 @@ def record_context(db, opp_id) -> dict:
 def overview(db, verdict: str = "") -> dict:
     rows = db.all(
         "SELECT o.id, o.ref_code, o.stage, o.created_at, c.full_name AS contact_name, c.phone_normalized, "
-        "u.full_name AS owner_name, p.screen_score, p.screen_verdict, p.form_status, p.office_visit_status, "
+        "u.full_name AS owner_name, p.screen_score, p.screen_verdict, p.form_status, p.form_answered, "
+        "p.form_questions, p.office_visit_status, "
         "p.office_visit_at, p.reg_status, m.need_type, m.all_in_max, "
         "(SELECT r.status FROM investor_reports r WHERE r.opportunity_id = o.id ORDER BY r.version DESC LIMIT 1) "
         "AS report_status, (SELECT MAX(r.sent_at) FROM investor_reports r WHERE r.opportunity_id = o.id) AS sent_at, "
@@ -688,17 +699,20 @@ def screen_from_form(a: dict) -> dict:
     return {"goal": goal, "budget": budget, "money": money, "runway": runway, "operator": operator}
 
 
-def submit_public(db, answers: dict, consent: bool) -> int:
+def submit_public(db, answers: dict, consent: bool, final: bool = True) -> int:
     """Create the buyer/investor record from the open Investor form, pre-screen it (Pursue / Nurture / Not now from
     their own answers), save the answers and draft the readiness report."""
     from . import buyers as B
     total = P.parse_amount(answers.get("total_budget"))
-    payload = {"full_name": answers.get("full_name"), "phone": answers.get("phone"), "city": answers.get("city"),
+    from . import geo
+    city = (answers.get("city") or "").strip()
+    city = (geo.city_of(city) or city) or "City not given"  # "Hyd" → "Hyderabad"; missing city is fine for now
+    payload = {"full_name": answers.get("full_name"), "phone": answers.get("phone"), "city": city,
                "locality": re.split(r"[,/;]", answers.get("areas") or "")[0].strip()[:80], "email": answers.get("email"),
                "need_type": GOAL_TO_NEED.get(answers.get("goal"), "exploring"),
                "all_in_max": str(int(total)) if total else "",
                "purchase_window": START_TO_WINDOW.get(answers.get("start_when"), "later"),
-               "preferred_city": answers.get("city"), "consent_contact": "1" if consent else ""}
+               "preferred_city": city if city != "City not given" else "", "consent_contact": "1" if consent else ""}
     with db:
         opp_id = B.submit_respondent_form(db, payload, source="landing_page")
         db.execute("UPDATE opportunities SET source_detail = ? WHERE id = ?", ("Investor form (public)", opp_id))
@@ -708,7 +722,10 @@ def submit_public(db, answers: dict, consent: bool) -> int:
         _upsert(db, opp_id, None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
                                    "screen_verdict": res["verdict"], "screen_note": "From the investor's own form — "
                                    "confirm on the call.", "screened_at": now_iso()})
-        save_response(db, opp, answers, "link")
+        if final:
+            save_response(db, opp, answers, "link")
+        else:
+            save_partial(db, opp, answers)
     return opp_id
 
 
@@ -817,3 +834,29 @@ def sync_to_mandate(db, opp_id: int, answers: dict, actor_id=None) -> list[str]:
         T.add_activity(db, actor_id, "opportunity", opp_id, "data_update",
                        "Filled from the investor form (empty fields only): " + ", ".join(labels))
     return labels
+
+
+
+def save_partial(db, opp: dict, answers: dict) -> None:
+    """Answers so far (not submitted yet): "Partly filled (n of m)", known facts fill the buyer's requirements, and
+    one task for the team to call / WhatsApp and complete the rest."""
+    if profile(db, opp["id"])["form_status"] == "filled":
+        return
+    got, total = progress(answers)
+    with db:
+        first = not db.scalar("SELECT partial_answers FROM investor_profiles WHERE opportunity_id = ?", (opp["id"],))
+        _upsert(db, opp["id"], None, {"form_status": "sent", "form_answered": got, "form_questions": total,
+                                      "partial_answers": json.dumps(answers, ensure_ascii=False)})
+        sync_to_mandate(db, opp["id"], answers, None)
+        P._followup_task(db, opp, got, total, first)
+
+
+
+def finish_public(db, opp: dict, answers: dict) -> None:
+    """Submit pressed on a form that was already being saved: re-screen from all answers, save, draft the report."""
+    scr = screen_from_form(answers)
+    res = screen_result(scr)
+    with db:
+        _upsert(db, opp["id"], None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
+                                      "screen_verdict": res["verdict"], "screened_at": now_iso()})
+    save_response(db, opp, answers, "link")

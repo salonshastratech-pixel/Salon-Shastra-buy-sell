@@ -1,4 +1,4 @@
-{% from "macros.html" import csrf %}
+{% from "macros.html" import form_progress, csrf %}
 {% set rep = inv_report %}
 <ol class="pilot-steps" aria-label="Investor steps">
   <li class="{{ 'done' if inv.screen_verdict }}"><a href="#screen">1 · Screening</a></li>
@@ -31,7 +31,7 @@
   {# 2. Investor form ----------------------------------------------------------------------------------------- #}
   <div class="card" id="form">
     <div class="card-h"><h2>Investor form</h2>
-      <span class="badge {{ 'ok' if inv.form_status == 'filled' else 'warn' if inv.form_status in ('sent', 'not_filled') else 'grey' }}">{{ P.FORM_STATUS_LABELS[inv.form_status] }}</span></div>
+      {{ form_progress(inv.form_status, inv.form_answered, inv.form_questions) }}</div>{% if inv.form_answered and inv.form_status != 'filled' %}<p class="small">They started the form and stopped — their answers so far are saved. Call or WhatsApp them, then use <strong>Fill on their behalf</strong> to complete the rest.</p>{% endif %}
     <p class="small muted">About 10 minutes: plan, experience, money (savings or loan, EMI, 6 months of running money), time, expectations and risk. No prices are shown.</p>
     <div class="inline">
       <form method="post" action="{{ url_for('investor.link', opp_id=opp.id) }}">{{ csrf() }}<input type="hidden" name="purpose" value="form"><button class="btn primary">{{ 'Send the form again' if inv.form_status in ('sent', 'filled') else 'Send the form link' }}</button></form>

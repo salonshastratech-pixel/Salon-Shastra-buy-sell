@@ -1,7 +1,7 @@
 {# The pilot program questions, one card per section (works as a step-by-step form on phones). #}
-{% macro question(q, answers, errors) %}{% set v = answers.get(q.key) %}
-<div class="field qf {{ 'has-err' if errors.get(q.key) }}">
-  <label for="q-{{ q.key }}" class="qlabel">{{ q.label }}{% if q.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+{% macro question(q, answers, errors, req_keys=none) %}{% set v = answers.get(q.key) %}{% set must = (q.key in req_keys) if req_keys is not none else q.required %}
+<div class="field qf {{ 'has-err' if errors.get(q.key) }}" {% if not q.extra %}data-q{% endif %}>
+  <label for="q-{{ q.key }}" class="qlabel">{{ q.label }}{% if must %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
   {% if q.hint %}<div class="help">{{ q.hint }}</div>{% endif %}
   {% if q.kind == 'choice' %}{% set is_other = v and v not in q.options %}
     <div class="chips" role="radiogroup">{% for o in q.options %}<label class="chip"><input type="radio" name="{{ q.key }}" value="{{ o }}" {{ 'checked' if v == o }}{% if loop.first %} id="q-{{ q.key }}"{% endif %}><span>{{ o }}</span></label>{% endfor %}
@@ -16,16 +16,19 @@
   {% elif q.kind == 'money' %}<div class="inr"><span class="inr-sym">₹</span><input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="40" inputmode="decimal" placeholder="e.g. 45000 or 45k or 1.5L" data-inr></div><div class="inr-words help" aria-live="polite"></div>
   {% elif q.kind == 'number' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="numeric">
   {% elif q.kind == 'phone' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="tel" autocomplete="tel">
+  {% elif q.kind == 'url' %}<input id="q-{{ q.key }}" type="url" name="{{ q.key }}" value="{{ v or '' }}" maxlength="500" inputmode="url" placeholder="https://drive.google.com/…">
   {% elif q.kind == 'email' %}<input id="q-{{ q.key }}" type="email" name="{{ q.key }}" value="{{ v or '' }}" maxlength="200" autocomplete="email">
+  {% elif q.key in ('location', 'areas', 'city') %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="300" list="area-names" autocomplete="off" placeholder="Start typing — e.g. Kondapur">
+    <div class="geo-row"><button type="button" class="btn sm geo-btn" data-geo-for="q-{{ q.key }}">📍 Use my location</button><span class="small muted geo-msg" aria-live="polite"></span></div>
   {% else %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="300">{% endif %}
   {% if errors.get(q.key) %}<div class="err">{{ errors[q.key] }}</div>{% endif %}
 </div>
 {% endmacro %}
 
-{% macro sections(P, answers, errors) %}
+{% macro sections(P, answers, errors, req_keys=none) %}
 {% for sk, title, sub, qs in P.SECTIONS %}
 <div class="card step" data-title="{{ title }}"><h2>{{ title }}</h2>{% if sub %}<p class="small muted">{{ sub }}</p>{% endif %}
-  {% for q in qs %}{{ question(q, answers, errors) }}{% endfor %}
+  {% for q in qs %}{{ question(q, answers, errors, req_keys) }}{% endfor %}
 </div>
 {% endfor %}
 {% endmacro %}

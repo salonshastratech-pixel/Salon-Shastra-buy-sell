@@ -139,6 +139,52 @@
     show(cur);
   }
 
+  // Forms: live "n of m answered" bar, save as you go (each step), and "Use my location"
+  var pform = document.querySelector('form[data-progress]');
+  if (pform) {
+    var qs = Array.prototype.slice.call(pform.querySelectorAll('[data-q]'));
+    var ptxt = pform.querySelector('.answered-text'), pbar = pform.querySelector('.answered-bar');
+    var answered = function (f) {
+      return Array.prototype.some.call(f.querySelectorAll('input, textarea, select'), function (i) {
+        if (i.type === 'radio' || i.type === 'checkbox') return i.checked;
+        return i.type !== 'hidden' && i.type !== 'button' && String(i.value || '').trim() !== '';
+      });
+    };
+    var count = function () {
+      var n = qs.filter(answered).length;
+      if (ptxt) ptxt.textContent = n + ' of ' + qs.length + ' answered';
+      if (pbar) { pbar.max = qs.length || 1; pbar.value = n; }
+    };
+    pform.addEventListener('input', count); pform.addEventListener('change', count); count();
+    var saveUrl = pform.getAttribute('data-autosave'), note = pform.querySelector('.saved-note');
+    var save = function (beacon) {
+      if (!saveUrl) return;
+      var fd = new FormData(pform);
+      if (beacon && navigator.sendBeacon) { navigator.sendBeacon(saveUrl, fd); return; }
+      fetch(saveUrl, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j && j.ok && j.draft) { pform.querySelector('input[name=draft]').value = j.draft; if (note) note.textContent = 'Saved'; }
+        }).catch(function () {});
+    };
+    pform.querySelectorAll('[data-step]').forEach(function (b) { b.addEventListener('click', function () { save(false); }); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') save(true); });
+    pform.querySelectorAll('[data-geo-for]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var inp = document.getElementById(b.getAttribute('data-geo-for')), msg = b.parentNode.querySelector('.geo-msg');
+        var fail = function () { if (msg) msg.textContent = 'Could not get your location — please type the area.'; };
+        if (!navigator.geolocation) { fail(); return; }
+        if (msg) msg.textContent = 'Finding your area…';
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          fetch('/f/geo/near?lat=' + pos.coords.latitude + '&lng=' + pos.coords.longitude).then(function (r) { return r.json(); })
+            .then(function (j) {
+              if (j && j.ok && j.label) { inp.value = j.label; if (msg) msg.textContent = 'Filled from your location — change it if needed.'; count(); }
+              else { fail(); }
+            }).catch(fail);
+        }, fail, {timeout: 10000, maximumAge: 600000});
+      });
+    });
+  }
+
   // Stage selector: show reason / follow-up inputs only when needed
   var stageSel = document.querySelector('#stage-to');
   if (stageSel) {

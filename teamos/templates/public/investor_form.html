@@ -9,10 +9,11 @@
   {% if filled %}<p class="flash ok">We already have your answers — thank you! You can update them and submit again.</p>{% endif %}
   {% if errors %}<p class="flash error">Please check the highlighted answers.</p>{% endif %}
 </div>
-<form method="post" novalidate data-stepper>
+<form method="post" novalidate data-stepper data-progress>
+  <div class="answered card"><div class="answered-row"><strong class="answered-text">0 answered</strong><span class="small muted">Answer what you can — blanks are fine.</span></div><progress class="answered-bar" value="0" max="1"></progress></div>
   <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
   <div class="stepbar" hidden><div class="stepbar-fill"></div><span class="stepbar-text small"></span></div>
-  {{ sections(I, answers, errors) }}
+  {{ sections(I, answers, errors, ()) }}
   <div class="card step" data-title="Submit"><h2>All done?</h2>
     <p>Thank you. After you submit, you can pick a time for a short call with our founder, Vikas Rachakonda.</p>
     <button class="btn primary">Submit</button></div>

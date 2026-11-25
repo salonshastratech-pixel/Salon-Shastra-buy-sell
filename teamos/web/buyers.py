@@ -16,9 +16,10 @@ bp = Blueprint("buyers", __name__, url_prefix="/buyers")
 LIST_SQL = (
     "SELECT o.*, c.full_name AS contact_name, c.phone_normalized, c.city AS contact_city, u.full_name AS owner_name, "
     "m.need_type, m.all_in_max, m.preferred_city, m.funding_status, m.purchase_window, m.data_version, "
-    "m.criteria_reviewed_version, m.id AS mandate_id "
+    "m.criteria_reviewed_version, m.id AS mandate_id, ip.form_status AS inv_form_status, "
+    "ip.form_answered AS inv_form_answered, ip.form_questions AS inv_form_questions "
     "FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN users u ON u.id = o.primary_owner_id "
-    "LEFT JOIN buyer_mandates m ON m.opportunity_id = o.id ")
+    "LEFT JOIN buyer_mandates m ON m.opportunity_id = o.id LEFT JOIN investor_profiles ip ON ip.opportunity_id = o.id ")
 
 
 def _all_stage_labels():
