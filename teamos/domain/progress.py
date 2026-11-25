@@ -266,3 +266,27 @@ def pick_owner(db, team: str, load: dict | None = None) -> int | None:
     pid = min(people, key=lambda p: load[p["id"]])["id"]
     load[pid] += 1
     return pid
+
+
+
+def round_robin(db, kind: str) -> int | None:
+    """The next person in turn for a new lead ('seller' or 'buyer'): team members whose "Mainly works on" is that side
+    or Both, in a fixed order, skipping anyone marked away or on leave. Each side keeps its own turn. Nobody
+    available → the admin."""
+    from .availability import away_ids
+    on_leave = away_ids(db)
+    people = [p["id"] for p in db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND team IN (?, 'general') "
+                                      "AND role IN ('team_member', 'team_lead') ORDER BY id", (kind,))
+              if not is_away(p) and p["id"] not in on_leave]
+    if not people:
+        row = db.one("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin' ORDER BY id LIMIT 1")
+        return row["id"] if row else None
+    key = f"round_robin:{kind}"
+    last = db.scalar("SELECT note FROM automation_settings WHERE key = ?", (key,))
+    last = int(last) if last and str(last).isdigit() else None
+    nxt = next((p for p in people if last is None or p > last), people[0])
+    if db.scalar("SELECT 1 FROM automation_settings WHERE key = ?", (key,)):
+        db.execute("UPDATE automation_settings SET note = ?, updated_at = ? WHERE key = ?", (str(nxt), now_iso(), key))
+    else:
+        db.insert("automation_settings", {"key": key, "enabled": 1, "note": str(nxt), "updated_at": now_iso()})
+    return nxt

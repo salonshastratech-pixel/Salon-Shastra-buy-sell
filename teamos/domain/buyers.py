@@ -331,7 +331,8 @@ def submit_respondent_form(db, payload: dict, source: str = "landing_page", is_s
     errors.update(ferrors)
     if errors:
         raise ValidationError(errors)
-    owner_id = _buyer_team_owner(db)
+    from .progress import round_robin
+    owner_id = round_robin(db, "buyer")  # every new lead: the next team member in turn
     dups = S.find_duplicates(db, phone, "", "")
     with db:
         opp_id = _insert_buyer(

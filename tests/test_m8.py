@@ -200,7 +200,7 @@ def test_menu_is_grouped_and_admin_tools_live_on_one_page(db, login):
     for t in ("Users &amp; access", "Integrations", "Audit log", "Spreadsheet import", "Match learning"):
         assert t in tools
     member = login("seller@t.test").get("/tools").data.decode()
-    assert "Field dictionary" in member and "Users &amp; access" not in member  # D-85: team = everything except Finance
+    assert "Spreadsheet import" in member and "Field dictionary" not in member and "Users &amp; access" not in member  # team sees only what they need
 
 
 def test_ai_connector_listed_and_off_by_default(db, login):

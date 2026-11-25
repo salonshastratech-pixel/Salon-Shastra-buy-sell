@@ -431,8 +431,8 @@ def summary(db, import_id: int) -> dict:
 
 
 def _owner(db, team: str, load: dict) -> int | None:
-    from .progress import pick_owner  # least-busy available person; people marked away are skipped
-    return pick_owner(db, team, load)
+    from .progress import round_robin  # the next team member in turn; people marked away are skipped
+    return round_robin(db, team)
 
 
 def _next_morning() -> str:

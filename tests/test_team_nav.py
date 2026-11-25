@@ -211,3 +211,39 @@ def test_daily_targets_set_by_admin_and_shown_to_the_person(db, login):
     assert "Today's targets" in page and "Calls</strong> 1 / 2" in page and "Conversations</strong> 1 / 1 ✓" in page
     assert login("seller@t.test").post(f"/team/targets/{me['id']}", {"target_calls": "1"}).status_code in (302, 403)
     assert "daily targets" in admin.get(f"/team/worklog?user={me['id']}").data.decode()
+
+
+
+def test_new_leads_go_round_robin_skipping_people_on_leave(db, app):
+    from test_open_forms import _token
+    from test_pilot import FULL
+
+    from teamos.domain import progress as PR
+    seller_user, lead_user = user(db, "seller@t.test"), user(db, "lead@t.test")   # seller team + "Both"
+    got = [PR.round_robin(db, "seller") for _ in range(4)]
+    assert got == [seller_user["id"], lead_user["id"], seller_user["id"], lead_user["id"]]
+    AV.add_time_off(db, seller_user, seller_user["id"], now_utc().astimezone(IST).date().isoformat(), None, "leave", None)
+    assert PR.round_robin(db, "seller") == lead_user["id"] and PR.round_robin(db, "seller") == lead_user["id"]
+    # buyer side keeps its own turn: buyer team + "Both"
+    assert {PR.round_robin(db, "buyer") for _ in range(2)} == {user(db, "buyer@t.test")["id"], lead_user["id"]}
+    # public forms use it too
+    pub = app.test_client()
+    for i in range(2):
+        page = pub.get("/f/pilot").data.decode()
+        pub.post("/f/pilot", data={**FULL, "contact_number": f"900001110{i}", "form_token": _token(page),
+                                   "consent_contact": "1"})
+    owners = [r["primary_owner_id"] for r in db.all("SELECT primary_owner_id FROM opportunities ORDER BY id")]
+    assert owners and all(o == lead_user["id"] for o in owners)      # the only one not on leave
+
+
+def test_team_members_see_only_what_they_need(db, login):
+    member = login("seller@t.test")
+    home = member.get("/").data.decode()
+    nav = home.split("<main")[0]
+    assert ">Team<" not in nav and "Work log" not in nav
+    tools = member.get("/tools").data.decode()
+    assert "Spreadsheet import" in tools and "Duplicate review" in tools and "Install on your phone" in tools
+    for hidden in ("Automations", "Audit log", "Match learning", "Field dictionary", "Lead sources"):
+        assert hidden not in tools, hidden
+    admin_nav = login("admin@t.test").get("/").data.decode().split("<main")[0]
+    assert ">Team<" in admin_nav

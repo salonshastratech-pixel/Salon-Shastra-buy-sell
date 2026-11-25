@@ -23,9 +23,9 @@ MODULES = [
         ("My availability", "team.mine", {}, None),
     ]},
     {"key": "team", "label": "Team", "icon": "users", "pages": [
-        ("Workload", "main.team_board", {}, "crm.view"),
-        ("Who's working", "team.week", {}, "crm.view"),
-        ("Activity", "team.activity", {}, "crm.view"),
+        ("Workload", "main.team_board", {}, "users.manage"),       # the Team module is for admins only
+        ("Who's working", "team.week", {}, "users.manage"),
+        ("Activity", "team.activity", {}, "users.manage"),
         ("Work log", "team.worklog", {}, "users.manage"),
     ]},
     {"key": "owners", "label": "Salon Owners", "icon": "store", "pages": [
@@ -54,15 +54,15 @@ MODULES = [
     {"key": "reports", "label": "Reports", "icon": "chart", "pages": [
         ("Overview", "reports.index", {}, "crm.view"),
         ("Funnel", "reports.funnel", {}, "crm.view"),
-        ("Lead sources", "workflow.sources", {}, "crm.view"),
-        ("Learning", "improve.learning", {}, "crm.view"),
+        ("Lead sources", "workflow.sources", {}, "users.manage"),
+        ("Learning", "improve.learning", {}, "users.manage"),
     ]},
     {"key": "admin", "label": "Tools & admin", "icon": "cog", "pages": [
         ("All tools", "improve.tools", {}, None),
         ("Users", "admin.users", {}, "users.manage"),
-        ("Automations", "workflow.automations", {}, None),
+        ("Automations", "workflow.automations", {}, "users.manage"),
         ("Imports", "imports.index", {}, "crm.import"),
-        ("Remark dictionary", "imports.remarks", {}, "crm.view"),
+        ("Remark dictionary", "imports.remarks", {}, "users.manage"),
         ("Duplicates", "admin.duplicates", {}, "duplicates.resolve"),
         ("Integrations", "admin.integrations", {}, "settings.manage"),
         ("Message templates", "admin.templates", {}, "settings.manage"),
@@ -70,8 +70,8 @@ MODULES = [
         ("Finance", "admin.finance", {}, "finance.view"),
         ("Jobs", "admin.jobs", {}, "settings.manage"),
         ("E-mail outbox", "admin.outbox", {}, "settings.manage"),
-        ("Audit log", "admin.audit_log", {}, "audit.view"),
-        ("Field dictionary", "main.dictionary", {}, None),
+        ("Audit log", "admin.audit_log", {}, "users.manage"),
+        ("Field dictionary", "main.dictionary", {}, "users.manage"),
     ]},
 ]
 BY_KEY = {m["key"]: m for m in MODULES}

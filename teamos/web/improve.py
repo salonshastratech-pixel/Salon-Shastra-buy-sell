@@ -127,11 +127,12 @@ def learning_reset(family):
 TOOLS = [  # (endpoint, title, what, capability or None for everyone with crm.view)
     ("imports.index", "Spreadsheet import", "Bring sellers and buyers in from Excel or a Google Sheets link.",
      "crm.import"),
-    ("main.dictionary", "Field dictionary", "Every field we collect, what it means and who can see it.", "crm.view"),
-    ("improve.learning", "Match learning", "Why matches are declined and suggested scoring changes.", "crm.view"),
+    ("main.dictionary", "Field dictionary", "Every field we collect, what it means and who can see it.",
+     "users.manage"),
+    ("improve.learning", "Match learning", "Why matches are declined and suggested scoring changes.", "users.manage"),
     ("workflow.automations", "Automations", "Everything TeamOS does by itself — pause any of it, quiet hours.",
-     "crm.view"),
-    ("workflow.sources", "Lead sources", "Which channels bring leads that become deals.", "crm.view"),
+     "users.manage"),
+    ("workflow.sources", "Lead sources", "Which channels bring leads that become deals.", "users.manage"),
     ("workflow.install", "Install on your phone", "Add TeamOS to your home screen; tap-to-call works from there.",
      "crm.view"),
     ("admin.users", "Users & access", "Add staff, WhatsApp numbers, reset passwords, mark people away.",
@@ -147,7 +148,7 @@ TOOLS = [  # (endpoint, title, what, capability or None for everyone with crm.vi
     ("admin.outbox", "E-mail outbox", "Every e-mail the system has sent or tried to send.", "settings.manage"),
     ("admin.jobs", "Background jobs", "Scheduled checks: overdue alerts, form chasing, matching, stuck records.",
      "settings.manage"),
-    ("admin.audit_log", "Audit log", "Who did what, when.", "audit.view"),
+    ("admin.audit_log", "Audit log", "Who did what, when.", "users.manage"),
 ]
 
 
