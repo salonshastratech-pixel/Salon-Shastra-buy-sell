@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}{{ title }} — board{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ title }} — pipeline board</h1>
+  <div class="sub">Every active record by stage. Move a card with its "Move to" menu; closing or nurture stages that need a reason are done on the record. {{ total }} active.</div></div>
+  <div class="actions"><a class="btn sm" href="{{ list_url }}">List view</a>
+    <form method="get" class="inline"><select name="owner" data-autosubmit aria-label="Owner"><option value="">Everyone</option><option value="me" {{ 'selected' if owner == 'me' }}>Mine</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if owner == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select></form></div></div>
+
+<div class="board" role="list">
+  {% for code, label in stages %}{% set cards = groups.get(code, []) %}
+  <section class="board-col" role="listitem" aria-label="{{ label }}">
+    <h2 class="board-h">{{ label }} <span class="badge grey">{{ cards|length }}</span></h2>
+    {% for r in cards[:60] %}
+    <div class="board-card click-card" data-href="{{ detail_url(r.id) }}">
+      <a href="{{ detail_url(r.id) }}"><strong>{{ r.salon_name or r.contact_name }}</strong></a>
+      <div class="small muted">{{ r.ref_code }}{% if r.salon_name %} · {{ r.contact_name }}{% endif %}</div>
+      <div class="small">{{ r.owner_name or 'Unassigned' }} · {{ (r.lead_created_at or r.created_at)|rel }}</div>
+      {% if r.next_action %}<div class="small {{ 'unknown' if r.next_action_due and r.next_action_due < now_iso() else 'muted' }}">{{ r.next_action }} · {{ r.next_action_due|rel }}</div>{% else %}<div class="small"><span class="badge warn">no next step</span></div>{% endif %}
+      {% if not r.first_contact_at %}<div><span class="badge bad small">not contacted</span></div>{% endif %}
+      <form method="post" action="{{ stage_url(r.id) }}" class="board-move">{{ csrf() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+        <select name="to" data-autosubmit aria-label="Move {{ r.ref_code }} to"><option value="">Move to…</option>{% for c2, l2 in stages if c2 != code and c2 not in reason_required %}<option value="{{ c2 }}">{{ l2 }}</option>{% endfor %}</select></form>
+    </div>
+    {% endfor %}
+    {% if cards|length > 60 %}<p class="small muted">+ {{ cards|length - 60 }} more — use the list view.</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

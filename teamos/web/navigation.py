@@ -30,12 +30,14 @@ MODULES = [
     ]},
     {"key": "owners", "label": "Salon Owners", "icon": "store", "pages": [
         ("All salon owners", "sellers.index", {}, "crm.view"),
+        ("Board", "sellers.board", {}, "crm.view"),
         ("Pilot program", "pilot.index", {}, "crm.view"),
         ("Vikas's free times", "pilot.vikas", {}, "crm.view"),
         ("+ New salon owner", "sellers.new", {}, "crm.create"),
     ]},
     {"key": "buyers", "label": "Buyers & investors", "icon": "briefcase", "pages": [
         ("All buyers", "buyers.index", {}, "crm.view"),
+        ("Board", "buyers.board", {}, "crm.view"),
         ("Investor pipeline", "investor.index", {}, "crm.view"),
         ("Needs review", "buyers.index", {"queue": "criteria"}, "crm.view"),
         ("+ New buyer", "buyers.new", {}, "crm.create"),
@@ -51,6 +53,7 @@ MODULES = [
     ]},
     {"key": "reports", "label": "Reports", "icon": "chart", "pages": [
         ("Overview", "reports.index", {}, "crm.view"),
+        ("Funnel", "reports.funnel", {}, "crm.view"),
         ("Lead sources", "workflow.sources", {}, "crm.view"),
         ("Learning", "improve.learning", {}, "crm.view"),
     ]},

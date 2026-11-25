@@ -132,3 +132,37 @@ def week(db, user: dict, end_day: date) -> list[dict]:
         out.append({"day": d, "work": s["work"], "work_min": s["work_min"], "break": s["break"],
                     "first_in": s["first_in"], "last_out": s["last_out"], **output(db, user["id"], d)})
     return out
+
+
+
+TARGETS = [("calls", "target_calls", "Calls"), ("connected", "target_connects", "Conversations"),
+           ("first_contacts", "target_first_contacts", "First contacts"), ("forms", "target_forms", "Forms sent")]
+
+
+def progress(db, user: dict, day: date | None = None) -> list[dict]:
+    """Today's numbers against the person's daily targets (only the targets that are set)."""
+    from ..timeutil import IST, now_utc
+    day = day or now_utc().astimezone(IST).date()
+    out = output(db, user["id"], day)
+    rows = []
+    for key, col, label in TARGETS:
+        target = user.get(col)
+        if target:
+            got = out.get(key) or 0
+            rows.append({"label": label, "got": got, "target": target, "pct": min(100, round(100 * got / target)),
+                         "done": got >= target})
+    return rows
+
+
+def set_targets(db, actor: dict, user_id: int, form) -> None:
+    from ..permissions import user_can
+    from .errors import PermissionDenied, ValidationError
+    if not user_can(db, actor, "users.manage"):
+        raise PermissionDenied("users.manage")
+    vals = {}
+    for _key, col, label in TARGETS:
+        raw = (form.get(col) or "").strip()
+        if raw and (not raw.isdigit() or int(raw) > 500):
+            raise ValidationError({col: f"{label}: a number from 0 to 500."})
+        vals[col] = int(raw) if raw else None
+    db.update("users", user_id, vals)

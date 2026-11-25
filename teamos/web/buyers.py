@@ -60,6 +60,9 @@ def index():
         r["top_localities"] = ", ".join(locs.get(r["mandate_id"], []))
         r["criteria_state"] = ("not_reviewed" if r["criteria_reviewed_version"] is None else
                                "current" if r["criteria_reviewed_version"] == r["data_version"] else "stale")
+    if request.args.get("export") == "csv":
+        from .records import export_csv
+        return export_csv("buyer", rows, g.user)
     return render_template("buyers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage, owner=owner,
                            need=need, status=status, queue=queue, STAGES=B.STAGES + B.HOLDING,
                            STAGE_LABELS=B.STAGE_LABELS, saved=SS.mine(db, g.user["id"], "buyer"), list_kind="buyer",
@@ -150,6 +153,9 @@ def _run(opp_id, fn, ok_msg, tab=None):
         flash(ok_msg, "ok")
     except ValidationError as e:
         flash(" ".join(str(v) for v in e.errors.values()), "error")
+    nxt = request.form.get("next") or ""
+    if nxt.startswith("/") and not nxt.startswith("//"):  # e.g. back to the pipeline board
+        return redirect(nxt)
     return _back(opp_id, tab)
 
 
@@ -273,3 +279,32 @@ def add_task(opp_id):
                           due_at=parse_local_input(f.get("due_at")), task_type=f.get("task_type") or "follow_up",
                           priority=f.get("priority") or "normal", entity_type="opportunity", entity_id=opp["id"])
     return _run(opp_id, go, "Task created.")
+
+
+
+@bp.route("/board")
+@require("crm.view")
+def board():
+    """Pipeline board: every active record in a column for its stage."""
+    db = get_db()
+    owner = request.args.get("owner") or ""
+    where, params = ["o.kind = ?", "o.status = 'active'"], ["buyer"]
+    if owner == "me":
+        where.append("o.primary_owner_id = ?")
+        params.append(g.user["id"])
+    elif owner.isdigit():
+        where.append("o.primary_owner_id = ?")
+        params.append(int(owner))
+    rows = db.all("SELECT o.id, o.ref_code, o.stage, o.next_action, o.next_action_due, o.lead_created_at, o.created_at, "
+                  "o.first_contact_at, c.full_name AS contact_name, b.name AS salon_name, u.full_name AS owner_name "
+                  "FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON "
+                  "b.id = o.business_id LEFT JOIN users u ON u.id = o.primary_owner_id WHERE " + " AND ".join(where) +
+                  " ORDER BY CASE WHEN o.next_action_due IS NULL THEN 1 ELSE 0 END, o.next_action_due", params)
+    groups = {}
+    for r in rows:
+        groups.setdefault(r["stage"], []).append(r)
+    return render_template("_board.html", title="Buyers & investors", stages=B.STAGES, groups=groups, total=len(rows),
+                           users=_active_users(db), owner=owner, reason_required=B.REASON_REQUIRED,
+                           list_url=url_for("buyers.index"),
+                           detail_url=lambda i: url_for("buyers.detail", opp_id=i),
+                           stage_url=lambda i: url_for("buyers.stage", opp_id=i))

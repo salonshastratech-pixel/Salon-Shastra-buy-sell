@@ -185,6 +185,29 @@
     });
   }
 
+  // Lists: tick records, choose an action (only that action's inputs show), select-all
+  var bulk = document.getElementById('bulk');
+  if (bulk) {
+    var act = bulk.querySelector('[data-bulk-action]');
+    var cnt = bulk.querySelector('.bulk-count');
+    var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll('input[name=ids][form=bulk]')); };
+    var refresh = function () {
+      var n = boxes().filter(function (b) { return b.checked; }).length;
+      cnt.textContent = n ? (n + ' ticked:') : 'With ticked records:';
+      bulk.classList.toggle('has-selection', n > 0);
+    };
+    act.addEventListener('change', function () {
+      bulk.querySelectorAll('.bulk-opt').forEach(function (o) { o.hidden = o.getAttribute('data-for') !== act.value; });
+    });
+    document.addEventListener('change', function (e) { if (e.target.name === 'ids') refresh(); });
+    var all = document.querySelector('[data-select-all]');
+    if (all) all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); refresh(); });
+    bulk.addEventListener('submit', function (e) {
+      if (act.value === 'delete' && !window.confirm('Delete the ticked records for good? This cannot be undone.')) e.preventDefault();
+    });
+    refresh();
+  }
+
   // Stage selector: show reason / follow-up inputs only when needed
   var stageSel = document.querySelector('#stage-to');
   if (stageSel) {

@@ -9,6 +9,8 @@
     <a class="btn primary" href="{{ url_for('buyers.new') }}">+ Buyer lead</a></div>{% endif %}
 </div>
 
+{% if targets %}<div class="card targets-card"><div class="card-h"><h2>Today's targets</h2><span class="small muted">{{ targets|selectattr('done')|list|length }} of {{ targets|length }} reached</span></div>
+  <div class="targets">{% for t in targets %}<div class="target {{ 'done' if t.done }}"><div class="small"><strong>{{ t.label }}</strong> {{ t.got }} / {{ t.target }}{% if t.done %} ✓{% endif %}</div><progress value="{{ t.got }}" max="{{ t.target }}"></progress></div>{% endfor %}</div></div>{% endif %}
 <div class="statbar">
   <a class="stat-chip {{ 'bad' if overdue }}" href="#overdue"><b>{{ overdue|length }}</b> overdue</a>
   <a class="stat-chip" href="#today"><b>{{ today|length }}</b> due today</a>

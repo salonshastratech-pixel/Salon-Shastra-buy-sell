@@ -709,3 +709,29 @@ a.cell-link:hover { text-decoration: underline; }
 .timeline li { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line, #eee); }
 .timeline li:last-child { border-bottom: 0; }
 .tl-icon { width: 22px; text-align: center; flex: none; }
+
+/* lists: bulk actions */
+.bulk-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; }
+.bulk-bar.has-selection { border-color: var(--brand, #c2410c); }
+.bulk-opt { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+th.sel, td.sel { width: 32px; text-align: center; }
+.danger-zone summary { cursor: pointer; color: var(--bad, #b91c1c); font-weight: 600; }
+
+/* daily targets */
+.targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 10px; }
+.target progress { display: block; width: 100%; height: 8px; }
+.target.done strong { color: var(--ok, #15803d); }
+
+/* funnel report */
+.funnel-row { display: grid; grid-template-columns: minmax(140px, 220px) 1fr 90px; gap: 10px; align-items: center; padding: 6px 0; }
+.funnel-bar { width: 100%; height: 14px; }
+.funnel-num { text-align: right; }
+@media (max-width: 640px) { .funnel-row { grid-template-columns: 1fr 70px; } .funnel-bar-wrap { grid-column: 1 / -1; order: 3; } }
+
+/* pipeline board */
+.board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+.board-col { flex: 0 0 250px; background: var(--surface-2, #f7f3ef); border-radius: 12px; padding: 10px; }
+.board-h { font-size: .95rem; margin: 0 0 8px; display: flex; justify-content: space-between; gap: 6px; }
+.board-card { background: var(--surface, #fff); border: 1px solid var(--line, #e7ded6); border-radius: 10px; padding: 9px;
+  margin-bottom: 8px; }
+.board-move select { width: 100%; margin-top: 6px; font-size: .8rem; }

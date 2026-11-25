@@ -58,7 +58,9 @@ def my_day():
                               "WHERE s.status = 'submitted' AND o.primary_owner_id = ?", (g.user["id"],))
     from ..domain import saved_searches as SSR
     saved_new = [s for s in SSR.mine(db, g.user["id"]) if s["new"]][:4]
-    return render_template("my_day.html", saved_new=saved_new, overdue=overdue, today=today, upcoming=upcoming, done_today=done_today,
+    from ..domain import worklog as WL
+    targets = WL.progress(db, g.user)
+    return render_template("my_day.html", targets=targets, saved_new=saved_new, overdue=overdue, today=today, upcoming=upcoming, done_today=done_today,
                            calls_today=calls_today, conversations=conversations, no_next=no_next,
                            notifications=notes, STAGE_LABELS=STAGE_LABELS,
                            match_tiles=MM.my_tiles(db, g.user["id"]) if g.user["role"] != "finance" else [],

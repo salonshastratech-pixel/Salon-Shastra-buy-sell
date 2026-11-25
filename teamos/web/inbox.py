@@ -324,6 +324,16 @@ def whatsapp():
 
 
 # -- Reports --------------------------------------------------------------------------------------
+@reports_bp.route("/funnel")
+@require("crm.view")
+def funnel():
+    """Where leads drop off, which sources bring the right people, and who converts best."""
+    from ..domain import funnel as FN
+    kind = "buyer" if request.args.get("kind") == "buyer" else "seller"
+    period = request.args.get("period") if request.args.get("period") in dict(FN.PERIODS) else "month"
+    return render_template("reports/funnel.html", f=FN.build(get_db(), kind, period), PERIODS=FN.PERIODS, zip=zip)
+
+
 @reports_bp.route("/")
 @require("crm.view")
 def index():

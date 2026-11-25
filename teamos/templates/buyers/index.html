@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import form_progress, contact_buttons, stage_badge %}
+{% extends "base.html" %}{% from "macros.html" import csrf, form_progress, contact_buttons, stage_badge %}
 {% block title %}Buyers / Investors{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Buyers / Investors</h1><div class="sub">Acquisition mandates the whole team can work. Ownership shows accountability, not access.</div></div>
@@ -21,11 +21,27 @@
 </form>
 {% include "_saved_searches.html" %}
 
+
+<form id="bulk" method="post" action="{{ url_for('records.bulk') }}" class="card bulk-bar">{{ csrf() }}
+  <input type="hidden" name="kind" value="buyer"><input type="hidden" name="next" value="{{ request.full_path }}">
+  <strong class="bulk-count">With ticked records:</strong>
+  <select name="action" aria-label="Action" data-bulk-action>
+    <option value="">Choose…</option>
+    {% if can('crm.assign') %}<option value="assign">Change owner</option>{% endif %}
+    <option value="task">Add a follow-up task</option>
+    {% if can('users.manage') %}<option value="delete">Delete for good (admin)</option>{% endif %}
+  </select>
+  <span class="bulk-opt" data-for="assign" hidden><select name="owner_id" aria-label="New owner">{% for u in users %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endfor %}</select></span>
+  <span class="bulk-opt" data-for="task" hidden><input name="title" placeholder="e.g. Call back about the pilot" maxlength="120" aria-label="Task"><input type="datetime-local" name="due_at" aria-label="Due"></span>
+  <span class="bulk-opt" data-for="delete" hidden><input name="reason" placeholder="Why? e.g. test data" aria-label="Reason"><input name="confirm" placeholder="Type DELETE" aria-label="Type DELETE to confirm" autocomplete="off"></span>
+  <button class="btn sm primary">Apply</button>
+  {% if can('users.manage') %}<a class="btn sm" href="?{{ request.query_string.decode() }}{{ '&' if request.query_string else '' }}export=csv">Export this list (CSV)</a>{% endif %}
+</form>
 <div class="card flush"><div class="table-wrap"><table>
-<tr><th>Ref</th><th>Buyer</th><th>Wants</th><th class="right">All-in ceiling</th><th>Where</th><th>Stage</th><th>Review</th><th>Owner</th><th>Next action</th></tr>
+<tr><th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th><th>Ref</th><th>Buyer</th><th>Wants</th><th class="right">All-in ceiling</th><th>Where</th><th>Stage</th><th>Review</th><th>Owner</th><th>Next action</th></tr>
 {% for r in rows %}
 <tr class="row-link">
-  <td class="nowrap"><a href="{{ url_for('buyers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}<div class="small muted" title="When the lead came in">{{ (r.lead_created_at or r.created_at)|rel }}</div>{% if not r.first_contact_at and r.status == 'active' %}<div><span class="badge bad small">not contacted</span></div>{% endif %}</td>
+  <td class="sel"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk" aria-label="Select {{ r.ref_code }}"></td><td class="nowrap"><a href="{{ url_for('buyers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}<div class="small muted" title="When the lead came in">{{ (r.lead_created_at or r.created_at)|rel }}</div>{% if not r.first_contact_at and r.status == 'active' %}<div><span class="badge bad small">not contacted</span></div>{% endif %}</td>
   <td><a href="{{ url_for('buyers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div>{% if r.inv_form_status and r.inv_form_status != 'not_sent' %}<div>{{ form_progress(r.inv_form_status, r.inv_form_answered, r.inv_form_questions) }}</div>{% endif %}</td>
   <td>{% if r.need_type %}<span class="badge {{ 'warn' if r.need_type == 'new_salon' else 'grey' if r.need_type == 'exploring' else 'info' }}">{{ BF.option_label('need_type', r.need_type) }}</span>{% else %}<span class="missing small">Not asked</span>{% endif %}
     {% if r.purchase_window %}<div class="small muted">{{ 'no fixed timeline' if r.purchase_window == 'later' else 'within ' ~ BF.option_label('purchase_window', r.purchase_window) }}</div>{% endif %}</td>
@@ -38,6 +54,6 @@
   <td>{{ r.owner_name or '—' }}</td>
   <td>{% if r.next_action %}<div class="small">{{ r.next_action }}</div><div class="small {{ 'unknown' if r.next_action_due and r.next_action_due < now_iso() else 'muted' }}">{{ r.next_action_due|rel }}</div>{% elif r.status != 'closed' %}<span class="badge bad">None</span>{% else %}—{% endif %}</td>
 </tr>
-{% else %}<tr><td colspan="9" class="empty">No buyers match these filters.</td></tr>{% endfor %}
+{% else %}<tr><td colspan="10" class="empty">No buyers match these filters.</td></tr>{% endfor %}
 </table></div></div>
 {% endblock %}

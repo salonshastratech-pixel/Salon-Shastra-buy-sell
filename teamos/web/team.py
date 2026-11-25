@@ -106,6 +106,7 @@ def worklog():
                            one_day=timedelta(days=1), person=person,
                            person_week=WL.week(db, person, day) if person else None,
                            person_day=WL.day_summary(db, person, day) if person else None,
+                           person_progress=WL.progress(db, person, day) if person else None, TARGETS=WL.TARGETS,
                            STATUS_LABELS=AV.STATUS_LABELS)
 
 
@@ -116,3 +117,16 @@ def founder_desk():
     """Everything that needs the founder today, on one page."""
     from ..domain import advisor
     return render_template("desk.html", d=advisor.desk(get_db()), STATUS_LABELS=AV.STATUS_LABELS)
+
+
+
+@bp.route("/team/targets/<int:user_id>", methods=["POST"])
+@require("users.manage")
+def set_targets(user_id):
+    from ..domain import worklog as WL
+    try:
+        WL.set_targets(get_db(), g.user, user_id, request.form)
+        flash("Daily targets saved.", "ok")
+    except ValidationError as e:
+        flash(_err(e), "error")
+    return redirect(url_for("team.worklog", user=user_id))

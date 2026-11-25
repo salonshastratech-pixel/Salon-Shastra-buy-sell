@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Funnel{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Funnel — {{ 'Buyers & investors' if f.kind == 'buyer' else 'Salon owners' }}</h1>
+  <div class="sub">Of the leads that came in during the period, how many reached each step (and % of all leads). Where do we lose people, which ad source brings the right people, and who converts best?</div></div>
+  <div class="actions seg">
+    {% for k, l in [('seller', 'Salon owners'), ('buyer', 'Buyers & investors')] %}<a class="btn sm {{ 'primary' if f.kind == k }}" href="{{ url_for('reports.funnel', kind=k, period=f.period) }}">{{ l }}</a>{% endfor %}
+  </div></div>
+<div class="actions seg">{% for k, l in PERIODS %}<a class="btn sm {{ 'primary' if f.period == k }}" href="{{ url_for('reports.funnel', kind=f.kind, period=k) }}">{{ l }}</a>{% endfor %}</div>
+
+<div class="card funnel">
+  {% for (key, label), n, p in zip(f.steps, f.overall.counts, f.overall.pct) %}
+  <div class="funnel-row"><div class="funnel-label">{{ label }}</div>
+    <div class="funnel-bar-wrap"><progress class="funnel-bar" value="{{ n }}" max="{{ f.overall.counts[0] or 1 }}"></progress></div>
+    <div class="funnel-num"><strong>{{ n }}</strong> <span class="small muted">{{ p }}%</span></div></div>
+  {% endfor %}
+</div>
+
+{% for title, rows in [('By lead source', f.by_source), ('By team member', f.by_owner)] %}
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;{{ title }}</h2></div><div class="table-wrap"><table class="small">
+  <tr><th></th>{% for key, label in f.steps %}<th class="right">{{ label }}</th>{% endfor %}</tr>
+  {% for r in rows %}<tr><td><strong>{{ r.name }}</strong></td>{% for n in r.counts %}<td class="right">{{ n }}{% if not loop.first %} <span class="muted">{{ r.pct[loop.index0] }}%</span>{% endif %}</td>{% endfor %}</tr>
+  {% else %}<tr><td colspan="{{ f.steps|length + 1 }}" class="empty">No leads in this period.</td></tr>{% endfor %}
+</table></div></div>
+{% endfor %}
+{% endblock %}

@@ -19,7 +19,7 @@ SEEDS = ["/", "/team", "/tasks/", "/tasks/?view=all", "/tasks/?view=done", "/tas
          "/inbox/", "/inbox/?q=unassigned", "/inbox/?q=unmatched", "/inbox/?q=open", "/inbox/?q=closed",
          "/inbox/batches", "/reports/", "/reports/?period=week", "/reports/?period=month", "/admin/integrations",
          "/admin/templates", "/admin/outbox", "/me/digest", "/tools", "/reports/learning", "/f/seller?lang=te",
-         "/f/buyer?lang=te", "/f/seller?lang=en", "/calendar", "/admin/lead-ads", "/automations", "/reports/sources", "/reports/sources?period=week", "/install", "/offline"]
+         "/f/buyer?lang=te", "/f/seller?lang=en", "/calendar", "/sellers/board", "/buyers/board", "/reports/funnel", "/reports/funnel?kind=buyer&period=all", "/desk", "/team/worklog", "/admin/lead-ads", "/automations", "/reports/sources", "/reports/sources?period=week", "/install", "/offline"]
 SKIP = ("logout", "/static/", "mailto:", "/f/i/", "/t/")
 
 

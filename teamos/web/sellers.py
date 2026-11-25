@@ -61,6 +61,9 @@ def index():
             r["areas"] = [P.HELP_LABELS[a] for a in json.loads(r.get("help_areas") or "[]") if a in P.HELP_LABELS]
         except ValueError:
             r["areas"] = []
+    if request.args.get("export") == "csv":
+        from .records import export_csv
+        return export_csv("seller", rows, g.user)
     return render_template("sellers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage,
                            owner=owner, status=status, STAGES=S.STAGES + S.HOLDING, STAGE_LABELS=S.STAGE_LABELS,
                            near=near, km=km, near_unknown=bool(near and not near_known), RADIUS_CHOICES=geo.RADIUS_CHOICES,
@@ -158,6 +161,9 @@ def _run(opp_id, fn, ok_msg, tab=None):
         flash(ok_msg, "ok")
     except ValidationError as e:
         flash(" ".join(e.errors.values()), "error")
+    nxt = request.form.get("next") or ""
+    if nxt.startswith("/") and not nxt.startswith("//"):  # e.g. back to the pipeline board
+        return redirect(nxt)
     return _back(opp_id, tab)
 
 
@@ -306,3 +312,32 @@ def _link_chat(db, conv_id, opp_id):
         flash("The WhatsApp conversation is now linked to this record.", "ok")
     except Exception:  # never block lead creation because of the chat link
         flash("Lead created, but the WhatsApp conversation could not be linked — link it from the inbox.", "error")
+
+
+
+@bp.route("/board")
+@require("crm.view")
+def board():
+    """Pipeline board: every active record in a column for its stage."""
+    db = get_db()
+    owner = request.args.get("owner") or ""
+    where, params = ["o.kind = ?", "o.status = 'active'"], ["seller"]
+    if owner == "me":
+        where.append("o.primary_owner_id = ?")
+        params.append(g.user["id"])
+    elif owner.isdigit():
+        where.append("o.primary_owner_id = ?")
+        params.append(int(owner))
+    rows = db.all("SELECT o.id, o.ref_code, o.stage, o.next_action, o.next_action_due, o.lead_created_at, o.created_at, "
+                  "o.first_contact_at, c.full_name AS contact_name, b.name AS salon_name, u.full_name AS owner_name "
+                  "FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON "
+                  "b.id = o.business_id LEFT JOIN users u ON u.id = o.primary_owner_id WHERE " + " AND ".join(where) +
+                  " ORDER BY CASE WHEN o.next_action_due IS NULL THEN 1 ELSE 0 END, o.next_action_due", params)
+    groups = {}
+    for r in rows:
+        groups.setdefault(r["stage"], []).append(r)
+    return render_template("_board.html", title="Salon owners", stages=S.STAGES, groups=groups, total=len(rows),
+                           users=_active_users(db), owner=owner, reason_required=S.REASON_REQUIRED,
+                           list_url=url_for("sellers.index"),
+                           detail_url=lambda i: url_for("sellers.detail", opp_id=i),
+                           stage_url=lambda i: url_for("sellers.stage", opp_id=i))

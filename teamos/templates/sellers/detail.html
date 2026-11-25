@@ -114,6 +114,12 @@
       <p class="small muted">A rule of thumb for negotiation, not a valuation. Better if the sales and expenses are backed by bills or bank statements.</p></div>
     {% endif %}
     {% include "_timeline.html" %}
+    {% if can('users.manage') %}<details class="card danger-zone"><summary>Delete this record (admin)</summary>
+      <form method="post" action="{{ url_for('records.delete_one', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        <p class="small full">Removes {{ opp.ref_code }} and everything linked to it — calls, tasks, form answers, reports, bookings, matches. This cannot be undone. The audit log keeps a line saying who deleted it.</p>
+        <div class="field"><label>Why?</label><input name="reason" placeholder="e.g. test data" required></div>
+        <div class="field"><label>Type {{ opp.ref_code }} to confirm</label><input name="confirm" autocomplete="off" required></div>
+        <div class="full"><button class="btn danger">Delete for good</button></div></form></details>{% endif %}
 
     {% include "forms/_record_card.html" %}
 

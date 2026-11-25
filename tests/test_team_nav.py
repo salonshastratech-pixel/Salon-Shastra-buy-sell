@@ -193,3 +193,21 @@ def test_founder_desk_price_guide_and_takeover_matching(db, login):
     db.execute("UPDATE buyer_mandates SET consider_takeover = 'yes', data_version = data_version + 1")
     M.refresh(db, force=True)
     assert cand(db, b, s, refresh=False) is not None
+
+
+
+def test_daily_targets_set_by_admin_and_shown_to_the_person(db, login):
+    me = user(db, "seller@t.test")
+    admin = login("admin@t.test")
+    r = admin.post(f"/team/targets/{me['id']}", {"target_calls": "2", "target_connects": "1", "target_first_contacts": "",
+                                                "target_forms": "x"})
+    assert user(db, "seller@t.test")["target_calls"] is None                       # bad number: nothing saved
+    admin.post(f"/team/targets/{me['id']}", {"target_calls": "2", "target_connects": "1"})
+    assert user(db, "seller@t.test")["target_calls"] == 2
+    opp = _seller(db)
+    c = login("seller@t.test")
+    c.post(f"/sellers/{opp}/call", {"outcome": "connected", "next_title": "x", "next_due": "2030-01-01T10:00"})
+    page = c.get("/").data.decode()
+    assert "Today's targets" in page and "Calls</strong> 1 / 2" in page and "Conversations</strong> 1 / 1 ✓" in page
+    assert login("seller@t.test").post(f"/team/targets/{me['id']}", {"target_calls": "1"}).status_code in (302, 403)
+    assert "daily targets" in admin.get(f"/team/worklog?user={me['id']}").data.decode()

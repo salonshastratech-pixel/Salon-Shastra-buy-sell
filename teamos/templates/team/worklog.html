@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "macros.html" import csrf %}
 {% block title %}Work log{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Work log — {{ day.strftime('%A %d %b %Y') }}</h1>
@@ -28,6 +28,12 @@
 </table></div></div>
 
 {% if person %}
+<div class="card"><h2>{{ person.full_name }} — daily targets</h2>
+  {% if person_progress %}<div class="targets">{% for t in person_progress %}<div class="target"><div class="small"><strong>{{ t.label }}</strong> {{ t.got }} / {{ t.target }}</div><progress value="{{ t.got }}" max="{{ t.target }}"></progress></div>{% endfor %}</div>{% endif %}
+  <form method="post" action="{{ url_for('team.set_targets', user_id=person.id) }}" class="inline">{{ csrf() }}
+    {% for key, col, label in TARGETS %}<label class="small">{{ label }} <input name="{{ col }}" value="{{ person[col] or '' }}" inputmode="numeric" size="3" aria-label="{{ label }} per day"></label>{% endfor %}
+    <button class="btn sm primary">Save targets</button><span class="small muted">per day; leave blank for none</span></form>
+</div>
 <div class="card"><h2>{{ person.full_name }} — last 7 days</h2>
   <div class="table-wrap"><table class="small">
     <tr><th>Day</th><th>Signed in</th><th>Signed out</th><th class="right">Working</th><th class="right">Breaks</th><th class="right">Calls · connected</th><th class="right">WhatsApp</th><th class="right">Tasks</th><th class="right">Forms</th></tr>
