@@ -19,7 +19,7 @@
 
 {% if o.upcoming %}
 <div class="card"><h2>Calls with {{ P.CONSULTANT_NAME }}</h2><ul class="plain">{% for b in o.upcoming %}
-  <li><a href="{{ url_for('sellers.detail', opp_id=b.opportunity_id, tab='pilot') }}#vikas"><strong>{{ b.salon_name or b.ref_code }}</strong></a> · {{ b.contact_name }} —
+  <li><a href="{{ opp_url(b.kind, b.opportunity_id, tab=('investor' if b.kind == 'buyer' else 'pilot')) }}#vikas"><strong>{{ b.salon_name or b.ref_code }}</strong></a> · {{ b.contact_name }} —
     {% if b.starts_at %}{{ b.starts_at|ist('%a %d %b, %I:%M %p') }}{% else %}<span class="badge warn">requested</span> {{ b.preferred_time }}{% endif %}</li>{% endfor %}</ul></div>
 {% endif %}
 

@@ -97,12 +97,12 @@ def vikas():
         except (ValidationError, ValueError) as e:
             flash(_err(e) if isinstance(e, ValidationError) else "Check the values.", "error")
         return redirect(url_for("pilot.vikas"))
-    slots = db.all("SELECT s.*, vb.opportunity_id, o.ref_code, c.full_name AS contact_name, b.name AS salon_name "
+    slots = db.all("SELECT s.*, vb.opportunity_id, o.ref_code, o.kind, c.full_name AS contact_name, b.name AS salon_name "
                    "FROM vikas_slots s LEFT JOIN vikas_bookings vb ON vb.slot_id = s.id AND vb.status <> 'cancelled' "
                    "LEFT JOIN opportunities o ON o.id = vb.opportunity_id LEFT JOIN contacts c ON c.id = o.contact_id "
                    "LEFT JOIN salon_businesses b ON b.id = o.business_id "
                    "WHERE s.status <> 'cancelled' AND s.starts_at > ? ORDER BY s.starts_at LIMIT 200", (now_iso(),))
-    requested = db.all("SELECT vb.*, o.ref_code, c.full_name AS contact_name, b.name AS salon_name FROM vikas_bookings "
+    requested = db.all("SELECT vb.*, o.ref_code, o.kind, c.full_name AS contact_name, b.name AS salon_name FROM vikas_bookings "
                        "vb JOIN opportunities o ON o.id = vb.opportunity_id JOIN contacts c ON c.id = o.contact_id "
                        "LEFT JOIN salon_businesses b ON b.id = o.business_id WHERE vb.status = 'requested' "
                        "ORDER BY vb.created_at")

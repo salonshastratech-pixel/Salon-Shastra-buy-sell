@@ -1,0 +1,11 @@
+{# CRM timeline card for a seller / buyer record (needs: timeline, lead_speed, opp). #}
+<div class="card timeline-card" id="timeline">
+  <div class="card-h"><h2>Timeline</h2><span class="badge {{ lead_speed.tone }}">{{ lead_speed.label }}</span></div>
+  <ol class="timeline">
+    {% for e in timeline %}<li><span class="tl-icon" aria-hidden="true">{{ e.icon }}</span>
+      <div><strong>{{ e.title }}</strong> <span class="small muted">{{ e.at|ist('%d %b %Y, %I:%M %p') }} · {{ e.at|rel }}</span>
+        {% if e.note %}<div class="small muted">{{ e.note }}</div>{% endif %}</div></li>
+    {% endfor %}
+  </ol>
+  <p class="small"><a href="?tab=history">Full history</a></p>
+</div>

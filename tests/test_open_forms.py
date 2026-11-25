@@ -236,3 +236,23 @@ def test_drive_link_for_photos_and_documents(app, db, login):
     oid = db.scalar("SELECT id FROM opportunities")
     rec = login("seller@t.test").get(f"/sellers/{oid}?tab=pilot").data.decode()
     assert "Photos &amp; documents" in rec and "drive.google.com/drive/folders/abc123" in rec
+
+
+
+def test_investor_with_few_answers_is_not_prescreened_and_area_retry(app, db, monkeypatch):
+    from teamos.domain import area_insights as AI
+    from teamos.domain import investor as II
+    pub = app.test_client()
+    page = pub.get("/f/investor").data.decode()
+    pub.post("/f/investor", data={"full_name": "Sneha", "phone": "9100011005", "goal": "Open a new salon",
+                                  "areas": "Kondapur", "form_token": _token(page), "consent_contact": "1"})
+    opp = db.one("SELECT * FROM opportunities WHERE kind = 'buyer'")
+    prof = II.profile(db, opp["id"])
+    assert prof["screen_verdict"] is None and "ask the 5 questions" in prof["screen_note"]
+    # the area check did not arrive at first (tests have no network): the hourly retry adds it
+    monkeypatch.setattr(AI, "fetch", lambda lat, lng, r, opener=None: {"counts": {"salon": 2, "beauty": 0, "nails": 0,
+                                                                                 "barber": 1, "spa": 0},
+                                                                      "total": 3, "names": []})
+    assert "added 1" in AI.retry_missing(db)
+    assert II.latest_report(db, opp["id"])["c"]["area"]["place"] == "Kondapur"
+    assert "added 0" in AI.retry_missing(db) or "retried 0" in AI.retry_missing(db)

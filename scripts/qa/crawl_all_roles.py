@@ -10,7 +10,7 @@ from html.parser import HTMLParser
 sys.stdout.reconfigure(encoding="utf-8")
 import os
 BASE = os.environ.get("QA_BASE_URL", "http://127.0.0.1:8000")  # a running app with the synthetic demo data
-USERS = ["founder", "lead", "shaheen", "harika", "accounts"]
+USERS = (os.environ.get("QA_USERS") or "founder,lead,shaheen,harika,accounts").split(",")
 SEEDS = ["/", "/team", "/tasks/", "/tasks/?view=all", "/tasks/?view=done", "/tasks/?view=created", "/sellers/",
          "/sellers/?status=all", "/buyers/", "/buyers/?queue=criteria", "/buyers/?queue=funding", "/buyers/?status=all",
          "/matches/", "/deals/", "/deals/?view=all", "/forms/", "/imports/", "/dictionary", "/search?q=glow",
@@ -84,4 +84,8 @@ for u in USERS:
     print(f"{u:9} pages={len(res):4}  statuses={dict(sorted(counts.items(), key=str))}")
     for p, c in sorted(bad.items()):
         print(f"   !! {c}  {p}")
+    if os.environ.get("QA_SHOW_DENIED"):
+        for p, c in sorted(res.items()):
+            if c == 403:
+                print(f"   .. 403  {p}")
 print("TOTAL PROBLEMS:", bad_total)

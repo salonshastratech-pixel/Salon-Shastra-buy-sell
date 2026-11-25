@@ -80,3 +80,30 @@ def week():
 def activity():
     db = get_db()
     return render_template("team/activity.html", a=AV.activity(db, request.args.get("period") or "today"), AV=AV)
+
+
+
+@bp.route("/team/worklog")
+@require("users.manage")
+def worklog():
+    """Admin: hours (sign-in, sign-out, breaks, field) and output per person per day."""
+    from datetime import date, timedelta
+
+    from ..domain import worklog as WL
+    from ..timeutil import IST, now_utc
+    db = get_db()
+    today = now_utc().astimezone(IST).date()
+    try:
+        day = date.fromisoformat(request.args.get("day") or today.isoformat())
+    except ValueError:
+        day = today
+    day = min(day, today)
+    person = None
+    uid = request.args.get("user") or ""
+    if uid.isdigit():
+        person = db.one("SELECT * FROM users WHERE id = ?", (int(uid),))
+    return render_template("team/worklog.html", rows=WL.team_day(db, day), day=day, today=today,
+                           one_day=timedelta(days=1), person=person,
+                           person_week=WL.week(db, person, day) if person else None,
+                           person_day=WL.day_summary(db, person, day) if person else None,
+                           STATUS_LABELS=AV.STATUS_LABELS)

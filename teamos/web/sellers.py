@@ -142,6 +142,8 @@ def detail(opp_id):
         from .matches import record_matches
         ctx.update(record_matches(db, opp))  # incremental: only re-scores pairs whose facts changed
         ctx["unblock"] = MM.unblock_suggestions(db, opp)
+    from ..domain import timeline as TL
+    ctx.update(timeline=TL.build(db, opp), lead_speed=TL.speed(opp))
     return render_template("sellers/detail.html", **ctx)
 
 

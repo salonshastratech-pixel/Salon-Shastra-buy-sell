@@ -5,7 +5,7 @@
   <h1>{{ P.CONSULTANT_NAME }} — free times</h1><div class="sub">Salon owners pick one of these from their report link. Bookings alert {{ consultant.full_name if consultant else 'the consultant' }}.</div></div></div>
 
 {% if requested %}<div class="card"><h2>Waiting for a time</h2><p class="small muted">No free time suited these owners — confirm a time on their record.</p><ul class="plain">{% for b in requested %}
-  <li><a href="{{ url_for('sellers.detail', opp_id=b.opportunity_id, tab='pilot') }}#vikas"><strong>{{ b.salon_name or b.ref_code }}</strong></a> · {{ b.contact_name }} — prefers “{{ b.preferred_time }}” · {{ b.created_at|rel }}</li>{% endfor %}</ul></div>{% endif %}
+  <li><a href="{{ opp_url(b.kind, b.opportunity_id, tab=('investor' if b.kind == 'buyer' else 'pilot')) }}#vikas"><strong>{{ b.salon_name or b.ref_code }}</strong></a> · {{ b.contact_name }} — prefers “{{ b.preferred_time }}” · {{ b.created_at|rel }}</li>{% endfor %}</ul></div>{% endif %}
 
 {% if can_manage %}
 <form method="post" class="card form-grid">{{ csrf() }}
@@ -20,7 +20,7 @@
 <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Coming up</h2></div><div class="table-wrap"><table>
 <tr><th>When (IST)</th><th>How</th><th>Status</th><th></th></tr>
 {% for s in slots %}<tr><td class="nowrap">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} <span class="small muted">· {{ s.minutes }} min</span></td><td>{{ s.mode }}</td>
-  <td>{% if s.status == 'booked' and s.opportunity_id %}<a href="{{ url_for('sellers.detail', opp_id=s.opportunity_id, tab='pilot') }}#vikas"><span class="badge ok">booked</span> {{ s.salon_name or s.ref_code }}</a> · {{ s.contact_name }}{% else %}<span class="badge grey">free</span>{% endif %}</td>
+  <td>{% if s.status == 'booked' and s.opportunity_id %}<a href="{{ opp_url(s.kind, s.opportunity_id, tab=('investor' if s.kind == 'buyer' else 'pilot')) }}#vikas"><span class="badge ok">booked</span> {{ s.salon_name or s.ref_code }}</a> · {{ s.contact_name }}{% else %}<span class="badge grey">free</span>{% endif %}</td>
   <td class="right">{% if s.status == 'open' and can_manage %}<form method="post">{{ csrf() }}<button class="btn sm" name="cancel_slot" value="{{ s.id }}">Remove</button></form>{% endif %}</td></tr>
 {% else %}<tr><td colspan="4" class="empty">No free times listed. Add some above so owners can book.</td></tr>{% endfor %}
 </table></div></div>

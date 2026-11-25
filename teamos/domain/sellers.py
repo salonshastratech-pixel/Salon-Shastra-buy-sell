@@ -630,7 +630,8 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
     now = now_iso()
     with db:
         T.add_activity(db, actor["id"], "opportunity", opp["id"], "call", (note or "").strip() or None, outcome)
-        db.update("opportunities", opp["id"], {"last_contact_at": now, "updated_at": now})
+        from .timeline import mark_contacted
+        mark_contacted(db, opp["id"], now)
         if outcome == "do_not_contact":
             change_stage(db, actor, opp, "do_not_contact", (note or "").strip() or "Requested on call")
             return

@@ -16,6 +16,9 @@ def login():
         user, error = authenticate(db, request.form.get("email", ""), request.form.get("password", ""))
         if user:
             token = start_session(db, user["id"])
+            if user["role"] in ("team_member", "team_lead", "super_admin"):
+                from ..domain import worklog
+                worklog.on_login(db, user)
             nxt = request.args.get("next") or ""
             dest = nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("main.my_day")
             if user.get("must_change_password"):
@@ -30,6 +33,9 @@ def login():
 
 @bp.route("/logout", methods=["POST"])
 def logout():
+    if g.get("user") and g.user["role"] in ("team_member", "team_lead", "super_admin"):
+        from ..domain import worklog
+        worklog.on_logout(get_db(), g.user)
     end_session(get_db(), request.cookies.get(COOKIE))
     resp = redirect(url_for("auth.login"))
     resp.delete_cookie(COOKIE)

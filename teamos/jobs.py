@@ -51,6 +51,8 @@ def schedule_periodic(db) -> None:
     enqueue(db, "stuck_sweep", dedupe_key="stuck_sweep:" + n.strftime("%Y%m%d"))  # daily; one alert per person
     enqueue(db, "learning_propose", dedupe_key="learning_propose:" + n.strftime("%G%V"))  # weekly
     enqueue(db, "sheet_watch", dedupe_key="sheet_watch:" + n.strftime("%Y%m%d%H"))  # hourly
+    enqueue(db, "area_retry", dedupe_key="area_retry:" + n.strftime("%Y%m%d%H"))  # hourly
+    enqueue(db, "lead_time_backfill", dedupe_key="lead_time_backfill:v1")  # once
 
 
 def run_once(db, limit: int = 20) -> int:
@@ -197,6 +199,20 @@ def sheet_watch(db, payload) -> str:
     """Hourly: connected Google Sheets with new people become an import preview to approve."""
     from .domain import connected_sheets
     return connected_sheets.check_all(db)
+
+
+@handler("area_retry")
+def area_retry(db, payload) -> str:
+    """Reports whose free area check did not arrive get another try."""
+    from .domain import area_insights
+    return area_insights.retry_missing(db)
+
+
+@handler("lead_time_backfill")
+def lead_time_backfill(db, payload) -> str:
+    """Once: records imported before lead times were kept get the time from their sheet row."""
+    from .domain import timeline
+    return f"{timeline.backfill_lead_times(db)} lead times filled"
 
 
 @handler("noop")

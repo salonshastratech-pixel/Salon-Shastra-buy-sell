@@ -315,7 +315,11 @@ def main():
                     cdp.call("Network.setCookie", name=c.name, value=c.value, url=BASE + "/", httpOnly=True)
                 small_pages = 0
                 for u in urls:
-                    status, probs, small = check(cdp, u, vp)
+                    try:
+                        status, probs, small = check(cdp, u, vp)
+                    except RuntimeError as e:  # e.g. a link the browser cannot open as a page
+                        print(f"   skipped {u!r}: {e}")
+                        continue
                     totals["pages"] += 1
                     small_pages += 1 if small > 3 else 0
                     if probs:

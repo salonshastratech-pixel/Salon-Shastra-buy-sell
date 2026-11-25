@@ -1082,7 +1082,7 @@ def overview(db, area: str = "", status: str = "") -> dict:
         for a_ in areas:
             if a_ in area_counts:
                 area_counts[a_] += 1
-    upcoming = db.all("SELECT vb.*, o.ref_code, c.full_name AS contact_name, b.name AS salon_name FROM vikas_bookings vb "
+    upcoming = db.all("SELECT vb.*, o.ref_code, o.kind, c.full_name AS contact_name, b.name AS salon_name FROM vikas_bookings vb "
                       "JOIN opportunities o ON o.id = vb.opportunity_id JOIN contacts c ON c.id = o.contact_id "
                       "LEFT JOIN salon_businesses b ON b.id = o.business_id WHERE vb.status IN ('requested','booked') "
                       "ORDER BY CASE WHEN vb.starts_at IS NULL THEN 0 ELSE 1 END, vb.starts_at LIMIT 30")

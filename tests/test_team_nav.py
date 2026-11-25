@@ -117,3 +117,57 @@ def test_rows_and_names_open_their_record(db, login):
     assert c.get(f"/tasks/?who={me['id']}").status_code == 200
     js = c.get("/static/app.js").data.decode()
     assert "tr.row-link, li.task, .click-card" in js
+
+
+
+def test_crm_timeline_lead_time_and_speed_to_first_contact(db, login):
+    from teamos.domain import timeline as TL
+    assert TL.lead_time("2026-11-22T01:15:43-05:00") == "2026-11-22T06:15:43Z"            # Meta ad time → UTC
+    assert TL.lead_time("22/11/2026 10:30:00") == "2026-11-22T05:00:00Z"                  # Google Form, Indian time
+    assert TL.lead_time("nonsense") is None
+    opp = _seller(db)
+    db.execute("UPDATE opportunities SET lead_created_at = ? WHERE id = ?", ("2026-11-20T04:30:00Z", opp))
+    c = login("seller@t.test")
+    page = c.get(f"/sellers/{opp}").data.decode()
+    assert "Timeline" in page and "Lead came in" in page and "Not contacted yet" in page
+    assert "not contacted" in c.get("/sellers/").data.decode()
+    c.post(f"/sellers/{opp}/call", {"outcome": "connected", "note": "Spoke about the pilot",
+                                     "next_title": "Send form", "next_due": "2030-01-01T10:00"})
+    o = db.one("SELECT * FROM opportunities WHERE id = ?", (opp,))
+    assert o["first_contact_at"] and o["first_contact_at"] == o["last_contact_at"]
+    page = c.get(f"/sellers/{opp}").data.decode()
+    assert "First contact after" in page and "Call — spoke" in page
+    first = o["first_contact_at"]
+    c.post(f"/sellers/{opp}/call", {"outcome": "no_answer", "next_title": "Try again", "next_due": "2030-01-02T10:00"})
+    assert db.scalar("SELECT first_contact_at FROM opportunities WHERE id = ?", (opp,)) == first   # first stays
+
+
+
+def test_work_log_hours_breaks_and_output(db, login, app):
+    from datetime import timedelta
+
+    from teamos.domain import worklog as WL
+    from teamos.timeutil import IST, now_utc, to_iso
+    c = login("seller@t.test")                                  # signing in starts the day
+    me = user(db, "seller@t.test")
+    assert me["work_status"] == "available"
+    assert db.scalar("SELECT COUNT(*) FROM work_log WHERE user_id = ? AND event = 'login'", (me["id"],)) == 1
+    # a day: 10:00 available, 13:00 break, 13:30 available, 15:00 salon visit, 17:00 off
+    day = now_utc().astimezone(IST).date() - timedelta(days=1)
+    from datetime import datetime, time
+    t = lambda h, m=0: to_iso(datetime.combine(day, time(h, m), tzinfo=IST))   # noqa: E731
+    db.execute("DELETE FROM work_log")
+    for at, st in ((t(10), "available"), (t(13), "on_break"), (t(13, 30), "available"), (t(15), "in_field"),
+                   (t(17), "offline")):
+        db.insert("work_log", {"user_id": me["id"], "event": "status", "status": st, "at": at})
+    db.insert("work_log", {"user_id": me["id"], "event": "login", "at": t(9, 58)})
+    db.insert("activities", {"entity_type": "opportunity", "entity_id": 1, "kind": "call", "call_outcome": "connected",
+                             "actor_id": me["id"], "at": t(16, 50)})
+    s = WL.day_summary(db, me, day)
+    assert s["work"] == "6 h 30 min" and s["break"] == "30 min" and s["breaks"] == 1 and s["field"] == "2 h 00 min"
+    assert WL.output(db, me["id"], day)["calls"] == 1
+    page = login("admin@t.test").get(f"/team/worklog?day={day.isoformat()}&user={me['id']}").data.decode()
+    assert "Work log" in page and "6 h 30 min" in page and "last 7 days" in page and "On a break" in page
+    assert c.get("/team/worklog").status_code in (302, 403)      # admins only
+    c.post("/logout")
+    assert user(db, "seller@t.test")["work_status"] == "offline"

@@ -671,6 +671,14 @@ GOAL_TO_NEED = {"Buy a running salon": "acquire_operating", "Open a new salon": 
 START_TO_WINDOW = {"Within 3 months": "90d", "3–6 months": "180d", "6–12 months": "later", "Just exploring": "later"}
 
 
+SCREEN_KEYS = ("goal", "total_budget", "source", "money_ready", "runway", "days_per_week")
+
+
+def enough_to_screen(a: dict) -> bool:
+    """At least 4 of the 6 answers the 5 screening points are read from; fewer = screen on the call instead."""
+    return sum(1 for k in SCREEN_KEYS if a.get(k)) >= 4
+
+
 def screen_from_form(a: dict) -> dict:
     """The 5 screening answers, read from the investor's own form (the team can correct them after the call)."""
     goal = {"Buy a running salon": "buy_running", "Open a new salon": "new_salon", "Take a franchise": "franchise",
@@ -717,11 +725,15 @@ def submit_public(db, answers: dict, consent: bool, final: bool = True) -> int:
         opp_id = B.submit_respondent_form(db, payload, source="landing_page")
         db.execute("UPDATE opportunities SET source_detail = ? WHERE id = ?", ("Investor form (public)", opp_id))
         opp = B.load(db, opp_id)
-        scr = screen_from_form(answers)
-        res = screen_result(scr)
-        _upsert(db, opp_id, None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
-                                   "screen_verdict": res["verdict"], "screen_note": "From the investor's own form — "
-                                   "confirm on the call.", "screened_at": now_iso()})
+        if enough_to_screen(answers):
+            scr = screen_from_form(answers)
+            res = screen_result(scr)
+            _upsert(db, opp_id, None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
+                                       "screen_verdict": res["verdict"], "screen_note": "From the investor's own "
+                                       "form — confirm on the call.", "screened_at": now_iso()})
+        else:
+            _upsert(db, opp_id, None, {"screen_note": "Not enough answers to pre-screen — ask the 5 questions on "
+                                                      "the call."})
         if final:
             save_response(db, opp, answers, "link")
         else:
@@ -854,9 +866,10 @@ def save_partial(db, opp: dict, answers: dict) -> None:
 
 def finish_public(db, opp: dict, answers: dict) -> None:
     """Submit pressed on a form that was already being saved: re-screen from all answers, save, draft the report."""
-    scr = screen_from_form(answers)
-    res = screen_result(scr)
-    with db:
-        _upsert(db, opp["id"], None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
-                                      "screen_verdict": res["verdict"], "screened_at": now_iso()})
+    if enough_to_screen(answers):
+        scr = screen_from_form(answers)
+        res = screen_result(scr)
+        with db:
+            _upsert(db, opp["id"], None, {"screen_answers": json.dumps(scr), "screen_score": res["score"],
+                                          "screen_verdict": res["verdict"], "screened_at": now_iso()})
     save_response(db, opp, answers, "link")

@@ -25,6 +25,7 @@ MODULES = [
         ("Workload", "main.team_board", {}, "crm.view"),
         ("Who's working", "team.week", {}, "crm.view"),
         ("Activity", "team.activity", {}, "crm.view"),
+        ("Work log", "team.worklog", {}, "users.manage"),
     ]},
     {"key": "owners", "label": "Salon Owners", "icon": "store", "pages": [
         ("All salon owners", "sellers.index", {}, "crm.view"),
@@ -92,7 +93,7 @@ PARENT = {
     "forms.review": "forms.inbox", "imports.preview": "imports.index", "imports.smart_preview": "imports.index",
     "pilot.vikas": "pilot.index", "pilot.fill": "sellers.index", "pilot.answers": "sellers.index",
     "investor.fill": "buyers.index", "investor.answers": "buyers.index", "investor.link": "investor.index",
-    "team.week": "main.team_board", "team.activity": "main.team_board",
+    "team.week": "main.team_board", "team.activity": "main.team_board", "team.worklog": "main.team_board",
 }
 
 
@@ -190,7 +191,8 @@ def related(db, opp: dict) -> list[dict]:
     deals = db.all(f"SELECT id, ref_code FROM deals WHERE {col} = ? ORDER BY id DESC", (oid,))
     for d in deals[:2]:
         out.append({"label": f"Deal {d['ref_code']}", "href": url_for("deals.detail", deal_id=d["id"])})
-    sub = db.one("SELECT id, status FROM form_submissions WHERE opportunity_id = ? ORDER BY id DESC LIMIT 1", (oid,))
+    sub = db.one("SELECT id, status FROM form_submissions WHERE opportunity_id = ? AND status <> 'draft' "
+                 "ORDER BY id DESC LIMIT 1", (oid,))  # a draft (still being filled) has nothing to review yet
     if sub:
         out.append({"label": "Form answers", "href": url_for("forms.review", sub_id=sub["id"]),
                     "tone": "warn" if sub["status"] in ("submitted", "pending_review") else ""})

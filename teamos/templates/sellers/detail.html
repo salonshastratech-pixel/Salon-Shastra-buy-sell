@@ -107,6 +107,8 @@
       {% if other_opps %}<h3>Other opportunities for this contact</h3>{% for o in other_opps %}<div class="small"><a href="{{ opp_url(o.kind, o.id) }}">{{ o.ref_code }}</a> · {{ o.kind }}{% if o.salon_name %} · {{ o.salon_name }}{% endif %} · {{ STAGE_LABELS.get(o.stage, o.stage) }}</div>{% endfor %}{% endif %}
     </div>
 
+    {% include "_timeline.html" %}
+
     {% include "forms/_record_card.html" %}
 
     <div class="card">

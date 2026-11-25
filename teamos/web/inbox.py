@@ -222,7 +222,8 @@ def wa_open(opp_id):
     text = f"Hello {first}, this is {me} from Salon Shastra." if me else f"Hello {first}, greetings from Salon Shastra."
     with db:
         I_T.add_activity(db, g.user["id"], "opportunity", opp_id, "note", "WhatsApp opened from TeamOS (personal WhatsApp)")
-        db.update("opportunities", opp_id, {"last_contact_at": now_iso()})
+        from ..domain.timeline import mark_contacted
+        mark_contacted(db, opp_id)
     return redirect(f"https://wa.me/{digits}?text={quote(text)}")
 
 

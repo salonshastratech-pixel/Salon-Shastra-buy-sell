@@ -20,7 +20,7 @@ CATEGORIES = [("salon", "Hair & unisex salons"), ("beauty", "Beauty parlours"), 
 CAT_LABEL = dict(CATEGORIES)
 _CACHE: dict[tuple, tuple[float, dict]] = {}
 CACHE_SECONDS = 24 * 3600
-log = logging.getLogger(__name__)
+log = logging.getLogger("teamos.area")  # shows in the server log
 
 
 def _query(lat: float, lng: float, radius_m: int) -> str:
@@ -150,3 +150,40 @@ def schedule(table: str, report_id: int, place: str | None, radius_km: float, fo
     if app.config.get("TESTING") and not app.config.get("AREA_CHECK_IN_TESTS"):
         return False
     return background.run(app, f"area:{table}:{report_id}", attach, table, report_id, place, radius_km, for_investor)
+
+
+
+def place_for(db, table: str, opp_id: int, answers: dict) -> tuple[str | None, float]:
+    """Where to look, and how far: the salon's own area (2 km), or the investor's first preferred area and radius."""
+    if table == "swot_reports":
+        place = db.scalar("SELECT b.locality FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id "
+                          "WHERE o.id = ?", (opp_id,)) or answers.get("location")
+        return place, 2
+    import re as _re
+    place = (_re.split(r"[,/;]| and ", answers.get("areas") or "")[0].strip() or None)
+    radius = {lbl: k for k, lbl in geo.RADIUS_CHOICES}.get(answers.get("radius")) or 3
+    return place, min(radius, 10)
+
+
+def retry_missing(db, limit: int = 3) -> str:
+    """Hourly: reports from the last week whose area check did not arrive (the free map server was busy) get
+    another try. A few per run, one after another, to stay polite to the free service."""
+    since = now_iso()[:10]
+    from datetime import date, timedelta as _td
+    since = (date.fromisoformat(since) - _td(days=7)).isoformat()
+    done, tried = 0, 0
+    for table, resp_table in (("swot_reports", "pilot_responses"), ("investor_reports", "investor_responses")):
+        rows = db.all(f"SELECT r.id, r.opportunity_id, r.content, x.answers FROM {table} r "
+                      f"LEFT JOIN {resp_table} x ON x.id = r.response_id "
+                      f"WHERE r.created_at >= ? AND r.content NOT LIKE ? ORDER BY r.id DESC LIMIT 20",
+                      (since, '%"area":%'))
+        for r in rows:
+            if tried >= limit:
+                break
+            answers = json.loads(r["answers"] or "{}")
+            place, radius = place_for(db, table, r["opportunity_id"], answers)
+            if not place or not geo.coords(place):
+                continue
+            tried += 1
+            done += attach(db, table, r["id"], place, radius, table == "investor_reports") == "ok"
+    return f"area check retried {tried}, added {done}"

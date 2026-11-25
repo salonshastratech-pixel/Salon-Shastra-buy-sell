@@ -79,6 +79,8 @@ def set_status(db, actor, status: str, note: str | None = None, user_id: int | N
         raise ValidationError({"status": "Choose a status."})
     db.execute("UPDATE users SET work_status = ?, work_status_note = ?, work_status_at = ? WHERE id = ?",
                (status, (note or "").strip()[:120] or None, now_iso(), uid))
+    from .worklog import log
+    log(db, uid, "status", status, note)
 
 
 # -- Time off -------------------------------------------------------------------------------------------------------

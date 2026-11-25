@@ -281,6 +281,10 @@ def migrate(db: Database) -> list[str]:
         sql = raw.replace("{{ID}}", ID_TYPES[db.dialect])
         with db:
             for stmt in _split_statements(sql):
+                if stmt.startswith("/*pg*/"):
+                    if db.dialect != "postgres":
+                        continue  # PostgreSQL-only (e.g. row-level security on Supabase)
+                    stmt = stmt[len("/*pg*/"):].strip()
                 db.execute(stmt)
             db.execute(
                 "INSERT INTO schema_migrations (version, checksum, applied_at) VALUES (?, ?, ?)",

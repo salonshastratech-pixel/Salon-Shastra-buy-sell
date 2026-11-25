@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Work log{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Work log — {{ day.strftime('%A %d %b %Y') }}</h1>
+  <div class="sub">Hours from sign-in, sign-out and status changes (Available · Busy · Salon visit · Break · Off). Output from what each person did in TeamOS. A forgotten sign-out stops counting 15 minutes after their last activity.</div></div>
+  <div class="actions"><a class="btn sm" href="{{ url_for('team.worklog', day=(day - one_day).isoformat()) }}">← Previous day</a>
+    {% if day < today %}<a class="btn sm" href="{{ url_for('team.worklog', day=(day + one_day).isoformat()) }}">Next day →</a>{% endif %}
+    <a class="btn sm" href="{{ url_for('team.worklog') }}">Today</a></div></div>
+
+<div class="card flush"><div class="table-wrap"><table>
+  <tr><th>Person</th><th>Now</th><th>Signed in</th><th>Signed out</th><th class="right">Working</th><th class="right">Breaks</th><th class="right">Field</th>
+    <th class="right">Calls · connected</th><th class="right">WhatsApp</th><th class="right">Tasks done</th><th class="right">Forms sent</th><th class="right">First contacts · avg speed</th><th class="right">Waiting for first call</th></tr>
+  {% for r in rows %}<tr class="row-link" data-href="{{ url_for('team.worklog', user=r.id, day=day.isoformat()) }}">
+    <td><a class="cell-link" href="{{ url_for('team.worklog', user=r.id, day=day.isoformat()) }}"><strong>{{ r.full_name }}</strong></a></td>
+    <td><span class="badge {{ 'ok' if r.work_status in ('available',) else 'info' if r.work_status in ('busy','in_field') else 'warn' if r.work_status == 'on_break' else 'grey' }}">{{ STATUS_LABELS.get(r.work_status or 'offline', r.work_status) }}</span><div class="small muted">{{ r.work_status_at|rel if r.work_status_at else '' }}</div></td>
+    <td class="small">{{ r.first_in|ist('%I:%M %p') if r.first_in else '—' }}</td>
+    <td class="small">{{ r.last_out|ist('%I:%M %p') if r.last_out else ('still on' if r.work_status and r.work_status != 'offline' else '—') }}</td>
+    <td class="right"><strong>{{ r.work }}</strong></td>
+    <td class="right">{{ r.break }}{% if r.breaks %} <span class="small muted">({{ r.breaks }})</span>{% endif %}</td>
+    <td class="right">{{ r.field }}</td>
+    <td class="right">{{ r.out.calls }} · {{ r.out.connected }}</td>
+    <td class="right">{{ r.out.whatsapp }}</td>
+    <td class="right">{{ r.out.tasks }}</td>
+    <td class="right">{{ r.out.forms }}</td>
+    <td class="right">{{ r.out.first_contacts }}{% if r.out.avg_first_contact %} · {{ r.out.avg_first_contact }}{% endif %}</td>
+    <td class="right {{ 'unknown' if r.out.waiting_first_contact }}">{{ r.out.waiting_first_contact }}</td></tr>
+  {% else %}<tr><td colspan="13" class="empty">No team members yet.</td></tr>{% endfor %}
+</table></div></div>
+
+{% if person %}
+<div class="card"><h2>{{ person.full_name }} — last 7 days</h2>
+  <div class="table-wrap"><table class="small">
+    <tr><th>Day</th><th>Signed in</th><th>Signed out</th><th class="right">Working</th><th class="right">Breaks</th><th class="right">Calls · connected</th><th class="right">WhatsApp</th><th class="right">Tasks</th><th class="right">Forms</th></tr>
+    {% for w in person_week %}<tr><td>{{ w.day.strftime('%a %d %b') }}</td><td>{{ w.first_in|ist('%I:%M %p') if w.first_in else '—' }}</td><td>{{ w.last_out|ist('%I:%M %p') if w.last_out else '—' }}</td>
+      <td class="right"><strong>{{ w.work }}</strong></td><td class="right">{{ w.break }}</td><td class="right">{{ w.calls }} · {{ w.connected }}</td><td class="right">{{ w.whatsapp }}</td><td class="right">{{ w.tasks }}</td><td class="right">{{ w.forms }}</td></tr>{% endfor %}
+  </table></div>
+  <h3>{{ day.strftime('%d %b') }}: sign-ins and status changes</h3>
+  <ol class="timeline">{% for e in person_day.events %}<li><span class="tl-icon">{{ {'login': '🔓', 'logout': '🔒'}.get(e.event, '•') }}</span>
+    <div><strong>{{ e.at|ist('%I:%M %p') }}</strong> {{ {'login': 'Signed in', 'logout': 'Signed out'}.get(e.event) or STATUS_LABELS.get(e.status, e.status) }}{% if e.note %} <span class="small muted">— {{ e.note }}</span>{% endif %}</div></li>
+  {% else %}<li class="small muted">Nothing logged this day.</li>{% endfor %}</ol>
+</div>
+{% endif %}
+<p class="small muted">Team members set their status from the status button at the top of every page (Available, Busy, Out on a salon visit, On a break, Off for the day). Signing in starts the day; signing out ends it.</p>
+{% endblock %}

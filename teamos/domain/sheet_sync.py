@@ -478,6 +478,10 @@ def commit(db, actor, import_id: int) -> dict:
             with db:
                 if r["action"] == "create":
                     opp_id = _create(db, actor, r, d, u, canon, src_note, load, due)
+                    from .timeline import lead_time
+                    lt = lead_time(canon.get("timestamp"))
+                    if lt:
+                        db.execute("UPDATE opportunities SET lead_created_at = ? WHERE id = ?", (lt, opp_id))
                     counts[f"created_{r['kind']}"] += 1
                     db.update("sheet_import_rows", r["id"], {"outcome": "created", "opportunity_id": opp_id})
                 else:
