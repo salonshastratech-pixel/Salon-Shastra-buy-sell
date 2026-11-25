@@ -100,15 +100,27 @@ def open_form():
                          message="We have already received several forms from this connection. Please try again "
                                  "later or call us.")
         answers, errors = mod.parse_answers(request.form)
+        phone_key = "contact_number" if kind == "pilot" else "phone"
+        if answers.get(phone_key) and phone_key not in errors:
+            from ..domain.common import normalize_indian_mobile
+            perr = normalize_indian_mobile(answers[phone_key])[1]
+            if perr:
+                errors[phone_key] = perr
         if not request.form.get("consent_contact"):
             errors["consent_contact"] = "Please tick this box so we can contact you about your answers."
         if not errors:
             try:
-                mod.submit_public(db, answers, consent=True)
+                opp_id = mod.submit_public(db, answers, consent=True)
+                token = PIL.issue_link(db, opp_id)
                 F.record_public_hit(db, ip, meta["key"], "submitted")
-                return redirect(url_for("public.open_thanks", kind=kind))
+                return redirect(url_for("public_pilot.thanks", token=token))
             except ValidationError as e:
-                errors = e.errors if isinstance(e.errors, dict) else {"_": str(e.errors)}
+                raw = e.errors if isinstance(e.errors, dict) else {"_": str(e.errors)}
+                # the record's field names → this form's question names, so the message shows on the right question
+                rename = ({"full_name": "owner_name", "phone": "contact_number", "city": "location",
+                           "locality": "location"} if kind == "pilot" else {})
+                errors = {rename.get(k, k): v for k, v in raw.items()}
+                errors["_"] = "Please check: " + " ".join(str(v) for v in raw.values())
     return _page("public/open_form.html", meta=meta, kind=kind, Q=mod, answers=answers, errors=errors,
                  form_token=_signer().dumps(meta["key"]))
 

@@ -337,6 +337,36 @@ def form(token):
                    filled=P.profile(db, opp["id"])["form_status"] == "filled")
 
 
+@public_bp.route("/s/<token>/thanks")
+def thanks(token):
+    """After the open form: what happens next, quick wins from their own answers, book Vikas, their personal page."""
+    from urllib.parse import quote
+    db = get_db()
+    opp = P.resolve(db, token)
+    if not opp:
+        return _public("public/pilot_gone.html", 404)
+    tips, keep_ready = [], []
+    if opp["kind"] == "buyer":
+        from ..domain import investor as I
+        rep = I.latest_report(db, opp["id"])
+        if rep:
+            tips = [s for s in rep["c"].get("steps") or [] if s.get("title")][:3]
+            keep_ready = (rep["c"].get("conditions") or [])[:4]
+        keep_ready = keep_ready or ["How much money is ready now, and from where (savings, family, loan)",
+                                    "Six months of running costs kept aside (rent, salaries, products)",
+                                    "Two or three areas you prefer, and how far from them is OK"]
+    else:
+        rep = P.latest_report(db, opp["id"])
+        if rep:
+            tips = [s for s in rep["c"].get("steps") or [] if s.get("title")][:3]
+    first = (opp.get("contact_name") or "").split(" ")[0]
+    wa_text = (f"Hi Salon Shastra, this is {first}. I just filled the "
+               + ("investor form." if opp["kind"] == "buyer" else f"pilot program form for {opp.get('salon_name') or 'my salon'}."))
+    return _public("public/thanks.html", token=token, opp=opp, tips=tips, keep_ready=keep_ready,
+                   slots=P.open_slots(db), booked=_live_booking(db, opp["id"]),
+                   wa_link="https://wa.me/918686878090?text=" + quote(wa_text))
+
+
 @public_bp.route("/s/<token>/report")
 def report_page(token):
     db = get_db()

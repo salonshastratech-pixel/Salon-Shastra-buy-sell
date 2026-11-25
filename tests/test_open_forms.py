@@ -20,14 +20,16 @@ def test_open_pilot_form_creates_salon_owner_and_swot(app, db, login):
     r = pub.post("/f/pilot", data={**FULL, "form_token": tok})                 # no consent tick → asked again
     assert r.status_code == 200 and "Please tick this box" in r.data.decode()
     r = pub.post("/f/pilot", data={**FULL, "form_token": tok, "consent_contact": "1"})
-    assert r.status_code == 302 and r.headers["Location"].endswith("/f/pilot/done")
+    assert r.status_code == 302 and "/s/" in r.headers["Location"] and r.headers["Location"].endswith("/thanks")
     opp = db.one("SELECT o.*, b.name AS salon_name FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id "
                  "WHERE o.kind = 'seller'")
     assert opp["salon_name"] == "Glow Studio" and opp["source_detail"] == "Pilot Program form (public)"
     assert P.profile(db, opp["id"])["form_status"] == "filled"
     assert P.latest_report(db, opp["id"])["status"] == "draft"
     assert db.scalar("SELECT COUNT(*) FROM tasks WHERE entity_id = ? AND task_type = 'review'", (opp["id"],)) == 1
-    assert "Thank you" in pub.get("/f/pilot/done").data.decode()
+    thanks = pub.get(r.headers["Location"]).data.decode()
+    assert "Thank you, Kavya" in thanks and "3 quick wins" in thanks and "What happens next" in thanks
+    assert "wa.me/918686878090" in thanks and "ChairPe" in thanks and "Talk to" in thanks
     forms = login("seller@t.test").get("/forms/").data.decode()
     assert "/f/pilot" in forms and "/f/investor" in forms and "on this computer only" not in forms
 
@@ -37,7 +39,9 @@ def test_open_investor_form_prescreens_and_drafts_report(app, db):
     page = pub.get("/f/investor").data.decode()
     assert "Planning a salon investment?" in page and "5,000" not in page
     r = pub.post("/f/investor", data={**STRONG, "form_token": _token(page), "consent_contact": "1"})
-    assert r.status_code == 302 and r.headers["Location"].endswith("/f/investor/done")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/thanks")
+    page2 = pub.get(r.headers["Location"]).data.decode()
+    assert "First pointers" in page2 and "Keep these ready" in page2 and "5,000" not in page2
     opp = db.one("SELECT * FROM opportunities WHERE kind = 'buyer'")
     prof = I.profile(db, opp["id"])
     assert prof["screen_verdict"] == "pursue" and prof["form_status"] == "filled"
@@ -155,3 +159,13 @@ def test_area_check_counts_nearby_salons_and_lands_in_both_reports(app, db, monk
     pdf = swot_pdf.build({"c": rep["c"], "date": "25 Nov 2026", "version": 1})
     assert pdf[:4] == b"%PDF" and len(pdf) > 3000
     app.config["AREA_CHECK_IN_TESTS"] = False
+
+
+def test_open_form_shows_save_errors_on_the_right_question(app, db):
+    pub = app.test_client()
+    page = pub.get("/f/pilot").data.decode()
+    r = pub.post("/f/pilot", data={**FULL, "contact_number": "12345", "form_token": _token(page),
+                                    "consent_contact": "1"})
+    body = r.data.decode()
+    assert r.status_code == 200 and not db.scalar("SELECT COUNT(*) FROM opportunities")
+    assert "10-digit" in body or "mobile" in body.lower()

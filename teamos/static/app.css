@@ -691,3 +691,8 @@ a.cell-link:hover { text-decoration: underline; }
 .area-count { border: 1px solid var(--line, #e7ded6); border-radius: 10px; padding: 8px; text-align: center; background: var(--surface, #fff); }
 .area-count b { display: block; font-size: 1.4rem; }
 .area-count span { font-size: .8rem; color: var(--muted, #6b625c); }
+
+/* thank-you page after the open forms */
+.thanks-hero h1 { margin-bottom: 4px; }
+.next-timeline { padding-left: 1.2em; }
+.next-timeline li { margin: 6px 0; }

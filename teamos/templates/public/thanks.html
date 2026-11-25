@@ -1,0 +1,57 @@
+{% extends "public/layout.html" %}
+{% block title %}Thank you{% endblock %}
+{% block content %}
+{% set first = (opp.contact_name or '').split(' ')[0] %}
+{% set investor = opp.kind == 'buyer' %}
+<div class="card thanks-hero">
+  <h1>Thank you{% if first %}, {{ first }}{% endif %}! 🎉</h1>
+  <p>We have received your answers{% if opp.salon_name and not investor %} for <strong>{{ opp.salon_name }}</strong>{% endif %}.
+    {% if investor %}Here is what happens next — and a few first pointers from your answers.{% else %}Here is what happens next — and three quick wins you can start this week.{% endif %}</p>
+</div>
+
+<div class="card"><h2>What happens next</h2>
+  <ol class="next-timeline">
+    {% if investor %}
+    <li><strong>Today</strong> — our team reads your answers.</li>
+    <li><strong>Within 24 hours</strong> — we call you to set up a short call with our founder, {{ P.CONSULTANT_NAME }} (or pick a time below now).</li>
+    <li><strong>After the call</strong> — you get your Investor Readiness Report: whether and how to invest, what to keep ready, and the next steps.</li>
+    {% else %}
+    <li><strong>Today</strong> — our team reviews your answers.</li>
+    <li><strong>Within 24 hours</strong> — your free SWOT report (strengths, weaknesses, opportunities, threats, competition around your salon and clear next steps) arrives on WhatsApp.</li>
+    <li><strong>Any time</strong> — a free call with our founder, {{ P.CONSULTANT_NAME }}, to turn the report into a plan (pick a time below).</li>
+    {% endif %}
+  </ol>
+</div>
+
+{% if tips %}
+<div class="card"><h2>{{ 'First pointers from your answers' if investor else '3 quick wins you can start this week' }}</h2>
+  <ol class="steps-list">{% for s in tips %}<li><strong>{{ s.title }}</strong>{% if s.why %}<div class="small muted">{{ s.why }}</div>{% endif %}</li>{% endfor %}</ol>
+  <p class="small muted">First ideas worked out from your own answers. Your full report comes after our team reviews it.</p>
+</div>
+{% endif %}
+
+{% if investor and keep_ready %}
+<div class="card"><h2>Keep these ready for the call</h2>
+  <ul>{% for x in keep_ready %}<li>{{ x }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="card" id="book"><h2>Talk to {{ P.CONSULTANT_NAME }} — free</h2>
+  <p class="small">The founder of Salon Shastra. A short call to understand your {{ 'plan' if investor else 'salon' }} and what would help most.</p>
+  {% include "public/_pilot_slots.html" %}
+</div>
+
+{% if not investor %}
+<div class="card"><h2>ChairPe — run your salon, see your numbers</h2>
+  <p>Billing &amp; UPI with GST, appointments and online booking, staff and commissions, stock, memberships, bills on WhatsApp and win-back of customers who stopped coming.</p>
+  <p><strong>Try the Elite plan free for 14 days</strong> — no card needed. <a href="https://www.chairpe.com" target="_blank" rel="noopener">www.chairpe.com</a></p>
+</div>
+{% endif %}
+
+<div class="card"><h2>Keep this page</h2>
+  <p class="small">This is your personal page. Open it any time — {{ 'your readiness report' if investor else 'your SWOT report' }} appears here once it is ready.</p>
+  <p><a class="btn" href="{{ url_for('public_pilot.report_page', token=token) }}">My report</a>
+     <a class="btn primary" href="{{ wa_link }}" target="_blank" rel="noopener">Message us on WhatsApp</a></p>
+  <p class="small muted">Salon Shastra · <a href="https://www.salonshastra.com" target="_blank" rel="noopener">www.salonshastra.com</a> · +91 86868 78090</p>
+</div>
+{% endblock %}

@@ -271,6 +271,16 @@ def create_link(db, actor, opp) -> str:
     return token
 
 
+def issue_link(db, opp_id: int) -> str:
+    """The personal link for someone who filled the open form themselves (no staff member involved): their thank-you
+    page, booking with Vikas and — once approved — their report."""
+    token = secrets.token_urlsafe(18)
+    now = now_utc()
+    db.insert("pilot_links", {"opportunity_id": opp_id, "token_hash": _hash(token), "created_by": None,
+                              "created_at": to_iso(now), "expires_at": to_iso(now + timedelta(days=LINK_DAYS))})
+    return token
+
+
 def revoke_links(db, actor, opp) -> None:
     _need(db, actor, "crm.log_activity")
     db.execute("UPDATE pilot_links SET revoked_at = ? WHERE opportunity_id = ? AND revoked_at IS NULL",
