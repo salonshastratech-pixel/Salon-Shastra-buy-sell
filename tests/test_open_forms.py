@@ -117,3 +117,41 @@ def test_team_can_do_everything_except_finance(app, db, login):
     assert c.get("/admin/finance").status_code in (302, 403)
     page = login("admin@t.test").get("/admin/users").data.decode()
     assert "Team members" in page and "everything except Finance" in page and "Default role matrix" not in page
+
+
+
+def test_area_check_counts_nearby_salons_and_lands_in_both_reports(app, db, monkeypatch):
+    import io
+    import json as _json
+
+    from teamos.domain import area_insights as AI
+    from teamos.domain import swot_pdf
+    els = [{"tags": {"shop": "hairdresser", "name": "Cuts & Co"}}, {"tags": {"shop": "hairdresser"}},
+           {"tags": {"shop": "beauty", "name": "Glam Beauty Parlour"}}, {"tags": {"shop": "barber"}},
+           {"tags": {"shop": "beauty", "beauty": "nails"}}, {"tags": {"leisure": "spa", "name": "Om Spa"}},
+           {"tags": {"shop": "hairdresser", "name": "Royal Mens Salon"}}]
+    calls = []
+
+    def opener(req, timeout):
+        calls.append(req.full_url)
+        return io.BytesIO(_json.dumps({"elements": els}).encode())
+    AI._CACHE.clear()
+    area = AI.build("Kondapur", 2, False, opener=opener)
+    assert area["counts"] == {"salon": 2, "beauty": 1, "nails": 1, "barber": 2, "spa": 1} and area["total"] == 7
+    from urllib.parse import unquote
+    assert any("Moderate competition" in t for t in area["tips"]) and "around:2000," in unquote(calls[0])
+    assert AI.build("Nowhere-pet", 2, False, opener=opener) is None
+    AI.build("Kondapur", 2, False, opener=lambda *a, **k: (_ for _ in ()).throw(AssertionError("cached")))  # cached
+    # a new pilot form: the draft gets the area block in the background (network replaced by the fake answer)
+    app.config["AREA_CHECK_IN_TESTS"] = True
+    monkeypatch.setattr(AI, "fetch", lambda lat, lng, r, opener=None: {"counts": area["counts"], "total": 7,
+                                                                       "names": []})
+    pub = app.test_client()
+    page = pub.get("/f/pilot").data.decode()
+    pub.post("/f/pilot", data={**FULL, "form_token": _token(page), "consent_contact": "1"})
+    opp = db.one("SELECT * FROM opportunities WHERE kind = 'seller'")
+    rep = P.latest_report(db, opp["id"])
+    assert rep["c"]["area"]["place"] and rep["c"]["area"]["counts"]["nails"] == 1
+    pdf = swot_pdf.build({"c": rep["c"], "date": "25 Nov 2026", "version": 1})
+    assert pdf[:4] == b"%PDF" and len(pdf) > 3000
+    app.config["AREA_CHECK_IN_TESTS"] = False

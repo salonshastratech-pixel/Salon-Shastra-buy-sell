@@ -1,0 +1,11 @@
+{# "Your area" block for reports (c = report content). staff=True shows a note while the look-up is pending. #}
+{% if c.area %}{% set a = c.area %}
+<div class="card area-card"><h2>Your area: {{ a.place }} (within {{ '%g'|format(a.radius_km) }} km)</h2>
+  <div class="area-counts">
+    {% for k, label in [('salon','Hair & unisex salons'),('beauty','Beauty parlours'),('nails','Nail studios'),('barber',"Barber / men's shops"),('spa','Spas & massage')] %}
+    <div class="area-count"><b>{{ a.counts[k] }}</b><span>{{ label }}</span></div>{% endfor %}
+  </div>
+  <ul>{% for t in a.tips %}<li>{{ t }}</li>{% endfor %}</ul>
+  <p class="small muted">Source: {{ a.source }}. Real numbers are usually higher — use this as a guide, and confirm with a visit.</p>
+</div>
+{% elif staff %}<p class="small muted">Area check (nearby salons from OpenStreetMap) is added to the draft automatically within a minute when the area is known.</p>{% endif %}

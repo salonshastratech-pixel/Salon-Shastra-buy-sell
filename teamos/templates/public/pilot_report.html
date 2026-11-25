@@ -13,6 +13,7 @@
   {% for k, t in [('strengths','Strengths'),('weaknesses','Weaknesses'),('opportunities','Opportunities'),('threats','Threats')] %}
   <div class="card swot-q swot-{{ k }}"><h2>{{ t }}</h2><ul>{% for x in c[k] %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endfor %}
 </div>
+{% include "_area.html" %}
 <div class="card"><h2>Your next steps</h2><ol class="steps-list">{% for s in c.steps %}<li><strong>{{ s.title }}</strong> <span class="badge">{{ s.when }}</span>{% if s.why %}<div class="small muted">{{ s.why }}</div>{% endif %}{% if s.how %}<div class="small">How we help: {{ s.how }}</div>{% endif %}</li>{% endfor %}</ol></div>
 <div class="card" id="book"><h2>Talk to {{ P.CONSULTANT_NAME }}</h2>
   <p>Discuss this report with the founder of Salon Shastra and get a clear plan for your salon.</p>

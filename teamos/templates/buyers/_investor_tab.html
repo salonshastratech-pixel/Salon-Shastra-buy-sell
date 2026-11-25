@@ -54,6 +54,7 @@
       <form method="post" action="{{ url_for('investor.redraft', opp_id=opp.id) }}">{{ csrf() }}<button class="btn sm">Re-draft from answers</button></form>
     </div>
     {% if rep.sent_at %}<p class="small ok-text">Sent {{ rep.sent_at|rel }}.</p>{% endif %}
+    {% with staff=True %}{% include "_area.html" %}{% endwith %}
     <div class="scores">{% for label, s in c.scores %}<div class="score"><span>{{ label }}</span><b class="{{ 'good' if s >= 7 else 'mid' if s >= 5 else 'low' }}">{{ s }}/10</b></div>{% endfor %}</div>
     <form method="post" action="{{ url_for('investor.save_report', opp_id=opp.id, rid=rep.id) }}" class="report-edit">{{ csrf() }}
       <div class="form-grid">

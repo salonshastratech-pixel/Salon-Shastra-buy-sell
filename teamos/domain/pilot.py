@@ -642,9 +642,14 @@ def draft_report(db, opp_id: int, response_id: int | None, actor_id) -> int:
         raise ValidationError({"report": "The pilot form has not been filled yet."})
     content = build_swot(json.loads(resp["answers"]), profile(db, opp_id)["help_areas"])
     version = (db.scalar("SELECT MAX(version) FROM swot_reports WHERE opportunity_id = ?", (opp_id,)) or 0) + 1
-    return db.insert("swot_reports", {"opportunity_id": opp_id, "response_id": resp["id"], "version": version,
-                                      "content": json.dumps(content, ensure_ascii=False), "status": "draft",
-                                      "created_by": actor_id, "created_at": now_iso(), "updated_at": now_iso()})
+    rid = db.insert("swot_reports", {"opportunity_id": opp_id, "response_id": resp["id"], "version": version,
+                                     "content": json.dumps(content, ensure_ascii=False), "status": "draft",
+                                     "created_by": actor_id, "created_at": now_iso(), "updated_at": now_iso()})
+    from . import area_insights as AI
+    place = db.scalar("SELECT b.locality FROM opportunities o JOIN salon_businesses b ON b.id = o.business_id "
+                      "WHERE o.id = ?", (opp_id,)) or json.loads(resp["answers"]).get("location")
+    db.after_commit(lambda: AI.schedule("swot_reports", rid, place, 2, False))  # competition within 2 km
+    return rid
 
 
 def latest_report(db, opp_id: int, approved_only: bool = False) -> dict | None:

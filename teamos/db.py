@@ -95,6 +95,14 @@ class Database:
         else:
             raise ValueError("Unsupported DATABASE_URL: " + url)
         self._tx_depth = 0
+        self._after_commit = []
+
+    def after_commit(self, fn) -> None:
+        """Run fn() once the current transaction has committed (at once when none is open; dropped on rollback)."""
+        if self._tx_depth == 0:
+            fn()
+        else:
+            self._after_commit.append(fn)
 
     # -- SQL helpers -------------------------------------------------------
     def _sql(self, sql: str) -> str:
@@ -160,6 +168,10 @@ class Database:
         self._tx_depth -= 1
         if self._tx_depth == 0:
             self.execute("ROLLBACK" if exc_type else "COMMIT")
+            pending, self._after_commit = self._after_commit, []
+            if not exc_type:
+                for fn in pending:
+                    fn()
         return False
 
     def close(self):

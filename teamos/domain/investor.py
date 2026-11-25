@@ -529,9 +529,15 @@ def draft_report(db, opp_id, response_id, actor_id) -> int:
         raise ValidationError({"report": "The investor form has not been filled yet."})
     content = build_report(json.loads(resp["answers"]), profile(db, opp_id)["screen"])
     version = (db.scalar("SELECT MAX(version) FROM investor_reports WHERE opportunity_id = ?", (opp_id,)) or 0) + 1
-    return db.insert("investor_reports", {"opportunity_id": opp_id, "response_id": resp["id"], "version": version,
-                                          "content": json.dumps(content, ensure_ascii=False), "status": "draft",
-                                          "created_by": actor_id, "created_at": now_iso(), "updated_at": now_iso()})
+    rid = db.insert("investor_reports", {"opportunity_id": opp_id, "response_id": resp["id"], "version": version,
+                                         "content": json.dumps(content, ensure_ascii=False), "status": "draft",
+                                         "created_by": actor_id, "created_at": now_iso(), "updated_at": now_iso()})
+    from . import area_insights as AI
+    a = json.loads(resp["answers"])
+    place = (re.split(r"[,/;]| and ", a.get("areas") or "")[0].strip() or None)
+    radius = {lbl: k for k, lbl in RADIUS_CHOICES}.get(a.get("radius")) or 3
+    db.after_commit(lambda: AI.schedule("investor_reports", rid, place, min(radius, 10), True))  # their area
+    return rid
 
 
 def latest_report(db, opp_id, approved_only=False):

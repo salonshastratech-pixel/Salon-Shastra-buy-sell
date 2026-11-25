@@ -685,3 +685,9 @@ input[type=time] { font: inherit; padding: 7px 9px; border: 1px solid var(--line
 li.task.is-clickable:hover { background: var(--surface-2, #fcf8f5); }
 a.cell-link { color: inherit; text-decoration: none; }
 a.cell-link:hover { text-decoration: underline; }
+
+/* report: your area */
+.area-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.area-count { border: 1px solid var(--line, #e7ded6); border-radius: 10px; padding: 8px; text-align: center; background: var(--surface, #fff); }
+.area-count b { display: block; font-size: 1.4rem; }
+.area-count span { font-size: .8rem; color: var(--muted, #6b625c); }

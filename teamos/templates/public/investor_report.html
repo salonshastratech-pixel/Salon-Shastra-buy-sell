@@ -17,6 +17,7 @@
   <div class="card swot-q swot-weaknesses"><h2>Risks to manage</h2><ul>{% for x in c.risks %}<li>{{ x }}</li>{% else %}<li>No major risks found.</li>{% endfor %}</ul></div>
 </div>
 {% if c.conditions %}<div class="card"><h2>Before you put money in</h2><ul>{% for x in c.conditions %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+{% include "_area.html" %}
 <div class="card"><h2>Your next steps</h2><ol class="steps-list">{% for s in c.steps %}<li><strong>{{ s.title }}</strong> <span class="badge">{{ s.when }}</span>{% if s.why %}<div class="small muted">{{ s.why }}</div>{% endif %}</li>{% endfor %}</ol></div>
 {% endif %}
 {% endblock %}

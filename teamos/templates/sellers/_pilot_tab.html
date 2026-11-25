@@ -51,6 +51,7 @@
       <form method="post" action="{{ url_for('pilot.redraft', opp_id=opp.id) }}">{{ csrf() }}<button class="btn sm" title="Throws away edits in a new version made from the latest answers">Re-draft from answers</button></form>
     </div>
     {% if rep.sent_at %}<p class="small ok-text">Sent {{ rep.sent_at|rel }}.</p>{% elif rep.status == 'approved' %}<p class="small muted">Approved by {{ rep.approver_name }} {{ rep.approved_at|rel }} — not sent yet.</p>{% endif %}
+    {% with staff=True %}{% include "_area.html" %}{% endwith %}
     <div class="scores">{% for label, s in c.scores %}<div class="score"><span>{{ label }}</span><b class="{{ 'good' if s >= 7 else 'mid' if s >= 5 else 'low' }}">{{ s }}/10</b></div>{% endfor %}</div>
     <form method="post" action="{{ url_for('pilot.save_report', opp_id=opp.id, rid=rep.id) }}" class="report-edit">{{ csrf() }}
       <div class="field"><label for="r-sum">In short</label><textarea id="r-sum" name="summary" rows="3" maxlength="1200">{{ c.summary }}</textarea></div>

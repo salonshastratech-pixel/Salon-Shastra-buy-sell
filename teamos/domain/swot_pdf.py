@@ -146,6 +146,26 @@ def _box(flowables, bg, pad=8, border=None):
     return t
 
 
+def _area_section(c: dict, S) -> list:
+    """'Your area' — nearby salons from OpenStreetMap, with what it means (only when the look-up has arrived)."""
+    a = c.get("area")
+    if not a:
+        return []
+    labels = [("salon", "Hair & unisex salons"), ("beauty", "Beauty parlours"), ("nails", "Nail studios"),
+              ("barber", "Barber / men's shops"), ("spa", "Spas & massage")]
+    cells = [[Paragraph(f"<b>{a['counts'].get(k, 0)}</b><br/><font size='8'>{escape(l)}</font>", S["body"])
+              for k, l in labels]]
+    tbl = Table(cells, colWidths=[(W - 2 * M - 16) / 5] * 5)
+    tbl.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.white), ("BOX", (0, 0), (-1, -1), 0.6, SOFT),
+                             ("INNERGRID", (0, 0), (-1, -1), 0.6, SOFT), ("ALIGN", (0, 0), (-1, -1), "CENTER")]))
+    inner = [Paragraph(f"Your area: {escape(a['place'])} (within {a['radius_km']:g} km)", S["h2"]), tbl,
+             Spacer(1, 5)]
+    inner += [Paragraph(_t(x), S["bullet"], bulletText="•") for x in a.get("tips") or []]
+    inner.append(Paragraph("Source: OpenStreetMap — shops volunteers have mapped, so real numbers are usually higher. "
+                           "A guide, not a census; confirm with a visit.", S["small"]))
+    return [Spacer(1, 8), KeepTogether(_box(inner, TINT, pad=10, border=SOFT)), Spacer(1, 6)]
+
+
 def build(report: dict, booking_link: str | None = None) -> bytes:
     """report = {'c': content dict, 'date': '24 Nov 2026', 'version': n}. Returns PDF bytes."""
     c = report["c"]
@@ -208,7 +228,8 @@ def build(report: dict, booking_link: str | None = None) -> bytes:
     story.append(grid)
     story.append(PageBreak())
 
-    # Page 3: next steps + CTA ------------------------------------------------------------------------------
+    # Page 3: your area, next steps + CTA ---------------------------------------------------------------------
+    story += _area_section(c, S)
     story.append(Paragraph("Your next steps", S["h1"]))
     story.append(Paragraph("In order of impact. Each step says why it matters and how Salon Shastra can help.",
                            S["small"]))
@@ -349,6 +370,7 @@ def build_investor(report: dict, booking_link: str | None = None) -> bytes:
             story.append(Paragraph(_t(x), S["bullet"], bulletText="•"))
     story.append(CondPageBreak(60 * mm))
     story.append(Spacer(1, 6))
+    story += _area_section(c, S)
     story.append(Paragraph("Your next steps", S["h2"]))
     for i, st in enumerate(c.get("steps") or [], 1):
         num = Table([[Paragraph(f"<b>{i}</b>", S["white"])]], colWidths=[9 * mm], rowHeights=[9 * mm])
