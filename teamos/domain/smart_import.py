@@ -272,6 +272,8 @@ def money_range(v: str, small_means_lakh: bool = False) -> tuple[int | None, int
     trailing = unit_m[-1][1] if unit_m else None
 
     def scale(x, u=None):
+        if u is None and x >= 1000:
+            return int(round(x))   # "70000 to 1 lakh": a big bare number is rupees, not lakhs
         u = u or trailing
         if u:
             return int(round(x * UNIT.get(u.rstrip("s") if u.rstrip("s") in UNIT else u, 1)))

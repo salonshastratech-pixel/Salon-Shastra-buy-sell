@@ -152,7 +152,8 @@ def manage():
     return render_template("admin/leads_data.html", split=PR.current_split(db), counts=counts,
                            clear=purge.clear_status(db), CONFIRM_WORD=purge.CONFIRM_WORD, rebuild=RB.status(db),
                            sheet_links=chr(10).join(sheets),
-                           excluded=db.scalar("SELECT COUNT(*) FROM lead_exclusions"))
+                           excluded=db.scalar("SELECT COUNT(*) FROM lead_exclusions"),
+                           wa_all=__import__("teamos.domain.wa_leads", fromlist=["x"]).all_chats_on(db))
 
 
 @bp.route("/split", methods=["POST"])
@@ -262,3 +263,22 @@ def edit_basics(opp_id):
     except PermissionDenied:
         abort(403)
     return redirect(target)
+
+
+
+@bp.route("/wa-chats", methods=["POST"])
+@require("users.manage")
+def wa_chats():
+    """Switch: should every new WhatsApp chat become a lead, or only chats that come from a Meta ad?"""
+    from ..domain import wa_leads as WL
+    from ..timeutil import now_iso
+    db = get_db()
+    on = 1 if request.form.get("on") == "1" else 0
+    with db:
+        if db.scalar("SELECT 1 FROM automation_settings WHERE key = ?", (WL.ALL_CHATS_KEY,)):
+            db.execute("UPDATE automation_settings SET enabled = ?, updated_at = ? WHERE key = ?",
+                       (on, now_iso(), WL.ALL_CHATS_KEY))
+        else:
+            db.insert("automation_settings", {"key": WL.ALL_CHATS_KEY, "enabled": on, "updated_at": now_iso()})
+    flash("Every new WhatsApp chat now becomes a lead." if on else "Only chats from Meta ads become leads.", "ok")
+    return redirect(url_for("records.manage") + "#wa")

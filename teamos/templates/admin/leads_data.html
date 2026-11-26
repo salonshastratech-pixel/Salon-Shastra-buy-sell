@@ -34,6 +34,13 @@
   </form>
 </div>
 
+<div class="card" id="wa"><div class="card-h"><h2>WhatsApp chats → leads</h2><span class="small muted">directly from Meta</span></div>
+  <p class="small">A new number that writes to our WhatsApp from a <strong>Meta "Click to WhatsApp" ad</strong> becomes a lead automatically — shared in turn, first call in 10 minutes, the ad as its source, the chat on its timeline. A number already in TeamOS is never duplicated; its record gets a note instead.</p>
+  <form method="post" action="{{ url_for('records.wa_chats') }}" class="inline">{{ csrf() }}<input type="hidden" name="on" value="{{ '0' if wa_all else '1' }}">
+    <span class="small">Other new chats (not from an ad): <strong>{{ 'become leads too' if wa_all else 'wait in Conversations' }}</strong></span>
+    <button class="btn sm">{{ 'Only ad chats become leads' if wa_all else 'Make every new chat a lead' }}</button></form>
+</div>
+
 <div class="card"><div class="card-h"><h2>Lead review</h2></div><p class="small">See leads that probably don't belong any more — said no, cold remarks, never reached, untouched for a month, test entries — each with the reason, and remove them in one go. <a class="btn sm" href="{{ url_for('records.review') }}">Open lead review</a></p></div>
 
 <div class="card danger-zone" id="clear">

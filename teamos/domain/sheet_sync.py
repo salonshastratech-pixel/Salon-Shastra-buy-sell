@@ -258,6 +258,8 @@ def understand(kind: str, flavour: str | None, canon: dict) -> dict:
             facts.append(f"Wants a {fmt} salon")
         if city:
             f["preferred_city"] = city
+    for k in [k for k, v in f.items() if isinstance(v, (int, float)) and not isinstance(v, bool) and abs(v) > 1_000_000_000]:
+        facts.append(f"{k.replace('_', ' ')}: the sheet's value could not be read sensibly ({f.pop(k)}) — please check")
     return {"fields": f, "facts": facts, "city": city, "area": area}
 
 

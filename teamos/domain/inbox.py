@@ -486,8 +486,10 @@ def ingest_webhook(db, payload: dict, provider: str = "meta-cloud") -> dict:
         for change in entry.get("changes", []):
             v = change.get("value", {})
             to_number = (v.get("metadata") or {}).get("phone_number_id")
+            names = {c.get("wa_id"): (c.get("profile") or {}).get("name") for c in v.get("contacts", [])}
             for msg in v.get("messages", []):
-                events.append((msg.get("id"), "message", {**msg, "_to_number_id": to_number}))
+                events.append((msg.get("id"), "message", {**msg, "_to_number_id": to_number,
+                                                          "_profile_name": names.get(msg.get("from"))}))
             for st in v.get("statuses", []):
                 events.append((f"{st.get('id')}:{st.get('status')}", "status", st))
     for event_id, kind, body in events:
@@ -514,8 +516,16 @@ def process_event(db, ev: dict) -> None:
             from datetime import datetime, timezone
             ts = body.get("timestamp")
             at = to_iso(datetime.fromtimestamp(int(ts), tz=timezone.utc)) if ts else None
-            record_inbound(db, body.get("from", ""), (body.get("text") or {}).get("body", "[non-text message]"),
-                           body.get("id"), at, provider=ev["provider"], business_number_id=body.get("_to_number_id"))
+            text = (body.get("text") or {}).get("body", "[non-text message]")
+            msg = record_inbound(db, body.get("from", ""), text, body.get("id"), at, provider=ev["provider"],
+                                 business_number_id=body.get("_to_number_id"))
+            if msg:   # a chat from a Meta ad (or any new chat, if switched on) becomes a lead — once
+                from . import wa_leads
+                raw = str(body.get("from", ""))
+                phone, _e = normalize_indian_mobile(raw if raw.startswith("+") else "+" + raw)
+                with db:
+                    wa_leads.on_inbound(db, phone or ("+" + raw.lstrip("+")), text, body.get("referral"),
+                                        body.get("_profile_name"), at, msg["conversation_id"])
             outcome = "processed"
         else:
             err = (body.get("errors") or [{}])[0].get("title") if body.get("errors") else None
