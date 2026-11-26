@@ -915,3 +915,45 @@ a.tile:hover, a.tile:hover *, a.wait-row:hover, a.stat-chip:hover { text-decorat
 
 .pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin: 6px 0 10px; flex-wrap: wrap; }
 .remark { margin-top: 3px; font-style: italic; overflow-wrap: anywhere; }
+
+/* ---- Lists: calmer filters, bulk bar only when something is ticked ---- */
+.filters { gap: 8px; align-items: center; }
+.filters input[type=search] { flex: 1 1 240px; min-width: 200px; }
+.filters select { width: auto; max-width: 220px; }
+.more-filters { flex-basis: 100%; margin-top: 2px; }
+.more-filters > summary { cursor: pointer; font-size: 13px; color: var(--brand-dark); font-weight: 600; list-style: none; display: inline-flex; gap: 6px; align-items: center; }
+.more-filters > summary::before { content: '＋'; font-weight: 700; }
+.more-filters[open] > summary::before { content: '－'; }
+.more-filters > .inline { margin-top: 8px; gap: 8px; }
+.bulk-bar { padding: 8px 14px; gap: 8px; align-items: center; }
+.bulk-bar select { width: auto; max-width: 230px; }
+.bulk-bar:not(.has-selection) [data-bulk-action], .bulk-bar:not(.has-selection) .bulk-opt, .bulk-bar:not(.has-selection) button.primary { display: none; }
+.bulk-bar:not(.has-selection) .bulk-count { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.badge.small { white-space: nowrap; }
+table td:last-child .small:first-child { min-width: 9em; }
+table th:last-child { min-width: 9em; }
+
+/* ---- Lead lists on phones: one card per lead, Call / WhatsApp always in view ---- */
+@media (max-width: 640px) {
+  .lead-table, .lead-table tbody, .lead-table tr, .lead-table td { display: block; width: auto; }
+  .lead-table tr:has(th) { display: none; }
+  .lead-table tr { position: relative; margin: 10px; padding: 12px 14px 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  .lead-table td { padding: 2px 0; border: 0 !important; }
+  .lead-table td.sel { position: absolute; top: 12px; right: 12px; }
+  .lead-table td.nowrap:nth-child(2) { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding-right: 34px; }
+  .lead-table td.nowrap:nth-child(2) > div { display: inline; }
+  .lead-table td[data-label] { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+  .lead-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; min-width: 52px; }
+  .lead-table td[data-label] > div { display: inline; }
+  .lead-table .empty { text-align: center; }
+}
+
+/* Phone alerts */
+.push-nudge { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-color: var(--brand, #c04000); }
+.push-nudge[hidden] { display: none; }
+ul.plain { list-style: none; padding: 0; margin: 6px 0 10px; }
+ul.plain.checks li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+ul.plain.checks label { display: flex; gap: 10px; align-items: center; cursor: pointer; }
+.push-state { font-weight: 600; }
+.push-devices { margin-top: 14px; }
+.bulk-inline { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }

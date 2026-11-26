@@ -186,7 +186,7 @@ def manifest():
 
 SW = """// TeamOS phone app. Privacy: only the app's look (styles, script, icons) and an offline notice are kept on the
 // phone. Pages with customer information are never stored — they always come fresh from the server.
-const CACHE = 'teamos-shell-v1';
+const CACHE = 'teamos-shell-v2';
 const SHELL = ['/offline', '/static/app.css', '/static/app.js', '/static/icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -201,6 +201,25 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return r; })
       .catch(() => caches.match(req)));
   }
+});
+// Alerts: the push carries no data. Woken, the phone asks TeamOS (signed in) what is new and shows that.
+self.addEventListener('push', e => {
+  e.waitUntil(fetch('/me/push/latest', {credentials: 'include', cache: 'no-store'})
+    .then(r => (r.ok && (r.headers.get('content-type') || '').includes('json')) ? r.json() : null)
+    .catch(() => null)
+    .then(d => {
+      d = d || {title: 'Salon Shastra TeamOS', body: 'You have new updates. Tap to open.', url: '/'};
+      return self.registration.showNotification(d.title, {body: d.body, icon: '/static/icons/icon-192.png',
+        badge: '/static/icons/icon-192.png', tag: d.tag || 'teamos', renotify: true, data: {url: d.url || '/'}});
+    }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '/', location.origin).href;
+  e.waitUntil(self.clients.matchAll({type: 'window', includeUncontrolled: true}).then(list => {
+    for (const c of list) { if (c.url.startsWith(location.origin) && 'focus' in c) { c.navigate(url); return c.focus(); } }
+    return self.clients.openWindow(url);
+  }));
 });
 """
 

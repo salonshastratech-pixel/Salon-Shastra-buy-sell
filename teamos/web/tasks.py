@@ -66,8 +66,10 @@ def create():
 def detail(task_id):
     db = get_db()
     task = db.one(TASK_SELECT + "WHERE t.id = ?", (task_id,))
-    if not task:
-        abort(404)
+    if not task:   # e.g. an old alert pointing at a task removed with its lead
+        from flask import flash
+        flash("That task no longer exists — it was removed, probably with its lead.", "warn")
+        return redirect(url_for("tasks.index"))
     if task["entity_type"] and not can("crm.view") and task["assignee_id"] != g.user["id"]:
         deny("crm.view", "task", task_id)
     events = db.all("SELECT e.*, u.full_name AS actor_name FROM task_events e LEFT JOIN users u ON u.id = e.actor_id "

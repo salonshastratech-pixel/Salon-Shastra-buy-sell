@@ -4,16 +4,12 @@
 <div class="ph"><div><h1>Salon Owners</h1><div class="sub">Shared team pipeline. Ownership shows accountability, not access.</div></div>
 <div class="actions">{% if can('crm.create') %}<a class="btn primary" href="{{ url_for('sellers.new') }}">+ New salon owner</a>{% endif %}</div></div>
 
-<form class="card inline" method="get">
+<form class="card inline filters" method="get">
   <input type="search" name="q" value="{{ q }}" placeholder="Name, mobile, salon, locality, SL-…">
   <select name="stage"><option value="">Any stage</option>{% for c, l in STAGES %}<option value="{{ c }}" {{ 'selected' if c == stage }}>{{ l }}</option>{% endfor %}</select>
   <select name="owner"><option value="">Any owner</option><option value="me" {{ 'selected' if owner == 'me' }}>Me</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if owner == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select>
-  <select name="status">{% for s in ['active','holding','closed','all'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s|title }}</option>{% endfor %}</select>
-  <input name="near" value="{{ near }}" list="area-names" placeholder="Near area, e.g. Kondapur" aria-label="Near area">
-  <select name="km" aria-label="Distance">{% for k, l in RADIUS_CHOICES %}<option value="{{ k }}" {{ 'selected' if k == km }}>{{ l }}</option>{% endfor %}</select>
-  <datalist id="area-names">{% for a in area_names %}<option value="{{ a }}">{% endfor %}</datalist>
+  {% set more_fields %}<select name="status">{% for s in ['active','holding','closed','all'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s|title }}</option>{% endfor %}</select><input name="near" value="{{ near }}" list="area-names" placeholder="Near area, e.g. Kondapur" aria-label="Near area"><select name="km" aria-label="Distance">{% for k, l in RADIUS_CHOICES %}<option value="{{ k }}" {{ 'selected' if k == km }}>{{ l }}</option>{% endfor %}</select><datalist id="area-names">{% for a in area_names %}<option value="{{ a }}">{% endfor %}</datalist>{% endset %}
   {% set side = 'seller' %}{% include "_lead_filters.html" %}
-  <button class="btn">Filter</button>
 </form>
 {% if near_unknown %}<p class="flash error">"{{ near }}" is not in the area list yet — try a nearby well-known area name.</p>{% elif near %}<p class="small muted">Salons within {{ km }} km of {{ near }}, nearest first (distances are approximate).</p>{% endif %}
 {% include "_saved_searches.html" %}
@@ -22,7 +18,7 @@
 
 <form id="bulk" method="post" action="{{ url_for('records.bulk') }}" class="card bulk-bar">{{ csrf() }}
   <input type="hidden" name="kind" value="seller"><input type="hidden" name="next" value="{{ request.full_path }}">
-  <strong class="bulk-count">With ticked records:</strong>
+  <strong class="bulk-count">Tick leads to change owner, add a follow-up or remove them.</strong>
   <select name="action" aria-label="Action" data-bulk-action>
     <option value="">Choose…</option>
     {% if can('crm.assign') %}<option value="assign">Change owner</option>{% endif %}
@@ -35,20 +31,17 @@
   <button class="btn sm primary">Apply</button>
   {% if can('users.manage') %}<a class="btn sm" href="?{{ request.query_string.decode() }}{{ '&' if request.query_string else '' }}export=csv">Export this list (CSV)</a>{% endif %}
 </form>
-<div class="card flush"><div class="table-wrap"><table>
-<tr><th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th><th>Ref</th><th>Salon</th><th>Contact</th><th>Stage</th><th>Needs help with</th><th>Listing</th><th class="right">Asking</th><th>Owner</th><th>Next action</th></tr>
+<div class="card flush"><div class="table-wrap"><table class="lead-table">
+<tr><th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th><th>Lead</th><th>Salon</th><th>Contact</th><th>Stage</th><th>Owner</th><th>Next action</th></tr>
 {% for r in rows %}
 <tr class="row-link">
   <td class="sel"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk" aria-label="Select {{ r.ref_code }}"></td><td class="nowrap"><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}{{ came_in(r) }}{% if not r.first_contact_at and r.status == 'active' %}<div><span class="badge bad small">not contacted</span></div>{% endif %}</td>
-  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.salon_name }}</a> {{ marks(r) }}<div class="small muted">{% if r.km is not none and near %}<span class="badge info">{{ r.km }} km</span> {% endif %}{{ r.locality }}, {{ r.city }}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}</div></td>
-  <td><a class="cell-link" href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div></td>
-  <td>{{ stage_badge(r.stage, STAGE_LABELS) }}</td>
-  <td class="small">{% if r.areas %}{{ r.areas|join(', ') }}{% else %}<span class="muted">—</span>{% endif %}{% if r.form_status and r.form_status != 'not_sent' %}<div>{{ form_progress(r.form_status, r.form_answered, r.form_questions) }}</div>{% endif %}</td>
-  <td>{{ approval_badge(r.approval_state) }}</td>
-  <td class="right nowrap">{{ r.asking_price|inr if r.asking_price is not none else '—' }}</td>
-  <td>{{ r.owner_name or '—' }}</td>
-  <td>{% if r.next_action %}<div class="small">{{ r.next_action }}</div><div class="small {{ 'unknown' if r.next_action_due and r.next_action_due < now_iso() else 'muted' }}">{{ r.next_action_due|rel }}</div>{% elif r.status != 'closed' %}<span class="badge bad">None</span>{% else %}—{% endif %}</td>
+  <td><a href="{{ url_for('sellers.detail', opp_id=r.id) }}"><strong>{{ r.salon_name|nice }}</strong></a> {{ marks(r) }}<div class="small muted">{% if r.km is not none and near %}<span class="badge info">{{ r.km }} km</span> {% endif %}{{ r.locality|nice }}{% if r.city and r.city != r.locality %}, {{ r.city|nice }}{% endif %}{% if r.gender_format %} · {{ SF.option_label('gender_format', r.gender_format) }}{% endif %}{% if r.chairs %} · {{ r.chairs }} chairs{% endif %}{% if r.asking_price is not none %} · asking {{ r.asking_price|inr }}{% endif %}</div>{% if r.areas %}<div class="small">Help with: {{ r.areas|join(', ') }}</div>{% endif %}{% if r.form_status and r.form_status != 'not_sent' %}<div>{{ form_progress(r.form_status, r.form_answered, r.form_questions) }}</div>{% endif %}</td>
+  <td><a class="cell-link" href="{{ url_for('sellers.detail', opp_id=r.id) }}">{{ r.contact_name|nice }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div></td>
+  <td data-label="Stage">{{ stage_badge(r.stage, STAGE_LABELS) }}{% if r.approval_state and r.approval_state != 'draft' %}<div>{{ approval_badge(r.approval_state) }}</div>{% endif %}</td>
+  <td class="nowrap" data-label="Owner">{{ r.owner_name|first_name or '—' }}</td>
+  <td data-label="Next">{% if r.next_action %}<div class="small">{{ r.next_action|short_action(r.contact_name, r.salon_name) }}</div><div class="small {{ 'unknown' if r.next_action_due and r.next_action_due < now_iso() else 'muted' }}">{{ r.next_action_due|rel }}</div>{% elif r.status != 'closed' %}<span class="badge bad">None</span>{% else %}—{% endif %}</td>
 </tr>
-{% else %}<tr><td colspan="10" class="empty">No salon owners match these filters.</td></tr>{% endfor %}
+{% else %}<tr><td colspan="7" class="empty">No salon owners match these filters.</td></tr>{% endfor %}
 </table></div></div>
 {% endblock %}

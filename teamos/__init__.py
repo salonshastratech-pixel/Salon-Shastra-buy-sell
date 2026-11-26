@@ -125,6 +125,9 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["ist"] = timeutil.fmt_ist
     app.jinja_env.filters["rel"] = timeutil.relative
     app.jinja_env.filters["tel"] = _tel_link
+    app.jinja_env.filters["nice"] = _nice
+    app.jinja_env.filters["first_name"] = lambda n: (str(n).split()[0] if n else "")
+    app.jinja_env.filters["short_action"] = _short_action
     app.jinja_env.globals.update(
         can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, CALL_OUTCOME_LABELS=_call_labels(), AP=_appointments(), LMK=_lead_marks(), ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
         now_iso=timeutil.now_iso,
@@ -214,3 +217,19 @@ def _appointments():
 def _lead_marks():
     from .domain import lead_marks
     return lead_marks
+
+
+def _nice(text) -> str:
+    """Names typed all in lower case in the sheets ("morning kisses salon") shown properly ("Morning Kisses Salon").
+    Anything with capitals already is left exactly as typed."""
+    s = str(text or "")
+    return s.title() if s and s == s.lower() and any(ch.isalpha() for ch in s) else s
+
+
+def _short_action(text, *names) -> str:
+    """'First call: Anji (morning kisses salon)' → 'First call' on a row that already shows Anji and the salon."""
+    t = str(text or "")
+    low = t.lower()
+    if ":" in t and any(n and str(n).lower() in low for n in names):
+        return t.split(":")[0]
+    return t

@@ -20,6 +20,7 @@ from .timeutil import now_iso, now_utc, to_iso
 log = logging.getLogger("teamos.jobs")
 MAX_ATTEMPTS = 5
 ESCALATE_AFTER_HOURS = 24
+DUE_SOON_MINUTES = 20   # reminder this long before a call-back / visit
 HANDLERS = {}
 
 
@@ -135,7 +136,19 @@ def sla_sweep(db, payload) -> str:
                              f"Escalation: '{t['title']}' ({t['assignee_name']}) is over 24 h overdue", link(t))
             db.insert("task_events", {"task_id": t["id"], "event": "escalated", "at": now})
             escalated += 1
-    return f"{alerted} overdue alerts, {escalated} escalations"
+    # heads-up before a promised call-back / visit (not the planned first calls of an import — too many)
+    soon = to_iso(now_utc() + timedelta(minutes=DUE_SOON_MINUTES))
+    reminded = 0
+    for t in db.all("SELECT t.* FROM tasks t WHERE t.status = 'open' AND t.assignee_id IS NOT NULL AND "
+                    "t.task_type IN ('follow_up', 'call', 'visit') AND t.due_at IS NOT NULL AND t.due_at >= ? AND "
+                    "t.due_at <= ? AND NOT EXISTS (SELECT 1 FROM task_events e WHERE e.task_id = t.id AND "
+                    "e.event = 'due_soon_alerted')", (now, soon)):
+        from .timeutil import fmt_ist
+        T.notify(db, t["assignee_id"], "due_soon", f"At {fmt_ist(t['due_at'], '%I:%M %p').lstrip('0')}: {t['title']}",
+                 link(t))
+        db.insert("task_events", {"task_id": t["id"], "event": "due_soon_alerted", "at": now})
+        reminded += 1
+    return f"{alerted} overdue alerts, {escalated} escalations, {reminded} reminders"
 
 
 @handler("form_chase")

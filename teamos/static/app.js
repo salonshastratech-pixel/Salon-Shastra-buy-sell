@@ -193,17 +193,18 @@
     var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll('input[name=ids][form=bulk]')); };
     var refresh = function () {
       var n = boxes().filter(function (b) { return b.checked; }).length;
-      cnt.textContent = n ? (n + ' ticked:') : 'With ticked records:';
+      cnt.textContent = n ? (n + (cnt.getAttribute('data-some') || ' ticked — choose what to do:'))
+                          : (cnt.getAttribute('data-empty') || 'Tick leads to change owner, add a follow-up or remove them.');
       bulk.classList.toggle('has-selection', n > 0);
     };
-    act.addEventListener('change', function () {
+    if (act) act.addEventListener('change', function () {   // the review page's bar has a single action, no picker
       bulk.querySelectorAll('.bulk-opt').forEach(function (o) { o.hidden = o.getAttribute('data-for') !== act.value; });
     });
     document.addEventListener('change', function (e) { if (e.target.name === 'ids') refresh(); });
     var all = document.querySelector('[data-select-all]');
     if (all) all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); refresh(); });
     bulk.addEventListener('submit', function (e) {
-      if (act.value === 'delete' && !window.confirm('Delete the ticked records for good? This cannot be undone.')) e.preventDefault();
+      if (act && act.value === 'delete' && !window.confirm('Delete the ticked records for good? This cannot be undone.')) e.preventDefault();
     });
     refresh();
   }
@@ -324,4 +325,72 @@
   };
   f.addEventListener('change', upd);
   upd();
+})();
+
+// -- Phone / computer alerts (Web Push). The settings card has [data-push]; My Day shows a nudge until it's on. ---
+(function () {
+  var card = document.querySelector('[data-push]'), nudge = document.querySelector('[data-push-nudge]');
+  if (!card && !nudge) return;
+  var supported = window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  function token() { var m = document.querySelector('[name=csrf_token]'); return m ? m.value : ''; }
+  function post(url, body) {
+    return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(body),
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': token()}});
+  }
+  function keyBytes(b64) {
+    var s = atob((b64 + '==='.slice((b64.length + 3) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+    var out = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out;
+  }
+  function device() {
+    var u = navigator.userAgent, os = /android/i.test(u) ? 'Android' : ios ? 'iPhone/iPad' : /windows/i.test(u) ? 'Windows' : /mac/i.test(u) ? 'Mac' : 'Computer';
+    var br = /edg\//i.test(u) ? 'Edge' : /firefox/i.test(u) ? 'Firefox' : /chrome|crios/i.test(u) ? 'Chrome' : /safari/i.test(u) ? 'Safari' : 'browser';
+    return os + ' · ' + (standalone ? 'TeamOS app' : br);
+  }
+  function show(sel, on) { var el = card && card.querySelector(sel); if (el) el.hidden = !on; }
+  function say(t) { var el = card && card.querySelector('[data-push-state]'); if (el) el.textContent = t; }
+  function current() {
+    return navigator.serviceWorker.register('/sw.js', {scope: '/'}).then(function () { return navigator.serviceWorker.ready; })
+      .then(function (reg) { return reg.pushManager.getSubscription().then(function (s) { return {reg: reg, sub: s}; }); });
+  }
+  function render() {
+    if (!supported) {
+      if (card) { say(ios && !standalone ? 'Not on yet.' : 'This browser can’t receive alerts.'); show(ios && !standalone ? '[data-push-ios]' : '[data-push-unsupported]', true); }
+      return;
+    }
+    if (Notification.permission === 'denied') { say('Blocked in this browser.'); show('[data-push-blocked]', true); return; }
+    current().then(function (st) {
+      if (st.sub) {
+        say('✓ Alerts are on for this device.'); show('[data-push-on]', false); show('[data-push-off]', true);
+        post('/me/push/subscribe', {subscription: st.sub.toJSON(), device: device()});   // keeps the server copy fresh
+      } else {
+        say('Alerts are off on this device.'); show('[data-push-on]', true); show('[data-push-off]', false);
+        if (nudge) nudge.hidden = false;
+      }
+    }).catch(function () { say('Could not check alerts on this device.'); });
+  }
+  if (card) {
+    card.addEventListener('click', function (e) {
+      if (e.target.closest('[data-push-on]')) {
+        say('Asking your browser…');
+        Notification.requestPermission().then(function (perm) {
+          if (perm !== 'granted') { render(); return null; }
+          return fetch('/me/push/key', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (k) {
+            return current().then(function (st) {
+              return st.reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: keyBytes(k.key)});
+            });
+          }).then(function (sub) { return post('/me/push/subscribe', {subscription: sub.toJSON(), device: device()}); })
+            .then(function () { window.location.reload(); });
+        }).catch(function () { say('Could not turn alerts on. Please try again.'); });
+      } else if (e.target.closest('[data-push-off]')) {
+        current().then(function (st) {
+          if (!st.sub) return null;
+          var ep = st.sub.endpoint;
+          return st.sub.unsubscribe().then(function () { return post('/me/push/unsubscribe', {endpoint: ep}); });
+        }).then(function () { window.location.reload(); });
+      }
+    });
+  }
+  render();
 })();

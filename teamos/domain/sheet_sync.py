@@ -848,6 +848,14 @@ def _schedule_first_calls(db, import_id: int) -> None:
                          f"{len(items)} new leads from a sheet import — first calls planned "
                          f"{fmt_ist(span['a'], '%a %d %b')} to {fmt_ist(span['b'], '%a %d %b')}, hottest first",
                          "/tasks/")
+                hot = db.all("SELECT o.id, o.kind, o.ref_code, c.full_name FROM opportunities o JOIN contacts c ON "
+                             "c.id = o.contact_id WHERE o.lead_temperature = 'hot' AND o.id IN (%s) ORDER BY o.id"
+                             % ",".join("?" * len(ids)), ids)
+                if hot:
+                    h = hot[0]
+                    more = f" and {len(hot) - 1} more" if len(hot) > 1 else ""
+                    T.notify(db, owner, "hot_lead", f"Hot lead for you: {h['full_name']} ({h['ref_code']}){more} — "
+                             "call first", f"/{'sellers' if h['kind'] == 'seller' else 'buyers'}/{h['id']}")
 
 
 def _create(db, actor, r, d, u, canon, src_note, load, due) -> int:

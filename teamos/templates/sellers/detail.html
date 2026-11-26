@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ph">
   <div>
-    <h1>{{ opp.salon_name }}</h1>
+    <h1>{{ opp.salon_name|nice }}</h1>
     <div class="inline sub">{{ stage_badge(opp.stage, STAGE_LABELS) }} {{ approval_badge(listing.approval_state) }}
       <span>{{ opp.locality }}, {{ opp.city }}</span> · <span>Owner: <strong>{{ opp.owner_name or 'Unassigned' }}</strong></span>
       · <span>Source: {{ SOURCE_LABELS.get(opp.source, opp.source) }}</span>
@@ -28,10 +28,6 @@
 {% if tab == 'overview' %}
 <div class="split">
   <div>
-    {% include "sellers/_pilot_card.html" %}
-    {% include "_summary_card.html" %}
-    {% include "_progress_card.html" %}
-    {% include "matches/_unblock_card.html" %}
     <div class="card">
       <div class="card-h"><h2>Next action</h2></div>
       {% if tasks %}
@@ -51,9 +47,6 @@
         </form></details>{% endif %}
     </div>
 
-    {% include "inbox/_quick_messages.html" %}
-    {% include "_still_to_collect.html" %}
-
     <div class="card" id="log-call">
       <div class="card-h"><h2>Log a call</h2>{% if opp.last_contact_at %}<span class="small muted">Last contact {{ opp.last_contact_at|rel }}</span>{% endif %}</div>
       {% if opp.do_not_contact %}<p class="muted">This contact asked not to be contacted. Calls cannot be logged as outreach.</p>{% else %}
@@ -66,6 +59,9 @@
         <div class="full"><button class="btn primary">Save call</button> <span class="small muted">A next action is required unless another task stays open.</span></div>
       </form>{% endif %}
     </div>
+
+    {% include "inbox/_quick_messages.html" %}
+    {% include "matches/_unblock_card.html" %}
 
     <div class="card">
       <div class="card-h"><h2>Key facts</h2><a class="small" href="{{ url_for('sellers.detail', opp_id=opp.id, tab='intake') }}">Edit intake →</a></div>
@@ -85,6 +81,11 @@
       </div>
       <p class="small muted">All values are seller-declared unless marked otherwise in the intake tab.</p>
     </div>
+
+    {% include "_still_to_collect.html" %}
+    {% include "sellers/_pilot_card.html" %}
+    {% include "_summary_card.html" %}
+    {% include "_progress_card.html" %}
 
     <div class="card">
       <h2>Notes &amp; activity</h2>
@@ -115,13 +116,6 @@
       <p class="small muted">A rule of thumb for negotiation, not a valuation. Better if the sales and expenses are backed by bills or bank statements.</p></div>
     {% endif %}
     {% include "_timeline.html" %}
-    {% if can('users.manage') %}<details class="card danger-zone"><summary>Delete this record (admin)</summary>
-      <form method="post" action="{{ url_for('records.delete_one', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
-        <p class="small full">Removes {{ opp.ref_code }} and everything linked to it — calls, tasks, form answers, reports, bookings, matches. This cannot be undone. The audit log keeps a line saying who deleted it.</p>
-        <div class="field"><label>Why?</label><input name="reason" placeholder="e.g. test data" required></div>
-        <div class="field"><label>Type {{ opp.ref_code }} to confirm</label><input name="confirm" autocomplete="off" required></div>
-        <div class="full"><button class="btn danger">Delete for good</button></div></form></details>{% endif %}
-
     {% include "forms/_record_card.html" %}
 
     <div class="card">
@@ -149,6 +143,12 @@
         <div class="field"><label>Context for the new owner</label><input name="reason" required></div>
         <button class="btn">Reassign</button></form></div>
     {% endif %}
+    {% if can('users.manage') %}<details class="card danger-zone"><summary>Delete this record (admin)</summary>
+      <form method="post" action="{{ url_for('records.delete_one', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+        <p class="small full">Removes {{ opp.ref_code }} and everything linked to it — calls, tasks, form answers, reports, bookings, matches. This cannot be undone. The audit log keeps a line saying who deleted it.</p>
+        <div class="field"><label>Why?</label><input name="reason" placeholder="e.g. test data" required></div>
+        <div class="field"><label>Type {{ opp.ref_code }} to confirm</label><input name="confirm" autocomplete="off" required></div>
+        <div class="full"><button class="btn danger">Delete for good</button></div></form></details>{% endif %}
   </div>
 </div>
 

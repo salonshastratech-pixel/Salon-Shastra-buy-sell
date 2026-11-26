@@ -32,6 +32,12 @@ def notify(db, user_id: int | None, kind: str, title: str, link: str | None = No
     if user_id:
         db.insert("notifications", {"user_id": user_id, "kind": kind, "title": title, "link": link,
                                     "created_at": now_iso()})
+        try:
+            from . import push
+            push.on_notification(db, user_id, kind)
+        except Exception:  # noqa: BLE001 — a phone alert must never stop the work that raised it
+            import logging
+            logging.getLogger(__name__).exception("push hook failed")
 
 
 def add_activity(db, actor_id, entity_type, entity_id, kind, body=None, call_outcome=None) -> int:

@@ -1,7 +1,7 @@
 {# Temperature, category and the team's latest remark for one list row #}
-{% macro marks(r) -%}
+{% macro marks(r, cats=True) -%}
 {% if r.lead_temperature in ('hot', 'warm', 'cold') %}<span class="badge {{ 'bad' if r.lead_temperature == 'hot' else 'warn' if r.lead_temperature == 'warm' else 'grey' }} small">{{ LMK.TEMP_LABELS[r.lead_temperature] }}</span> {% endif %}
-{% for c in LMK.categories(r.lead_category) %}<span class="badge grey small">{{ c }}</span> {% endfor %}
+{% for c in (LMK.categories(r.lead_category) if cats else []) %}<span class="badge grey small">{{ c }}</span> {% endfor %}
 {% if r.team_remark %}<div class="small muted remark" title="{{ r.team_remark }}">“{{ r.team_remark|truncate(90) }}”</div>{% endif %}
 {%- endmacro %}
 {% macro came_in(r) -%}

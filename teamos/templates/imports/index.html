@@ -2,7 +2,7 @@
 {% block title %}Imports{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Import from sheets</h1><div class="sub">Drop in any Google Sheet or Excel file — sellers, buyers or both. TeamOS reads every tab, keeps only the relevant people, merges repeats and updates people already in the system. You see everything before it is saved.</div></div></div>
-<div class="split">
+<div class="stack">
   <div class="card"><h2>Smart import</h2>
     <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.smart_upload') }}">{{ csrf() }}
       <div class="field"><label for="sm-file">Excel (.xlsx, all tabs) or CSV — up to 8 MB</label><input id="sm-file" type="file" name="file" accept=".csv,.xlsx"></div>

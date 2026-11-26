@@ -51,7 +51,7 @@
         <a class="bell" href="{{ url_for('main.my_day') }}#notifications" aria-label="Alerts">{{ icon('bell') }}{% if unread_count %}<b>{{ unread_count }}</b>{% endif %}</a>
         <details class="pop user-pop"><summary class="avatar" title="{{ current_user.full_name }}">{{ (current_user.full_name or '?')[:1] }}</summary>
           <div class="pop-body"><strong>{{ current_user.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[current_user.role] }}</div>
-            <a href="{{ url_for('team.mine') }}">My availability</a><a href="{{ url_for('auth.change_password') }}">Change password</a>
+            <a href="{{ url_for('team.mine') }}">My availability</a><a href="{{ url_for('main.notification_settings') }}">Phone alerts</a><a href="{{ url_for('auth.change_password') }}">Change password</a>
             <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm">Sign out</button></form></div></details>
       </div>
     </header>

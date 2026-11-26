@@ -211,3 +211,84 @@ def digest_preview():
     from ..domain import digests
     subject, body = digests.build(get_db(), g.user)
     return render_template("digest_preview.html", subject=subject, body=body)
+
+
+# -- Push notifications (phone / computer alerts) ---------------------------------------------------------------------
+@bp.route("/me/notifications", methods=["GET", "POST"])
+@login_required
+def notification_settings():
+    from flask import flash
+
+    from ..domain import push as PU
+    db = get_db()
+    if request.method == "POST":
+        PU.save_prefs(db, g.user["id"], request.form.getlist("on"))
+        flash("Saved. You'll be alerted only for what is ticked.", "ok")
+        return redirect(url_for("main.notification_settings"))
+    return render_template("me_notifications.html", prefs=PU.prefs(db, g.user["id"]), cats=PU.CATEGORIES,
+                           devices=PU.devices(db, g.user["id"]))
+
+
+@bp.route("/me/push/key")
+@login_required
+def push_key():
+    from flask import jsonify
+
+    from ..domain import push as PU
+    return jsonify({"key": PU.keys(get_db())[1]})
+
+
+@bp.route("/me/push/subscribe", methods=["POST"])
+@login_required
+def push_subscribe():
+    from flask import jsonify
+
+    from ..domain import push as PU
+    data = request.get_json(silent=True) or {}
+    try:
+        PU.subscribe(get_db(), g.user["id"], data.get("subscription") or {}, data.get("device") or "")
+    except ValueError:
+        return jsonify({"ok": False}), 400
+    return jsonify({"ok": True})
+
+
+@bp.route("/me/push/unsubscribe", methods=["POST"])
+@login_required
+def push_unsubscribe():
+    from flask import jsonify
+
+    from ..domain import push as PU
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint") or request.form.get("endpoint")
+    PU.unsubscribe(get_db(), g.user["id"], endpoint or None)
+    if request.is_json:
+        return jsonify({"ok": True})
+    from flask import flash
+    flash("Alerts switched off on " + ("that device." if endpoint else "all your devices."), "ok")
+    return redirect(url_for("main.notification_settings"))
+
+
+@bp.route("/me/push/test", methods=["POST"])
+@login_required
+def push_test():
+    from flask import flash
+
+    from ..domain import push as PU
+    db = get_db()
+    db.insert("notifications", {"user_id": g.user["id"], "kind": "push_test", "created_at": now_iso(),
+                                "title": "Test alert: notifications are working on this device.",
+                                "link": url_for("main.notification_settings")})   # sent below, at once
+    n = PU.send_now(db, g.user["id"], force=True)
+    flash(f"Test sent to {n} device{'s' if n != 1 else ''}. It should arrive within a few seconds." if n else
+          "No device took the test. Press “Turn on alerts on this device” first.", "ok" if n else "warn")
+    return redirect(url_for("main.notification_settings"))
+
+
+@bp.route("/me/push/latest")
+@login_required
+def push_latest():
+    """Asked by the phone when a push wakes it: what to show. (The push itself carries no data.)"""
+    from flask import jsonify
+
+    from ..domain import push as PU
+    return jsonify(PU.latest(get_db(), g.user["id"]))

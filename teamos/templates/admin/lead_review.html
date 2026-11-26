@@ -16,11 +16,13 @@
 <form id="bulk" method="post" action="{{ url_for('records.bulk') }}" class="card bulk-bar">{{ csrf() }}
   <input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="next" value="{{ request.full_path }}">
   <input type="hidden" name="action" value="delete">
-  <strong class="bulk-count">Remove ticked records for good:</strong>
+  <strong class="bulk-count" data-empty="Tick the records you want to remove for good." data-some=" ticked — remove for good:">Remove ticked records for good:</strong>
+  <span class="bulk-opt bulk-inline">
   <input name="reason" placeholder="Why? e.g. not interested" aria-label="Reason" required>
   <input name="confirm" placeholder="Type DELETE" aria-label="Type DELETE to confirm" autocomplete="off" required>
   <button class="btn sm danger">Remove</button>
   <span class="small muted">Everything linked (calls, tasks, notes) goes too. This cannot be undone.</span>
+  </span>
 </form>
 {% else %}<p class="small muted">Only an admin can remove records. Open a lead to log a call or close it instead.</p>{% endif %}
 

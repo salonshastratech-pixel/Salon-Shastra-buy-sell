@@ -50,6 +50,7 @@
       <a class="small" href="{{ url_for('matches.desk', mine='1') }}">All my matches →</a>{% endif %}
     </div>
     {% endif %}
+    <div class="card push-nudge" data-push-nudge hidden><div><strong>Get alerts on this phone</strong><div class="small muted">New leads, hot leads and due follow-ups — even when TeamOS is closed.</div></div><a class="btn primary sm" href="{{ url_for('main.notification_settings') }}">Turn on</a></div>
     <div class="card" id="notifications">
       <div class="card-h"><h2>Alerts</h2>
         {% if notifications %}<form method="post" action="{{ url_for('main.notifications_read') }}">{{ csrf() }}<button class="btn link small">Mark all read</button></form>{% endif %}</div>

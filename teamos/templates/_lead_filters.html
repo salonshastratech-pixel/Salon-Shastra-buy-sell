@@ -1,7 +1,16 @@
-{# Extra list filters shared by Salon Owners and Buyers (inside their filter form). `side` = 'seller' | 'buyer'. #}
-<select name="temp" aria-label="Temperature"><option value="">Hot / warm / normal</option>{% for v, l in LMK.TEMPS %}<option value="{{ v }}" {{ 'selected' if f.get('temp') == v }}>{{ l }}</option>{% endfor %}</select>
-<select name="cat" aria-label="Category"><option value="">Any category</option>{% for v, l in LMK.CATEGORIES[side] %}<option value="{{ v }}" {{ 'selected' if f.get('cat') == v }}>{{ l }}</option>{% endfor %}</select>
-<select name="came" aria-label="Lead came in"><option value="">Came in: any time</option>{% for v, l in LMK.CAME_IN %}<option value="{{ v }}" {{ 'selected' if f.get('came') == v }}>{{ l }}</option>{% endfor %}</select>
-<select name="src" aria-label="Source"><option value="">Any source</option>{% for v, l in LMK.SOURCES %}<option value="{{ v }}" {{ 'selected' if f.get('src') == v }}>{{ l }}</option>{% endfor %}</select>
-<select name="contact" aria-label="Contact"><option value="">Called or not</option><option value="not_yet" {{ 'selected' if f.get('contact') == 'not_yet' }}>Not called yet</option><option value="done" {{ 'selected' if f.get('contact') == 'done' }}>Called at least once</option><option value="remark" {{ 'selected' if f.get('contact') == 'remark' }}>Has a team remark</option></select>
+{# Extra list filters shared by Salon Owners and Buyers (inside their filter form). `side` = 'seller' | 'buyer'.
+   The page may pass `more_fields` (its own rarely-used filters) — they go into "More filters" with these. #}
+<select name="temp" aria-label="Temperature"><option value="">Hot / warm / cold</option>{% for v, l in LMK.TEMPS %}<option value="{{ v }}" {{ 'selected' if f.get('temp') == v }}>{{ l }}</option>{% endfor %}</select>
 <select name="sort" aria-label="Sort">{% for v, l in LMK.SORTS %}<option value="{{ v }}" {{ 'selected' if (f.get('sort') or 'latest') == v }}>{{ l }}</option>{% endfor %}</select>
+<button class="btn primary">Filter</button>
+{% set nm = namespace(n=1 if f.get('status') and f.get('status') != 'active' else 0) %}{% for k in ['cat', 'came', 'src', 'contact', 'near', 'need'] %}{% if f.get(k) %}{% set nm.n = nm.n + 1 %}{% endif %}{% endfor %}{% set n_more = nm.n %}
+{% if f.get('q') or f.get('stage') or f.get('owner') or f.get('temp') or n_more %}<a class="btn link small" href="?">Clear all</a>{% endif %}
+<details class="more-filters full-row" {{ 'open' if n_more }}><summary>More filters{% if n_more %} <span class="badge info small">{{ n_more }}</span>{% endif %}</summary>
+  <div class="inline">
+  {{ more_fields|default('', true) }}
+  <select name="cat" aria-label="Category"><option value="">Any category</option>{% for v, l in LMK.CATEGORIES[side] %}<option value="{{ v }}" {{ 'selected' if f.get('cat') == v }}>{{ l }}</option>{% endfor %}</select>
+  <select name="came" aria-label="Lead came in"><option value="">Came in: any time</option>{% for v, l in LMK.CAME_IN %}<option value="{{ v }}" {{ 'selected' if f.get('came') == v }}>{{ l }}</option>{% endfor %}</select>
+  <select name="src" aria-label="Source"><option value="">Any source</option>{% for v, l in LMK.SOURCES %}<option value="{{ v }}" {{ 'selected' if f.get('src') == v }}>{{ l }}</option>{% endfor %}</select>
+  <select name="contact" aria-label="Contact"><option value="">Called or not</option><option value="not_yet" {{ 'selected' if f.get('contact') == 'not_yet' }}>Not called yet</option><option value="done" {{ 'selected' if f.get('contact') == 'done' }}>Called at least once</option><option value="remark" {{ 'selected' if f.get('contact') == 'remark' }}>Has a team remark</option></select>
+  </div>
+</details>

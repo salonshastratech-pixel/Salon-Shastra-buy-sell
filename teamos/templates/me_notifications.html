@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Alerts on my phone{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Alerts on my phone &amp; computer</h1>
+  <div class="sub">Get a notification the moment a new lead is given to you, a lead turns hot, or a follow-up is due — even when TeamOS is closed.</div></div></div>
+
+<div class="grid g2">
+<div class="card push-card" data-push>
+  <h2>This device</h2>
+  <p class="push-state small" data-push-state>Checking…</p>
+  <div class="inline">
+    <button type="button" class="btn primary" data-push-on hidden>Turn on alerts on this device</button>
+    <button type="button" class="btn" data-push-off hidden>Turn off on this device</button>
+  </div>
+  <p class="small muted" data-push-ios hidden>On iPhone: first add TeamOS to your Home Screen (Share → <em>Add to Home Screen</em>), open it from there, then press the button. Needs iOS 16.4 or newer.</p>
+  <p class="small muted" data-push-blocked hidden>Alerts are blocked for this site in your browser. Open the browser's site settings (the lock icon next to the address), allow <em>Notifications</em>, then reload this page.</p>
+  <p class="small muted" data-push-unsupported hidden>This browser can't receive alerts. Use Chrome, Edge or Firefox — or on iPhone, the TeamOS app added to the Home Screen.</p>
+  {% if devices %}
+  <h3 class="push-devices">Your devices ({{ devices|length }})</h3>
+  <ul class="plain small">{% for d in devices %}<li>{{ d.device or 'A browser' }} · added {{ d.created_at|rel }}{% if d.failures %} · <span class="badge warn small">not reachable</span>{% endif %}</li>{% endfor %}</ul>
+  <div class="inline">
+    <form method="post" action="{{ url_for('main.push_test') }}">{{ csrf() }}<button class="btn sm">Send me a test</button></form>
+    <form method="post" action="{{ url_for('main.push_unsubscribe') }}">{{ csrf() }}<button class="btn link small">Turn off everywhere</button></form>
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" class="card">{{ csrf() }}
+  <h2>What should alert me?</h2>
+  <ul class="plain checks">
+  {% for k, label in cats %}<li><label><input type="checkbox" name="on" value="{{ k }}" {{ 'checked' if prefs[k] }}> {{ label }}</label></li>{% endfor %}
+  </ul>
+  <p class="small muted">Everything still appears under the bell in TeamOS; this only decides what pings your phone. Several updates within a minute arrive as one alert.</p>
+  <button class="btn primary">Save</button>
+</form>
+</div>
+{% endblock %}

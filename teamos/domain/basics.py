@@ -86,6 +86,11 @@ def update(db, actor: dict, opp: dict, data) -> list[str]:
             db.execute("UPDATE opportunities SET " + ", ".join(f"{k} = ?" for k in o_set) + ", updated_at = ? WHERE id = ?",
                        (*o_set.values(), now_iso(), opp["id"]))
             changed += [LABELS[k] for k in o_set]
+            owner = before_o.get("primary_owner_id")
+            if o_set.get("lead_temperature") == "hot" and owner and owner != actor["id"]:
+                T.notify(db, owner, "hot_lead", f"{actor['full_name']} marked {before_o.get('ref_code')} as hot "
+                         f"({contact.get('full_name') or business.get('name') or 'lead'}) — call soon",
+                         f"/{'sellers' if kind == 'seller' else 'buyers'}/{opp['id']}")
         if changed:
             T.add_activity(db, actor["id"], "opportunity", opp["id"], "data_update", "Details edited: " + ", ".join(changed))
             audit.record(db, actor["id"], "record.basics_edited", "opportunity", opp["id"],
