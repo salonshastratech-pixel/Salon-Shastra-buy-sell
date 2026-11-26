@@ -14,6 +14,28 @@
   <div class="full"><button class="btn primary">Save</button></div>
 </form>
 
+<div class="card" id="rebuild"><div class="card-h"><h2>Bring in the team's sheets</h2><span class="small muted">all workbooks judged together · {{ excluded }} number{{ 's' if excluded != 1 }} remembered as left out</span></div>
+  <p class="small">Paste every Google Sheet the team has worked in (one link per line, shared as "Anyone with the link can view"). Each person is judged on everything written about them in all the sheets: <strong>cold</strong> (COLD / Cool / disqualified / "time pass"), <strong>not interested</strong> and <strong>job seekers</strong> are left out — unless someone marked them hot or warm anywhere. Everyone else comes in once, with hot / warm, their category, the team's latest remark and when they first came in. Existing records are updated, never duplicated.</p>
+  {% if rebuild %}<div class="answered small">
+    {% if rebuild.state == 'running' %}<strong>Running ({{ rebuild.mode }})…</strong> {{ rebuild.step }} — refresh to see progress.
+    {% elif rebuild.state == 'failed' %}<strong class="unknown">Stopped:</strong> {{ rebuild.error }}
+    {% elif rebuild.report %}{% set r = rebuild.report %}<strong>{{ 'Dry run — nothing changed' if rebuild.mode == 'dry' else 'Done' }}</strong> ({{ rebuild.at|rel }}):
+      {{ r.workbooks }} workbooks, {{ r.rows }} rows ·
+      {% if rebuild.mode == 'dry' %}would create {{ r.will_create.seller }} salon owners and {{ r.will_create.buyer }} investors, update {{ r.will_update }}{% else %}created {{ r.counts.created_seller }} salon owners and {{ r.counts.created_buyer }} investors, updated {{ r.counts.updated }}{% endif %} ·
+      left out {{ r.left_out_people }} people ({% for k, v in r.left_out_by_reason.items() %}{{ v }} {{ k|lower }}{{ ', ' if not loop.last }}{% endfor %})
+      {% if r.remove_existing_cold %}· {{ 'would remove' if rebuild.mode == 'dry' else 'removed' }} {{ r.remove_existing_cold|length }} existing record{{ 's' if r.remove_existing_cold|length != 1 }} the sheets mark cold ({{ r.remove_existing_cold|join(', ')|truncate(200) }}){% endif %}
+      {% if r.kept_despite_sheet_cold %}· kept {{ r.kept_despite_sheet_cold|length }} the sheets call cold because someone had a good call with them in TeamOS{% endif %}
+      {% if r.remove_tests %}· test records: {{ r.remove_tests|join(', ') }}{% endif %}
+    {% endif %}</div>{% endif %}
+  <form method="post" action="{{ url_for('records.rebuild_from_sheets') }}" class="form-grid">{{ csrf() }}
+    <div class="field full"><label for="rb-links">Google Sheets links</label><textarea id="rb-links" name="links" rows="4" placeholder="https://docs.google.com/spreadsheets/d/...">{{ sheet_links }}</textarea></div>
+    <div class="field"><label for="rb-confirm">To apply, type <strong>APPLY</strong></label><input id="rb-confirm" name="confirm" autocomplete="off"></div>
+    <div class="full inline"><button class="btn" name="mode" value="dry">Dry run (see what would change)</button> <button class="btn primary" name="mode" value="apply">Apply</button></div>
+  </form>
+</div>
+
+<div class="card"><div class="card-h"><h2>Lead review</h2></div><p class="small">See leads that probably don't belong any more — said no, cold remarks, never reached, untouched for a month, test entries — each with the reason, and remove them in one go. <a class="btn sm" href="{{ url_for('records.review') }}">Open lead review</a></p></div>
+
 <div class="card danger-zone" id="clear">
   <div class="card-h"><h2>Start fresh — remove all leads</h2></div>
   {% if clear and clear.state == 'running' %}

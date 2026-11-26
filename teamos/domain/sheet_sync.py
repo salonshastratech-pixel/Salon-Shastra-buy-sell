@@ -43,6 +43,9 @@ def classify_tab(book: str, tab: str, fields: set[str]) -> dict:
         if SI.OFF_TOPIC_TABS.search(title) and not (SI.BUYER_TITLE.search(tab) or SI.SELLER_TITLE.search(tab)):
             return {"kind": "skip", "flavour": None,
                     "why": f"'{title}' is about staff, training, products or properties — not salon buyers/sellers"}
+    if "pilot_interest" in fields:
+        return {"kind": "seller", "flavour": "seek_help",
+                "why": "Pilot programme form: salon owners asking for help to grow — kept as owners to nurture"}
     for title in (tab, book):
         if re.search(r"struggling|pilot", title, re.I):
             return {"kind": "seller", "flavour": "seek_help",
@@ -75,6 +78,8 @@ def read_row(headers: list[str], mapping: dict[int, str], row: list[str]) -> tup
             notes.append(f"{label}: {v}" if field != "notes" or len(label) > 0 else v)
             if field in ("call_status", "lead_type"):
                 canon.setdefault(field, v)
+            if field == "lead_type":
+                canon.setdefault("_marks", []).append(v)
             continue
         if field.startswith("help_"):
             if field == "help_staff" and re.fullmatch(r"\d+(\.0)?", v):
@@ -258,6 +263,11 @@ def understand(kind: str, flavour: str | None, canon: dict) -> dict:
 
 # -- Plan -------------------------------------------------------------------------------------------------------------
 def plan(db, filename: str, data: bytes) -> dict:
+    return plan_many(db, [(filename, data)])
+
+
+def _tab_pass(filename: str, data: bytes) -> tuple[str, list[dict], list[dict]]:
+    """First pass over one workbook: each tab's verdict and its raw rows (not judged yet)."""
     book = re.sub(r"\.(xlsx|csv)$", "", filename or "", flags=re.I)
     tabs = SI.read_workbook(filename, data)
     headers_by_tab = {}
@@ -265,13 +275,13 @@ def plan(db, filename: str, data: bytes) -> dict:
         hi, hdr = SI.find_header(rows)
         if hi is not None:
             headers_by_tab[name] = hdr
-    tab_info, rows_out = [], []
-    total = 0
+    tab_info, raw = [], []
     for name, rows in tabs:
         nonempty = [r for r in rows if any(c for c in r)]
         hi, hdr = SI.find_header(rows, siblings=[h for n, h in headers_by_tab.items() if n != name])
         if not nonempty:
-            tab_info.append({"name": name, "kind": "skip", "why": "Empty tab", "rows": 0, "mapping": {}, "ignored": []})
+            tab_info.append({"name": name, "kind": "skip", "why": "Empty tab", "rows": 0, "mapping": {}, "ignored": [],
+                             "book": book})
             continue
         mapping = {}
         for i, h in enumerate(hdr):
@@ -283,60 +293,199 @@ def plan(db, filename: str, data: bytes) -> dict:
         body = rows[hi + 1:] if hi is not None else [r for r in rows if any(r)]
         body = [r for r in body if any(c for c in r)]
         info = {"name": name, "kind": verdict["kind"], "flavour": verdict["flavour"], "why": verdict["why"],
-                "rows": len(body), "header_borrowed": hi is None and bool(hdr),
+                "rows": len(body), "header_borrowed": hi is None and bool(hdr), "book": book,
+                "unsure": verdict["why"].startswith("Can't tell") and bool(fields & {"phone", "whatsapp"}),
                 "mapping": {hdr[i]: f for i, f in mapping.items()},
                 "ignored": [h for i, h in enumerate(hdr) if h and i not in mapping][:40]}
         tab_info.append(info)
-        if verdict["kind"] == "skip":
+        if verdict["kind"] == "skip" and not info["unsure"]:
             continue
         is_form = bool(fields & {"timestamp"}) and not re.search(r"call", name, re.I)
         for n, r in enumerate(body, start=(hi + 2) if hi is not None else 1):
-            total += 1
-            if total > SI.MAX_ROWS:
-                raise ValidationError({"file": f"More than {SI.MAX_ROWS} rows — split the workbook."})
-            canon, notes = read_row(hdr, mapping, r)
             if hdr and sum(1 for i, v in enumerate(r) if v and i < len(hdr) and v.strip() == (hdr[i] or "").strip()) >= 3:
                 continue  # the header row pasted again inside the data
+            canon, notes = read_row(hdr, mapping, r)
             phones = SI.clean_phones(canon.get("phone")) + [p for p in SI.clean_phones(canon.get("whatsapp"))]
             phones = list(dict.fromkeys(phones))
-            phone = phones[0] if phones else None
-            if len(phones) > 1:
-                canon["alt_phone"] = phones[1]
-            alltext = " ".join([canon.get("full_name", ""), canon.get("looking_to_buy", ""),
-                                canon.get("describes_you", ""), canon.get("call_status", ""), *notes,
-                                canon.get("phone", ""), *[c for c in r if c and len(c) < 120]])
-            kind, reason = verdict["kind"], None
-            why_not = SI.judge_row(alltext)
-            if re.search(r"^\s*(test|example|sample|dummy)\b", canon.get("full_name", ""), re.I):
-                why_not = "Test / sample entry"
-            if not why_not and kind == "buyer" and re.match(r"^no", canon.get("looking_to_buy", ""), re.I):
-                why_not = "Said they are not looking to buy"
-            dy = (canon.get("describes_you") or "").lower()
-            if not why_not and dy and not re.search(r"own|owner|partner", dy):
-                why_not = f"Not a salon owner ({canon['describes_you'].replace('_', ' ').strip()})"
-            if not why_not and kind == "buyer" and SI.SELL_SIGNAL.search(" ".join(notes).lower()):
-                kind, reason = "seller", "Remarks say they want to SELL — imported as a seller"
-            if why_not:
-                action, reason = "skip", why_not
-            elif not phone:
-                action, reason = "skip", f"No valid Indian mobile number ({canon.get('phone') or 'blank'})"
-            else:
-                action = "create"
-            u = understand(kind, verdict["flavour"] if kind == verdict["kind"] else None, canon)
-            rows_out.append({"tab": name, "row_no": n, "raw": dict(zip([h or f"Column {i + 1}" for i, h in enumerate(hdr)]
-                                                                       if hdr else [], r)) if hdr else {"cells": r},
-                             "kind": kind, "phone": phone, "canon": canon, "understood": u, "notes": notes,
-                             "action": action, "reason": reason, "is_form": is_form, "book": book,
-                             "flavour": verdict["flavour"] if kind == verdict["kind"] else None})
+            raw.append({"tab": name, "row_no": n, "hdr": hdr, "cells": r, "canon": canon, "notes": notes,
+                        "phones": phones, "is_form": is_form, "book": book, "info": info})
+    return book, tab_info, raw
+
+
+def _resolve_unsure_tabs(tab_info: list[dict], raw: list[dict]) -> None:
+    """A tab we could not type (e.g. 'Sheet2' = call notes on an ad list, 'interested leads') takes the type of the tab
+    in the same workbook that shares most of its people; failing that, the workbook's only type."""
+    by_tab: dict[tuple, set] = {}
+    for x in raw:
+        if x["phones"]:
+            by_tab.setdefault((x["book"], x["tab"]), set()).add(x["phones"][0])
+    known = [t for t in tab_info if t["kind"] in ("seller", "buyer")]
+    for t in tab_info:
+        if not t.get("unsure"):
+            continue
+        mine = by_tab.get((t["book"], t["name"]), set())
+        best, best_n = None, 0
+        for k in known:
+            if k["book"] != t["book"]:
+                continue
+            n = len(mine & by_tab.get((k["book"], k["name"]), set()))
+            if n > best_n:
+                best, best_n = k, n
+        same_book = {k["kind"] for k in known if k["book"] == t["book"]}
+        if best and mine and best_n >= max(3, len(mine) * 0.25):
+            t.update(kind=best["kind"], flavour=best["flavour"],
+                     why=f"Same people as '{best['name']}' ({best_n} of {len(mine)}) — treated as {best['kind']}s")
+        elif len(same_book) == 1:
+            kind = same_book.pop()
+            t.update(kind=kind, flavour=None, why=f"Every other list in this workbook is {kind}s")
+        else:
+            t.update(kind="skip", why="Can't tell whether these people are buyers or sellers")
+
+
+def _judge(x: dict) -> dict:
+    """Second pass: one row → decision (kind, action, reason), understood fields and the team's marks."""
+    info, canon, notes, r = x["info"], x["canon"], x["notes"], x["cells"]
+    phones = x["phones"]
+    phone = phones[0] if phones else None
+    if len(phones) > 1:
+        canon["alt_phone"] = phones[1]
+    alltext = " ".join([canon.get("full_name", ""), canon.get("looking_to_buy", ""),
+                        canon.get("describes_you", ""), canon.get("call_status", ""), *notes,
+                        canon.get("phone", ""), *[c for c in r if c and len(c) < 120]])
+    kind, flavour, reason = info["kind"], info["flavour"], None
+    why_not = SI.judge_row(alltext)
+    if re.search(r"^\s*(test|example|sample|dummy)\b", canon.get("full_name", ""), re.I):
+        why_not = "Test / sample entry"
+    if not why_not and kind == "buyer" and re.match(r"^no", canon.get("looking_to_buy", ""), re.I):
+        why_not = "Said they are not looking to buy"
+    if not canon.get("describes_you"):   # some trackers keep "I own a salon / planning to open" in the Lead Type column
+        dmark = next((m for m in canon.get("_marks") or [] if re.search(r"i_?\s*own|co.?owner|manage_?\s*a_?\s*salon|"
+                                                                      r"planning_?\s*to_?\s*open", m, re.I)), None)
+        if dmark:
+            canon["describes_you"] = dmark
+            if re.search(r"own|co.?owner", dmark, re.I) and kind == "buyer":
+                kind, flavour, reason = "seller", "seek_help", "Tracker says they own a salon — imported as a salon owner"
+    dy = (canon.get("describes_you") or "").lower().replace("_", " ")
+    if not why_not and dy and not re.search(r"own|owner|partner", dy):
+        if re.search(r"planning to open|new salon|start a salon", dy):
+            kind, flavour, reason = "buyer", "new_salon", "Planning to open a new salon — imported as an investor (new salon)"
+        elif re.search(r"manage", dy):
+            notes = notes + ["Manages the salon for someone else (not the owner)"]
+        else:
+            why_not = f"Not a salon owner ({canon['describes_you'].replace('_', ' ').strip()})"
+    needs_staff = bool(not why_not and SI.NEEDS_STAFF.search(alltext.lower()))
+    if not why_not and kind == "buyer" and SI.SELL_SIGNAL.search(" ".join(notes).lower()):
+        kind, flavour, reason = "seller", None, "Remarks say they want to SELL — imported as a seller"
+    elif not why_not and kind == "buyer" and flavour != "new_salon" and needs_staff:
+        kind, flavour, reason = "seller", "seek_help", "Remarks say they run a salon and need staff — imported as a salon owner"
+    if needs_staff and kind == "seller":
+        canon["help_staff"] = canon.get("help_staff") or "yes"
+    if why_not and re.match(r"(Not interested|Wrong number|Said they are not looking)", why_not):
+        canon.setdefault("_marks", []).append(f"cold ({why_not.lower()})")   # kept, last in every list
+        why_not = None
+    if why_not:
+        action, reason = "skip", why_not
+    elif not phone:
+        action, reason = "skip", f"No valid Indian mobile number ({canon.get('phone') or 'blank'})"
+    else:
+        action = "create"
+    u = understand(kind, flavour if kind in ("seller", "buyer") else None, canon)
+    return {"tab": x["tab"], "row_no": x["row_no"],
+            "raw": dict(zip([h or f"Column {i + 1}" for i, h in enumerate(x["hdr"])], r)) if x["hdr"] else {"cells": r},
+            "kind": kind, "phone": phone, "canon": canon, "understood": u, "notes": notes, "action": action,
+            "reason": reason, "is_form": x["is_form"], "book": x["book"], "flavour": flavour,
+            "marks": list(canon.get("_marks") or []), "needs_staff": needs_staff}
+
+
+def plan_many(db, files: list[tuple[str, bytes]]) -> dict:
+    """Plan several workbooks as one: each person is judged on everything the team wrote about them anywhere."""
+    tab_info, raw, books = [], [], []
+    for filename, data in files:
+        book, info, rows = _tab_pass(filename, data)
+        books.append(book)
+        tab_info += info
+        raw += rows
+        if len(raw) > SI.MAX_ROWS * max(1, len(files)):
+            raise ValidationError({"file": f"More than {SI.MAX_ROWS} rows per workbook — split it."})
+    _resolve_unsure_tabs(tab_info, raw)
+    rows_out = [_judge(x) for x in raw if x["info"]["kind"] in ("seller", "buyer")]
+    _cold_and_marks(rows_out)
+    from .purge import exclusions
+    ex = exclusions(db)
+    for r in rows_out:
+        if r["action"] != "skip" and r["phone"] in ex and not db.scalar(
+                "SELECT 1 FROM contacts WHERE phone_normalized = ? OR alt_phone_normalized = ?", (r["phone"], r["phone"])):
+            r["action"], r["reason"] = "skip", f"Left out earlier — {ex[r['phone']]}"
     _merge_and_sync(db, rows_out)
-    return {"book": book, "tabs": tab_info, "rows": rows_out}
+    _lead_meta(rows_out)
+    for t in tab_info:
+        t.pop("unsure", None)
+    return {"book": " + ".join(books), "tabs": tab_info, "rows": rows_out}
+
+
+def _cold_and_marks(rows: list[dict]) -> None:
+    """The team's temperature for each person, across every tab of every workbook: hot / warm / cold (cold only if
+    nobody marked them hot or warm anywhere)."""
+    marks: dict[str, list] = {}
+    where: dict[str, dict] = {}
+    for r in rows:
+        if r["phone"]:
+            marks.setdefault(r["phone"], []).extend(r["marks"])
+            said = SI.COLD_REMARK.search(" ".join(r["notes"]).lower())
+            if said:   # "time pass", "just asking", "not serious" in the remarks = the team's cold verdict
+                r["marks"] = r["marks"] + [f"cold (remark: {said.group(0)})"]
+                marks[r["phone"]].append(r["marks"][-1])
+    for r in rows:   # cold leads are kept (nothing is thrown away) — they simply sort last
+        r["temperature"] = SI.temperature(marks.get(r["phone"], [])) if r["phone"] else None
+
+
+REMARK_LABEL = re.compile(r"^(consolidated notes|remarks?\b[^:]*|notes?|follow\s*up remarks?[^:]*|remarks for[^:]*|"
+                          r"internal notes|problem explained|major problem)\s*:\s*", re.I)
+
+
+def _lead_meta(rows: list[dict]) -> None:
+    """For each record to create/update: temperature, category, the team's latest remark and the earliest lead time."""
+    kids: dict[int, list] = {}
+    for r in rows:
+        if r.get("merged_into") is not None:
+            kids.setdefault(id(r["merged_into"]), []).append(r)
+    for r in rows:
+        if r["action"] not in ("create", "update"):
+            continue
+        group = [r] + kids.get(id(r), [])
+        f = r["understood"]["fields"]
+        if r["kind"] == "seller":
+            cats = []
+            if f.get("sale_purpose") in ("sell_entire", "partnership"):
+                cats.append("sell")
+            if f.get("sale_purpose") == "seek_help":
+                cats.append("help")
+            if any(g.get("needs_staff") for g in group):
+                cats.append("staff")
+            cat = ",".join(dict.fromkeys(cats)) or "help"
+        else:
+            cat = {"new_salon": "new_salon", "passive_invest": "investor"}.get(f.get("need_type"), "buy_salon")
+        remarks = [REMARK_LABEL.sub("", n).strip() for n in r["notes"] if REMARK_LABEL.match(n)]
+        remarks = [x for x in remarks if len(x) > 3 and not re.fullmatch(
+            r"(?i)created|connected|not connected|yes|no|nil|none|n/?a|ok|okay|done|\d+([./-]\d+)*", x)]
+        consolidated = [REMARK_LABEL.sub("", n).strip() for n in r["notes"] if n.lower().startswith("consolidated notes")]
+        if consolidated and len(consolidated[-1]) > 3:
+            remarks.append(consolidated[-1])          # the team's own summary wins
+        stamps = [SI.parse_date(g["canon"].get("timestamp")) for g in group]
+        stamps = [x for x in stamps if x]
+        times = sorted(g["canon"]["timestamp"] for g in group if g["canon"].get("timestamp")
+                       and SI.parse_date(g["canon"]["timestamp"]) == min(stamps)) if stamps else []
+        r["understood"]["meta"] = {"temperature": r.get("temperature") if r.get("temperature") in ("hot", "warm", "cold")
+                                   else "normal", "category": cat, "remark": (remarks[-1] if remarks else "")[:400]}
+        if times:
+            r["canon"]["timestamp"] = times[0]       # when the person FIRST reached us, from any sheet
 
 
 def _richness(r) -> int:
     return len(r["understood"]["fields"]) + len(r["notes"]) + (2 if r["canon"].get("salon_name") else 0)
 
 
-NEGATIVE = ("Not interested", "Wrong number", "Looking for staff")
+NEGATIVE = ("Looking for a job",)
 
 
 def _merge_and_sync(db, rows: list[dict]) -> None:
@@ -375,8 +524,10 @@ def _merge_and_sync(db, rows: list[dict]) -> None:
                    (phone, phone))
         if c:
             primary["contact_id"] = c["id"]
-            opp = db.one("SELECT id, ref_code FROM opportunities WHERE contact_id = ? AND kind = ? ORDER BY id DESC "
-                         "LIMIT 1", (c["id"], kind))
+            # a record of this side under ANY contact with this number (older imports may have made two contacts)
+            opp = db.one("SELECT o.id, o.ref_code FROM opportunities o JOIN contacts c ON c.id = o.contact_id WHERE "
+                         "(c.phone_normalized = ? OR c.alt_phone_normalized = ?) AND o.kind = ? ORDER BY o.id DESC LIMIT 1",
+                         (phone, phone, kind))
             if opp:
                 primary["action"], primary["opportunity_id"] = "update", opp["id"]
                 primary["reason"] = f"Already in TeamOS as {opp['ref_code']} — empty fields will be filled, nothing overwritten"
@@ -386,9 +537,14 @@ def _merge_and_sync(db, rows: list[dict]) -> None:
 
 # -- Persist + commit -----------------------------------------------------------------------------------------------
 def create_import(db, actor, filename: str, data: bytes) -> int:
+    return create_import_many(db, actor, filename, [(filename, data)])
+
+
+def create_import_many(db, actor, filename: str, files: list[tuple[str, bytes]]) -> int:
     if not user_can(db, actor, "crm.import"):
         raise PermissionDenied("crm.import")
-    p = plan(db, filename, data)
+    data = b"".join(d for _n, d in files)
+    p = plan_many(db, files)
     if not any(t["kind"] != "skip" for t in p["tabs"]):
         raise ValidationError({"file": "No buyer or seller lists found in this file. "
                                        + "; ".join(f"{t['name']}: {t['why']}" for t in p["tabs"])[:600]})
@@ -444,6 +600,46 @@ def _next_morning() -> str:
     return to_iso(datetime.combine(day, time(10, 0), tzinfo=IST))
 
 
+def _note_once(db, actor_id, entity_type, opp_id, kind, body):
+    """Re-running an import must not pile up the same note on a record."""
+    if db.scalar("SELECT 1 FROM activities WHERE entity_type = ? AND entity_id = ? AND kind = ? AND body = ?",
+                 (entity_type, opp_id, kind, body)):
+        return None
+    return T.add_activity(db, actor_id, entity_type, opp_id, kind, body)
+
+
+SPOKE = re.compile(r"call\s*status[^:]*:\s*connected\b", re.I)
+
+
+def _already_spoken(db, actor, opp_id: int, notes: list[str], u: dict, lead_at: str | None) -> None:
+    """The previous team already spoke to this person (sheet says Connected, or they rated them hot/warm): mark the
+    first contact and turn the 'first call' task into a follow-up on what they said."""
+    meta = u.get("meta") or {}
+    if not (any(SPOKE.search(n) for n in notes) or meta.get("temperature") in ("hot", "warm")):
+        return
+    when = lead_at or now_iso()
+    db.execute("UPDATE opportunities SET first_contact_at = ? WHERE id = ? AND first_contact_at IS NULL", (when, opp_id))
+    remark = (meta.get("remark") or "").strip()
+    db.execute("UPDATE tasks SET task_type = 'follow_up', title = ? WHERE entity_type = 'opportunity' AND entity_id = ? "
+               "AND status = 'open' AND task_type = 'first_contact'",
+               (("Follow up — " + remark[:80]) if remark else "Follow up — the team spoke to them before (see notes)",
+                opp_id))
+    _note_once(db, actor["id"], "opportunity", opp_id, "system",
+                   "The team spoke to them before TeamOS (from the sheets)"
+                   + ("" if lead_at else " — the sheet has no call date, so the import date is used"))
+
+
+def _apply_meta(db, opp_id: int, u: dict) -> None:
+    m = u.get("meta")
+    if not m:
+        return
+    vals = {"lead_temperature": m.get("temperature"), "lead_category": m.get("category")}
+    if m.get("remark"):
+        vals["team_remark"] = m["remark"]
+    db.execute("UPDATE opportunities SET " + ", ".join(f"{k} = ?" for k in vals) + " WHERE id = ?",
+               (*vals.values(), opp_id))
+
+
 def _raw(v) -> str:
     return str(v) if v is not None else ""
 
@@ -488,6 +684,8 @@ def commit(db, actor, import_id: int, live: bool = False) -> dict:
                     if lt:
                         db.execute("UPDATE opportunities SET lead_created_at = ? WHERE id = ?", (lt, opp_id))
                     counts[f"created_{r['kind']}"] += 1
+                    _apply_meta(db, opp_id, u)
+                    _already_spoken(db, actor, opp_id, notes, u, lt)
                     db.update("sheet_import_rows", r["id"], {"outcome": "created", "opportunity_id": opp_id})
                 else:
                     opp_id = r["opportunity_id"]
@@ -495,9 +693,17 @@ def commit(db, actor, import_id: int, live: bool = False) -> dict:
                     if filled:
                         notes.insert(0, "Filled from sheet: " + ", ".join(filled))
                     counts["updated"] += 1
+                    _apply_meta(db, opp_id, u)
+                    from .timeline import lead_time as _lt
+                    _already_spoken(db, actor, opp_id, notes, u, _lt(canon.get("timestamp")))
+                    from .timeline import lead_time
+                    lt = lead_time(canon.get("timestamp"))
+                    if lt:   # the sheet knows when they first came in: keep the earlier of the two
+                        db.execute("UPDATE opportunities SET lead_created_at = ? WHERE id = ? AND (lead_created_at IS "
+                                   "NULL OR lead_created_at > ?)", (lt, opp_id, lt))
                     db.update("sheet_import_rows", r["id"], {"outcome": "updated"})
                 if notes:
-                    T.add_activity(db, actor["id"], "opportunity", opp_id, "note",
+                    _note_once(db, actor["id"], "opportunity", opp_id, "note",
                                    f"From sheet ({src_note}, row {r['row_no']}):\n" + "\n".join(notes)[:3000])
                 to_understand.append((r["kind"], opp_id, canon, json.loads(r["notes"] or "[]"),
                                       json.loads(r["raw"] or "{}")))
@@ -573,7 +779,8 @@ def _hotness(d: dict) -> tuple:
     f = d["understood"]["fields"]
     soon = f.get("purchase_window") == "30d" or f.get("sale_timeline") == "immediate"
     ts = SI.parse_date(d["canon"].get("timestamp")) or ""
-    return (bool(d.get("is_form")), soon, bool(f.get("all_in_max") or f.get("asking_price")), ts)
+    temp = {"hot": 3, "warm": 2, "normal": 1, "cold": 0}.get((d["understood"].get("meta") or {}).get("temperature"), 1)
+    return (temp, bool(d.get("is_form")), soon, bool(f.get("all_in_max") or f.get("asking_price")), ts)
 
 
 def _schedule_first_calls(db, import_id: int) -> None:
@@ -626,6 +833,9 @@ def _schedule_first_calls(db, import_id: int) -> None:
 
 def _create(db, actor, r, d, u, canon, src_note, load, due) -> int:
     f = u["fields"]
+    if not r["contact_id"] and r["phone"]:   # created moments ago in this same import (the other side of this person)
+        r = {**r, "contact_id": db.scalar("SELECT id FROM contacts WHERE phone_normalized = ? OR alt_phone_normalized = ? "
+                                          "ORDER BY id LIMIT 1", (r["phone"], r["phone"]))}
     owner = _owner(db, r["kind"], load) or actor["id"]
     base = {"full_name": _name(canon), "phone": r["phone"], "email": canon.get("email", ""),
             "alt_phone": canon.get("alt_phone", ""),
@@ -774,7 +984,7 @@ def apply_understanding(db, actor, kind: str, opp_id: int, canon: dict, notes: l
         done.append("next call: " + title)
     # 3. A plain-English summary on the record, with the words it came from
     ev = "; ".join(f"{label} ← “{', '.join(words)[:60]}”" for label, words in res["evidence"])
-    T.add_activity(db, actor["id"], "opportunity", opp_id, "note",
+    _note_once(db, actor["id"], "opportunity", opp_id, "note",
                    f"TeamOS read the remarks ({res['language']}): {res['summary']}\nFrom: {ev}"[:1500])
     done.append(res["summary"])
     return done

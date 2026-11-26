@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf, form_progress, contact_buttons, stage_badge %}
+{% extends "base.html" %}{% from "_lead_marks.html" import marks, came_in %}{% from "macros.html" import csrf, form_progress, contact_buttons, stage_badge %}
 {% block title %}Buyers / Investors{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Buyers / Investors</h1><div class="sub">Acquisition mandates the whole team can work. Ownership shows accountability, not access.</div></div>
@@ -17,9 +17,11 @@
   <select name="stage"><option value="">Any stage</option>{% for c, l in STAGES %}<option value="{{ c }}" {{ 'selected' if c == stage }}>{{ l }}</option>{% endfor %}</select>
   <select name="owner"><option value="">Any owner</option><option value="me" {{ 'selected' if owner == 'me' }}>Me</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if owner == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select>
   <select name="status">{% for s in ['active','holding','closed','all'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s|title }}</option>{% endfor %}</select>
+  {% set side = 'buyer' %}{% include "_lead_filters.html" %}
   <button class="btn">Filter</button>
 </form>
 {% include "_saved_searches.html" %}
+{% include "_pager.html" %}
 
 
 <form id="bulk" method="post" action="{{ url_for('records.bulk') }}" class="card bulk-bar">{{ csrf() }}
@@ -41,8 +43,8 @@
 <tr><th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th><th>Ref</th><th>Buyer</th><th>Wants</th><th class="right">All-in ceiling</th><th>Where</th><th>Stage</th><th>Review</th><th>Owner</th><th>Next action</th></tr>
 {% for r in rows %}
 <tr class="row-link">
-  <td class="sel"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk" aria-label="Select {{ r.ref_code }}"></td><td class="nowrap"><a href="{{ url_for('buyers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}<div class="small muted" title="When the lead came in">{{ (r.lead_created_at or r.created_at)|rel }}</div>{% if not r.first_contact_at and r.status == 'active' %}<div><span class="badge bad small">not contacted</span></div>{% endif %}</td>
-  <td><a href="{{ url_for('buyers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a><div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div>{% if r.inv_form_status and r.inv_form_status != 'not_sent' %}<div>{{ form_progress(r.inv_form_status, r.inv_form_answered, r.inv_form_questions) }}</div>{% endif %}</td>
+  <td class="sel"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk" aria-label="Select {{ r.ref_code }}"></td><td class="nowrap"><a href="{{ url_for('buyers.detail', opp_id=r.id) }}"><strong>{{ r.ref_code }}</strong></a>{% if r.is_synthetic %}<div><span class="badge syn">synthetic</span></div>{% endif %}{{ came_in(r) }}{% if not r.first_contact_at and r.status == 'active' %}<div><span class="badge bad small">not contacted</span></div>{% endif %}</td>
+  <td><a href="{{ url_for('buyers.detail', opp_id=r.id) }}">{{ r.contact_name }}</a> {{ marks(r) }}<div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized, r.do_not_contact) }}</div>{% if r.inv_form_status and r.inv_form_status != 'not_sent' %}<div>{{ form_progress(r.inv_form_status, r.inv_form_answered, r.inv_form_questions) }}</div>{% endif %}</td>
   <td>{% if r.need_type %}<span class="badge {{ 'warn' if r.need_type == 'new_salon' else 'grey' if r.need_type == 'exploring' else 'info' }}">{{ BF.option_label('need_type', r.need_type) }}</span>{% else %}<span class="missing small">Not asked</span>{% endif %}
     {% if r.purchase_window %}<div class="small muted">{{ 'no fixed timeline' if r.purchase_window == 'later' else 'within ' ~ BF.option_label('purchase_window', r.purchase_window) }}</div>{% endif %}</td>
   <td class="right nowrap">{{ r.all_in_max|inr if r.all_in_max is not none else '—' }}</td>

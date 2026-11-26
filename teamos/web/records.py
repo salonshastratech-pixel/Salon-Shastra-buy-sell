@@ -147,8 +147,12 @@ def manage():
     from ..domain import progress as PR
     db = get_db()
     counts = {r["kind"]: r["n"] for r in db.all("SELECT kind, COUNT(*) AS n FROM opportunities GROUP BY kind")}
+    from ..domain import rebuild as RB
+    sheets = [r["url"] for r in db.all("SELECT url FROM connected_sheets WHERE active = 1")]
     return render_template("admin/leads_data.html", split=PR.current_split(db), counts=counts,
-                           clear=purge.clear_status(db), CONFIRM_WORD=purge.CONFIRM_WORD)
+                           clear=purge.clear_status(db), CONFIRM_WORD=purge.CONFIRM_WORD, rebuild=RB.status(db),
+                           sheet_links=chr(10).join(sheets),
+                           excluded=db.scalar("SELECT COUNT(*) FROM lead_exclusions"))
 
 
 @bp.route("/split", methods=["POST"])
@@ -188,3 +192,50 @@ def clear_all():
     background.run(current_app._get_current_object(), "clear_all", lambda bdb: purge.clear_all(bdb, actor, ids, reason))
     flash(f"Removing {len(ids)} record(s) and everything linked to them. This page shows the progress.", "ok")
     return redirect(url_for("records.manage"))
+
+
+@bp.route("/review")
+@require("crm.view")
+def review():
+    """Lead review: records that probably don't belong any more, each with the reason — tick and remove."""
+    from flask import render_template
+
+    from ..domain import lead_review as LR
+    kind = "buyer" if request.args.get("kind") == "buyer" else "seller"
+    why = request.args.get("why") or ""
+    res = LR.review(get_db(), kind, why if why in LR.REASON_LABELS else "")
+    return render_template("admin/lead_review.html", kind=kind, why=why, rows=res["rows"], counts=res["counts"],
+                           REASONS=LR.REASONS)
+
+
+@bp.route("/rebuild", methods=["POST"])
+@require("users.manage")
+def rebuild_from_sheets():
+    """Bring the team's sheets in as the source of truth: dry run (report only) or apply. Runs in the background."""
+    from flask import current_app
+
+    from .. import background
+    from ..domain import rebuild as RB
+    db = get_db()
+    urls = [u.strip() for u in (request.form.get("links") or "").split() if "docs.google.com/spreadsheets" in u]
+    mode = "apply" if request.form.get("mode") == "apply" else "dry"
+    if not urls:
+        flash("Paste at least one Google Sheets link (shared as 'Anyone with the link can view').", "error")
+        return redirect(url_for("records.manage") + "#rebuild")
+    if mode == "apply" and (request.form.get("confirm") or "").strip().upper() != "APPLY":
+        flash("Type APPLY to confirm — or run a dry run first to see exactly what will change.", "error")
+        return redirect(url_for("records.manage") + "#rebuild")
+    st = RB.status(db)
+    if st and st.get("state") == "running":
+        flash("A sheets rebuild is already running.", "error")
+        return redirect(url_for("records.manage") + "#rebuild")
+    actor_id = g.user["id"]
+    with db:
+        db.execute("DELETE FROM automation_settings WHERE key = ?", (RB.KEY,))
+        db.insert("automation_settings", {"key": RB.KEY, "enabled": 1, "note": '{"state": "running", "mode": "%s", '
+                  '"step": "starting"}' % mode, "updated_at": __import__("teamos.timeutil", fromlist=["now_iso"]).now_iso()})
+    background.run(current_app._get_current_object(), "sheets_rebuild",
+                   lambda bdb: RB.run(bdb, bdb.one("SELECT * FROM users WHERE id = ?", (actor_id,)), urls, mode))
+    flash(("Dry run started — the report appears below in a minute or two. Nothing is changed."
+           if mode == "dry" else "Rebuild started — this takes a few minutes. Progress shows below."), "ok")
+    return redirect(url_for("records.manage") + "#rebuild")

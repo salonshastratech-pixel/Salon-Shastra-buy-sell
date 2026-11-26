@@ -1,0 +1,7 @@
+{# Extra list filters shared by Salon Owners and Buyers (inside their filter form). `side` = 'seller' | 'buyer'. #}
+<select name="temp" aria-label="Temperature"><option value="">Hot / warm / normal</option>{% for v, l in LMK.TEMPS %}<option value="{{ v }}" {{ 'selected' if f.get('temp') == v }}>{{ l }}</option>{% endfor %}</select>
+<select name="cat" aria-label="Category"><option value="">Any category</option>{% for v, l in LMK.CATEGORIES[side] %}<option value="{{ v }}" {{ 'selected' if f.get('cat') == v }}>{{ l }}</option>{% endfor %}</select>
+<select name="came" aria-label="Lead came in"><option value="">Came in: any time</option>{% for v, l in LMK.CAME_IN %}<option value="{{ v }}" {{ 'selected' if f.get('came') == v }}>{{ l }}</option>{% endfor %}</select>
+<select name="src" aria-label="Source"><option value="">Any source</option>{% for v, l in LMK.SOURCES %}<option value="{{ v }}" {{ 'selected' if f.get('src') == v }}>{{ l }}</option>{% endfor %}</select>
+<select name="contact" aria-label="Contact"><option value="">Called or not</option><option value="not_yet" {{ 'selected' if f.get('contact') == 'not_yet' }}>Not called yet</option><option value="done" {{ 'selected' if f.get('contact') == 'done' }}>Called at least once</option><option value="remark" {{ 'selected' if f.get('contact') == 'remark' }}>Has a team remark</option></select>
+<select name="sort" aria-label="Sort">{% for v, l in LMK.SORTS %}<option value="{{ v }}" {{ 'selected' if (f.get('sort') or 'latest') == v }}>{{ l }}</option>{% endfor %}</select>

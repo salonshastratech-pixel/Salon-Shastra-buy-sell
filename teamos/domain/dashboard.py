@@ -4,6 +4,7 @@ and leads still waiting for their first call — plus a feed of the latest activ
 from __future__ import annotations
 
 from ..timeutil import ist_day_bounds, now_iso
+from .lead_marks import LEAD_AT
 
 CALL_TYPES = ("first_contact", "call")
 FOLLOW_TYPES = ("follow_up", "collect_info", "visit", "review")
@@ -32,8 +33,8 @@ def numbers(db, user_ids: list[int]) -> dict:
     productive = n(f"SELECT COUNT(*) FROM activities WHERE kind = 'call' AND at >= ? AND actor_id IN ({m}) AND "
                    f"call_outcome IN ({pr})", day_start, *ids, *prs)
     return {
-        "new_leads": n(f"SELECT COUNT(*) FROM opportunities WHERE primary_owner_id IN ({m}) AND "
-                       f"COALESCE(lead_created_at, created_at) >= ?", *ids, day_start),
+        "new_leads": n(f"SELECT COUNT(*) FROM opportunities o WHERE o.primary_owner_id IN ({m}) AND "
+                       f"{LEAD_AT} >= ?", *ids, day_start),
         "calls_to_do": n(f"SELECT COUNT(*) FROM tasks WHERE status = 'open' AND assignee_id IN ({m}) AND task_type IN "
                          f"({ct}) AND due_at IS NOT NULL AND due_at < ?", *ids, *cts, day_end),
         "calls_made": calls_made, "productive": productive,
@@ -53,14 +54,15 @@ def new_leads(db, user_ids: list[int], limit: int = 10) -> list[dict]:
         return []
     m, ids = _in(user_ids)
     rows = db.all(f"SELECT o.id, o.kind, o.ref_code, o.source, o.source_detail, o.lead_created_at, o.created_at, "
-                  f"o.first_contact_at, o.status, c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, "
+                  f"o.first_contact_at, o.status, o.source, o.lead_temperature, o.lead_category, o.team_remark, "
+                  f"c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, "
                   f"u.full_name AS owner_name FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN "
                   f"salon_businesses b ON b.id = o.business_id LEFT JOIN users u ON u.id = o.primary_owner_id WHERE "
-                  f"o.primary_owner_id IN ({m}) AND o.status = 'active' ORDER BY COALESCE(o.lead_created_at, o.created_at) "
+                  f"o.primary_owner_id IN ({m}) AND o.status = 'active' AND {LEAD_AT} IS NOT NULL ORDER BY {LEAD_AT} "
                   f"DESC LIMIT ?", (*ids, limit))
     from .timeline import SOURCE_NAMES, span, speed
     for r in rows:
-        r["lead_at"] = r["lead_created_at"] or r["created_at"]
+        r["lead_at"] = r["lead_created_at"] or r["created_at"]   # rows without a known time are not listed here
         r["source_name"] = SOURCE_NAMES.get(r["source"], (r["source"] or "").replace("_", " ").capitalize())
         r["speed"] = speed(r)
         r["first_after"] = span(r["lead_at"], r["first_contact_at"]) if r["first_contact_at"] else None

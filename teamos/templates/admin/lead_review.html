@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% from "macros.html" import csrf, contact_buttons, stage_badge %}{% from "_lead_marks.html" import marks %}
+{% block title %}Lead review{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Lead review</h1><div class="sub">Leads that probably don't belong any more — each with the reason. Open one to check, or tick and remove.</div></div></div>
+
+<div class="inline small queue-tabs">
+  <a class="btn sm {{ 'primary' if kind == 'seller' }}" href="{{ url_for('records.review', kind='seller') }}">Salon owners</a>
+  <a class="btn sm {{ 'primary' if kind == 'buyer' }}" href="{{ url_for('records.review', kind='buyer') }}">Buyers &amp; investors</a>
+</div>
+<div class="statbar">
+  <a class="stat-chip {{ 'info' if not why }}" href="{{ url_for('records.review', kind=kind) }}"><b>{{ counts.values()|sum }}</b> all reasons</a>
+  {% for k, l in REASONS %}<a class="stat-chip {{ 'info' if why == k }} {{ 'warn' if counts[k] and why != k }}" href="{{ url_for('records.review', kind=kind, why=k) }}" title="{{ l }}"><b>{{ counts[k] }}</b> {{ l.split(' (')[0].split(' —')[0] }}</a>{% endfor %}
+</div>
+
+{% if can('users.manage') %}
+<form id="bulk" method="post" action="{{ url_for('records.bulk') }}" class="card bulk-bar">{{ csrf() }}
+  <input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="next" value="{{ request.full_path }}">
+  <input type="hidden" name="action" value="delete">
+  <strong class="bulk-count">Remove ticked records for good:</strong>
+  <input name="reason" placeholder="Why? e.g. not interested" aria-label="Reason" required>
+  <input name="confirm" placeholder="Type DELETE" aria-label="Type DELETE to confirm" autocomplete="off" required>
+  <button class="btn sm danger">Remove</button>
+  <span class="small muted">Everything linked (calls, tasks, notes) goes too. This cannot be undone.</span>
+</form>
+{% else %}<p class="small muted">Only an admin can remove records. Open a lead to log a call or close it instead.</p>{% endif %}
+
+<div class="card flush"><div class="table-wrap"><table>
+<tr>{% if can('users.manage') %}<th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th>{% endif %}<th>Lead</th><th>Why it is here</th><th>Last contact</th><th>Owner</th></tr>
+{% for r in rows %}<tr>
+  {% if can('users.manage') %}<td class="sel"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk" aria-label="Select {{ r.ref_code }}"></td>{% endif %}
+  <td><a href="{{ opp_url(r.kind, r.id) }}"><strong>{{ r.salon_name if kind == 'seller' and r.salon_name else r.contact_name }}</strong></a> <span class="small muted">{{ r.ref_code }}</span> {{ marks(r) }}
+    <div class="small muted mono">{{ r.phone_normalized }} {{ contact_buttons(r.id, r.phone_normalized) }}</div></td>
+  <td class="small"><span class="badge warn">{{ r.reason_label.split(' (')[0] }}</span>
+    {% if r.said_no %}<div class="muted">{{ r.said_no }} call{{ 's' if r.said_no > 1 }} ended with a no</div>{% endif %}
+    {% if r.missed %}<div class="muted">{{ r.missed }} call{{ 's' if r.missed > 1 }} not answered{% if not r.reached %}, never connected{% endif %}</div>{% endif %}</td>
+  <td class="small">{{ r.last_touch|rel if r.last_touch else 'never' }}{% if r.lead_at %}<div class="muted">came in {{ r.lead_at|rel }}</div>{% endif %}</td>
+  <td class="small">{{ r.owner_name or '—' }}</td>
+</tr>{% else %}<tr><td colspan="5" class="empty">Nothing to review here — every lead looks alive.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

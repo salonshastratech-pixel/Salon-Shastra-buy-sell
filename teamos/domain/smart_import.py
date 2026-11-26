@@ -103,9 +103,10 @@ COLUMNS = [
     ("help_marketing", "s", [r"^(digital\s*)?marketing$"]),
     ("help_staff", "s", [r"^staff$", r"^staff\s*(hiring|support)$"]),
     ("help_training", "s", [r"^(staff\s*)?training$"]),
-    ("lead_type", "n", [r"^lead\s*type$", r"lead temp", r"^priority$", r"lead\s*status"]),
+    ("lead_type", "n", [r"^lead\s*type$", r"lead temp", r"^priority$", r"lead\s*status", r"lead\s*strength"]),
     ("call_status", "n", [r"call\s*status"]),
-    ("notes", "n", [r"remark", r"notes?$", r"comment", r"follow\s*up", r"consultation|consultaion", r"payment collected",
+    ("notes", "n", [r"remark", r"notes?$", r"problem explained|major problem|current profession|want to open in area|"
+                    r"form (shared|filled)", r"comment", r"follow\s*up", r"consultation|consultaion", r"payment collected",
                     r"assigned to", r"impact", r"price\?|this price|valuation", r"liabilit.*explain|nature of",
                     r"next step", r"pending amount|outstanding value", r"seriously thinking|does not sell in",
                     r"parking .*visibility", r"instagram", r"^column\s*\d+\s+\d+$"]),
@@ -434,10 +435,12 @@ def reason_category(v: str) -> str | None:
 
 NOT_RELEVANT = [
     (re.compile(r"<test lead|dummy data|^test$|^testing$"), "Test / dummy entry"),
-    (re.compile(r"\bnot\s*(intre?s?te?d|interested|intrested)\b|no interest|not looking"), "Not interested"),
+    (re.compile(r"\bnot\s*(intre?s?te?d|interested|intrested|in?n?t[ae]?r[ae]?s[a-z]{0,3}d|inst[ae]?r[a-z]{0,3}d)\b|"
+                r"no interest|not looking|\bnot int\w*sted\b"), "Not interested"),
     (re.compile(r"wrong\s*(number|no)"), "Wrong number"),
-    (re.compile(r"looking for (a )?(staff|job|work)|asking (for )?staff|need(s)? staff|staff requirement|"
-                r"looking for job|job seeker|want(s)? (a )?job|^staff$"), "Looking for staff / a job — not a buyer or seller"),
+    (re.compile(r"looking for (a )?(job|work)|job seeker|want(s)? (a )?job|need(s)? (a )?job|searching for (a )?job|"
+                r"i am (a )?(hair\s*dresser|stylist|beautician|barber) looking|seeking (a )?job"),
+     "Looking for a job — not a buyer or seller"),
 ]
 SELL_SIGNAL = re.compile(r"want(s)? to sell|sell(ing)? (the|my|his|her)? ?salon|salon (for )?sale|exit|i own a salon")
 
@@ -456,3 +459,31 @@ def file_sha(data: bytes) -> str:
 
 __all__ = ["recognise", "read_workbook", "find_header", "clean_phone", "money_range", "split_place", "judge_row",
            "json"]
+
+
+# A salon owner who needs people is a lead (they run a salon); someone who wants a job is not (above).
+NEEDS_STAFF = re.compile(r"need(s|ed|ing)?\s+(\d+\s*)?(staff|stylist|hair\s*dress\w*|hairdress\w*|beautician|barber|"
+                         r"employee|male|female|unisex)|staff requirement|asking (for )?staff|looking for (a )?(staff|"
+                         r"stylist|hair\s*dress\w*|beautician|barber)|hiring|staff (needed|required|shortage)")
+# The team's own temperature marks (Lead Type / Lead strength / lead status columns)
+HOT_MARK = re.compile(r"^(hot|very hot|qualified|interested|very interested|serious)\b|\bhot\b")
+WARM_MARK = re.compile(r"^warm\b|\bwarm\b")
+COLD_MARK = re.compile(r"^(cold|cool|disqualified|not a lead|junk|spam|fake|not serious)\b|\b(cold|not a lead)\b")
+
+
+# Remarks that mean the same as a COLD mark (the team often wrote these instead of marking the lead type)
+COLD_REMARK = re.compile(r"time\s*pass|ti?me\s*pass|tymepass|timepass|just (asking|click\w*|enquir\w*|checking)|"
+                         r"not serious|fake (lead|number|enquiry)|by mistake|clicked by mistake|no budget")
+
+
+def temperature(marks: list[str]) -> str | None:
+    """'hot' / 'warm' / 'cold' / None from everything the team wrote in the lead-type columns. A lead anyone marked
+    hot or warm is never treated as cold."""
+    ms = [re.sub(r"\s+", " ", (m or "").strip().lower()) for m in marks if m and str(m).strip()]
+    if any(HOT_MARK.search(m) for m in ms):
+        return "hot"
+    if any(WARM_MARK.search(m) for m in ms):
+        return "warm"
+    if any(COLD_MARK.search(m) for m in ms):
+        return "cold"
+    return None

@@ -61,13 +61,14 @@ def span(a: str | None, b: str | None) -> str | None:
 
 def speed(opp: dict) -> dict:
     """Speed to first contact: {'label', 'tone'} — good within 1 hour, ok same day, slow after that."""
-    lead = opp.get("lead_created_at") or opp.get("created_at")
+    from .lead_marks import lead_at
+    lead = lead_at(opp)
     first = opp.get("first_contact_at")
     if first:
         secs = (parse_iso(first) - parse_iso(lead)).total_seconds() if lead else 0
         tone = "ok" if secs <= 3600 else "info" if secs <= 86400 else "warn"
         return {"label": f"First contact after {span(lead, first) or '0 min'}", "tone": tone}
-    waited = span(lead, now_iso())
+    waited = span(lead, now_iso()) if lead else None
     return {"label": f"Not contacted yet — waiting {waited}" if waited else "Not contacted yet", "tone": "bad"}
 
 
@@ -75,10 +76,16 @@ def build(db, opp: dict, limit: int = 14) -> list[dict]:
     """Milestones, newest first: [{at, icon, title, note}]."""
     oid = opp["id"]
     ev = []
-    lead = opp.get("lead_created_at") or opp.get("created_at")
+    from .lead_marks import lead_at
+    lead = lead_at(opp)
     src = SOURCE_NAMES.get(opp.get("source"), (opp.get("source") or "").replace("_", " ").capitalize())
     detail = opp.get("source_detail") or ""
-    ev.append({"at": lead, "icon": "🎯", "title": "Lead came in", "note": " · ".join(x for x in (src, detail) if x)})
+    if lead:
+        ev.append({"at": lead, "icon": "🎯", "title": "Lead came in", "note": " · ".join(x for x in (src, detail) if x)})
+    else:
+        ev.append({"at": opp.get("created_at"), "icon": "🎯", "title": "Imported from the team's sheets",
+                   "note": " · ".join(x for x in (src, detail, "the sheet did not record when this lead first came in")
+                                      if x)})
     if opp.get("created_at") and lead and abs((parse_iso(opp["created_at"]) - parse_iso(lead)).total_seconds()) > 120:
         ev.append({"at": opp["created_at"], "icon": "📥", "title": "Added to TeamOS",
                    "note": f"{span(lead, opp['created_at'])} after the lead came in"})
@@ -116,7 +123,9 @@ def build(db, opp: dict, limit: int = 14) -> list[dict]:
 
 def age(opp: dict) -> str | None:
     """How long ago the lead came in: '3 h', '2 days'."""
-    return span(opp.get("lead_created_at") or opp.get("created_at"), now_iso())
+    from .lead_marks import lead_at
+    at = lead_at(opp)
+    return span(at, now_iso()) if at else None
 
 
 def backfill_lead_times(db, limit: int = 2000) -> int:

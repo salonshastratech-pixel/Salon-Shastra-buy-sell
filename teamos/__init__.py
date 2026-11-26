@@ -126,7 +126,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["rel"] = timeutil.relative
     app.jinja_env.filters["tel"] = _tel_link
     app.jinja_env.globals.update(
-        can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, CALL_OUTCOME_LABELS=_call_labels(), AP=_appointments(), ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
+        can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, CALL_OUTCOME_LABELS=_call_labels(), AP=_appointments(), LMK=_lead_marks(), ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
         now_iso=timeutil.now_iso,
         _=lambda s: s,  # customer forms pass a translating `_`; everywhere else text is shown as written
         # A global (not context variable) so imported macros can read it.
@@ -209,3 +209,8 @@ def _call_labels() -> dict:
 def _appointments():
     from .domain import appointments
     return appointments
+
+
+def _lead_marks():
+    from .domain import lead_marks
+    return lead_marks

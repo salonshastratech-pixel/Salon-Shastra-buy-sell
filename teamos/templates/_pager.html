@@ -1,0 +1,6 @@
+{% set pages = ((total + page_size - 1) // page_size) if total else 1 %}
+<div class="pager small"><span class="muted">{{ total }} record{{ 's' if total != 1 }}{% if pages > 1 %} · page {{ page }} of {{ pages }}{% endif %}</span>
+  {% if pages > 1 %}{% set base = request.args.to_dict() %}
+  {% if page > 1 %}{% set _ = base.update(page=page - 1) %}<a class="btn sm" href="?{{ base|urlencode }}">← Previous</a>{% endif %}
+  {% if page < pages %}{% set _ = base.update(page=page + 1) %}<a class="btn sm" href="?{{ base|urlencode }}">Next →</a>{% endif %}{% endif %}
+</div>

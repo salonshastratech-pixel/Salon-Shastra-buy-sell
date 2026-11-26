@@ -12,7 +12,8 @@ from ..timeutil import now_iso
 from .errors import ValidationError
 
 MAX_PER_PERSON = 20
-KEYS = {"seller": ["q", "stage", "owner", "status"], "buyer": ["q", "stage", "owner", "need", "status", "queue"]}
+KEYS = {"seller": ["q", "stage", "owner", "status", "temp", "cat", "came", "src", "contact", "sort"],
+        "buyer": ["q", "stage", "owner", "need", "status", "queue", "temp", "cat", "came", "src", "contact", "sort"]}
 FROM = {
     "seller": ("FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b "
                "ON b.id = o.business_id LEFT JOIN users u ON u.id = o.primary_owner_id LEFT JOIN seller_listings l "
@@ -64,6 +65,43 @@ def where(kind: str, args, user_id: int) -> tuple[list[str], list]:
             w.append("(m.criteria_reviewed_version IS NULL OR m.criteria_reviewed_version <> m.data_version)")
         elif queue == "funding":
             w.append("m.funding_status IN ('not_reviewed','evidence_requested')")
+    from .lead_marks import LEAD_AT
+    temp = _get(args, "temp")
+    if temp in ("hot", "warm", "normal", "cold"):
+        w.append("COALESCE(o.lead_temperature, 'normal') = ?")
+        p.append(temp)
+    cat = _get(args, "cat")
+    if cat and cat.replace("_", "").isalpha():
+        w.append("(',' || COALESCE(o.lead_category, '') || ',') LIKE ?")
+        p.append(f"%,{cat},%")
+    came = _get(args, "came")
+    if came:
+        from datetime import timedelta
+
+        from ..timeutil import ist_day_bounds, now_utc, to_iso
+        days = {"7d": 7, "30d": 30, "90d": 90}
+        if came == "today":
+            w.append(f"{LEAD_AT} >= ?")
+            p.append(ist_day_bounds()[0])
+        elif came in days:
+            w.append(f"{LEAD_AT} >= ?")
+            p.append(to_iso(now_utc() - timedelta(days=days[came])))
+        elif came == "older":
+            w.append(f"{LEAD_AT} < ?")
+            p.append(to_iso(now_utc() - timedelta(days=90)))
+        elif came == "unknown":
+            w.append(f"{LEAD_AT} IS NULL")
+    src = _get(args, "src")
+    if src and src.replace("_", "").isalpha():
+        w.append("o.source = ?")
+        p.append(src)
+    contact = _get(args, "contact")
+    if contact == "not_yet":
+        w.append("o.first_contact_at IS NULL")
+    elif contact == "done":
+        w.append("o.first_contact_at IS NOT NULL")
+    elif contact == "remark":
+        w.append("o.team_remark IS NOT NULL AND o.team_remark <> ''")
     status = _get(args, "status") or "active"
     if status in ("active", "holding", "closed"):
         w.append("o.status = ?")
@@ -143,3 +181,12 @@ def open_search(db, actor: dict, sid: int) -> dict | None:
 
 def delete(db, actor: dict, sid: int) -> None:
     db.execute("DELETE FROM saved_searches WHERE id = ? AND user_id = ?", (sid, actor["id"]))
+
+
+
+PAGE_SIZE = 100
+
+
+def page(args) -> int:
+    v = _get(args, "page")
+    return max(1, min(int(v), 1000)) if v.isdigit() else 1

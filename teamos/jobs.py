@@ -209,6 +209,23 @@ def sheet_watch(db, payload) -> str:
     return connected_sheets.check_all(db)
 
 
+@handler("sheets_rebuild")
+def sheets_rebuild(db, payload) -> str:
+    """Once, started by an admin: the team's sheets as the source of truth (dry run first, then apply)."""
+    from flask import current_app, has_app_context
+
+    from . import background
+    from .domain import rebuild
+    actor = db.one("SELECT * FROM users WHERE id = ? AND is_active = 1", (int(payload.get("actor_id") or 0),)) or db.one(
+        "SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    args = (actor, payload.get("urls") or [], payload.get("mode") or "dry", payload.get("remove_refs") or [])
+    if has_app_context():   # minutes of work on a hosted database: never inside the timer request
+        background.run(current_app._get_current_object(), "sheets_rebuild",
+                       lambda bdb: rebuild.run(bdb, bdb.one("SELECT * FROM users WHERE id = ?", (actor["id"],)), *args[1:]))
+        return f"sheets rebuild ({args[2]}) started in the background"
+    return json.dumps(rebuild.run(db, *args))[:500]
+
+
 @handler("area_retry")
 def area_retry(db, payload) -> str:
     """Reports whose free area check did not arrive get another try."""

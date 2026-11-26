@@ -14,7 +14,7 @@
     <div class="board-card click-card" data-href="{{ detail_url(r.id) }}">
       <a href="{{ detail_url(r.id) }}"><strong>{{ r.salon_name or r.contact_name }}</strong></a>
       <div class="small muted">{{ r.ref_code }}{% if r.salon_name %} · {{ r.contact_name }}{% endif %}</div>
-      <div class="small">{{ r.owner_name or 'Unassigned' }} · {{ (r.lead_created_at or r.created_at)|rel }}</div>
+      <div class="small">{{ r.owner_name or 'Unassigned' }} · {% set at = LMK.lead_at(r) %}{{ at|rel if at else 'date not recorded' }}{% if r.lead_temperature in ('hot', 'warm', 'cold') %} <span class="badge {{ 'bad' if r.lead_temperature == 'hot' else 'warn' if r.lead_temperature == 'warm' else 'grey' }} small">{{ LMK.TEMP_LABELS[r.lead_temperature] }}</span>{% endif %}</div>
       {% if r.next_action %}<div class="small {{ 'unknown' if r.next_action_due and r.next_action_due < now_iso() else 'muted' }}">{{ r.next_action }} · {{ r.next_action_due|rel }}</div>{% else %}<div class="small"><span class="badge warn">no next step</span></div>{% endif %}
       {% if not r.first_contact_at %}<div><span class="badge bad small">not contacted</span></div>{% endif %}
       <form method="post" action="{{ stage_url(r.id) }}" class="board-move">{{ csrf() }}<input type="hidden" name="next" value="{{ request.full_path }}">

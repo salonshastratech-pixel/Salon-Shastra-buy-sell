@@ -48,8 +48,12 @@ def index():
     need = request.args.get("need") or ""
     status = request.args.get("status") or "active"
     queue = request.args.get("queue") or ""
-    rows = db.all(LIST_SQL + "WHERE " + " AND ".join(where) + " ORDER BY CASE WHEN o.next_action_due IS NULL "
-                  "THEN 1 ELSE 0 END, o.next_action_due LIMIT 300", params)
+    from ..domain import lead_marks as LM
+    from ..domain import saved_searches as SSX
+    rows = db.all(LIST_SQL + "WHERE " + " AND ".join(where) + " ORDER BY " + LM.order_by(request.args.get("sort") or "latest")
+                  + (" LIMIT 5000" if request.args.get("export") == "csv" else
+                     f" LIMIT {SSX.PAGE_SIZE} OFFSET {(SSX.page(request.args) - 1) * SSX.PAGE_SIZE}"), params)
+    total = db.scalar("SELECT COUNT(*) " + SSX.FROM["buyer"] + "WHERE " + " AND ".join(where), params)
     locs: dict[int, list[str]] = {}
     ids = [r["mandate_id"] for r in rows if r["mandate_id"]]
     if ids:  # portable (no group_concat/string_agg): one query, grouped in Python
@@ -66,7 +70,8 @@ def index():
     return render_template("buyers/index.html", rows=rows, users=_active_users(db), q=q, stage=stage, owner=owner,
                            need=need, status=status, queue=queue, STAGES=B.STAGES + B.HOLDING,
                            STAGE_LABELS=B.STAGE_LABELS, saved=SS.mine(db, g.user["id"], "buyer"), list_kind="buyer",
-                           current_qs=SS.query_string("buyer", request.args))
+                           current_qs=SS.query_string("buyer", request.args), total=total, page=SSX.page(request.args),
+                           page_size=SSX.PAGE_SIZE, LM=LM, f=request.args)
 
 
 @bp.route("/new", methods=["GET", "POST"])

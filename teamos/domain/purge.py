@@ -74,7 +74,7 @@ def _delete(db, table: str, ids: list, kids: dict, cache: dict, seen: set, count
     counts[table] = counts.get(table, 0) + len(ids)
 
 
-def delete_records(db, actor: dict, opp_ids: list[int], reason: str) -> dict:
+def delete_records(db, actor: dict, opp_ids: list[int], reason: str, remember: bool = True) -> dict:
     """Delete these records for good. Returns {records, rows}."""
     if not user_can(db, actor, "users.manage"):
         raise PermissionDenied("users.manage")
@@ -86,7 +86,11 @@ def delete_records(db, actor: dict, opp_ids: list[int], reason: str) -> dict:
     if not opps:
         raise ValidationError({"records": "Nothing to delete."})
     kids, cache, seen, counts = _children(db), {}, set(), {}
+    phones = [p for o in opps for p in db.one("SELECT phone_normalized, alt_phone_normalized FROM contacts WHERE id = ?",
+                                              (o["contact_id"],)).values() if p] if remember else []
     with db:
+        for ph in phones:   # a removed lead must not come back from a sheet import (a new form still comes in)
+            exclude(db, ph, f"Removed by {actor.get('full_name') or 'an admin'}: {reason.strip()[:150]}")
         for o in opps:
             _delete(db, "opportunities", [o["id"]], kids, cache, seen, counts)
         for o in opps:  # the person / salon go too when nothing else uses them
@@ -153,7 +157,7 @@ def clear_all(db, actor: dict, ids: list[int], reason: str) -> dict:
         for i in range(0, len(ids), 40):
             chunk = [x for x in ids[i:i + 40] if db.scalar("SELECT 1 FROM opportunities WHERE id = ?", (x,))]
             if chunk:
-                r = delete_records(db, actor, chunk, reason)
+                r = delete_records(db, actor, chunk, reason, remember=False)   # start fresh: may be re-imported
                 rows += r["rows"]
             done += len(ids[i:i + 40])
             _set_status(db, {"state": "running", "total": len(ids), "done": done, "by": actor["full_name"],
@@ -167,3 +171,15 @@ def clear_all(db, actor: dict, ids: list[int], reason: str) -> dict:
               "finished": now_iso()}
     _set_status(db, st)
     return st
+
+
+
+# -- Numbers not to import again --------------------------------------------------------------------------------------
+def exclude(db, phone: str, reason: str) -> None:
+    from ..timeutil import now_iso
+    if phone and not db.scalar("SELECT 1 FROM lead_exclusions WHERE phone = ?", (phone,)):
+        db.insert("lead_exclusions", {"phone": phone, "reason": (reason or "")[:300], "created_at": now_iso()})
+
+
+def exclusions(db) -> dict[str, str]:
+    return {r["phone"]: r["reason"] or "" for r in db.all("SELECT phone, reason FROM lead_exclusions")}

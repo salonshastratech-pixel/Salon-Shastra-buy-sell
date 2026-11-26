@@ -32,6 +32,7 @@ def _opp_or_404(db, opp_id):
 def index():
     db = get_db()
     from ..domain import saved_searches as SS
+    from ..domain import lead_marks as LM
     where, params = SS.where("seller", request.args, g.user["id"])
     q = (request.args.get("q") or "").strip()
     stage = request.args.get("stage") or ""
@@ -44,8 +45,10 @@ def index():
         "FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id "
         "LEFT JOIN users u ON u.id = o.primary_owner_id LEFT JOIN seller_listings l ON l.opportunity_id = o.id "
         "LEFT JOIN pilot_profiles p ON p.opportunity_id = o.id "
-        "WHERE " + " AND ".join(where) + " ORDER BY CASE WHEN o.next_action_due IS NULL THEN 1 ELSE 0 END, "
-        "o.next_action_due LIMIT 300", params)
+        "WHERE " + " AND ".join(where) + " ORDER BY " + LM.order_by(request.args.get("sort") or "latest")
+        + (" LIMIT 5000" if request.args.get("export") == "csv" or request.args.get("near") else
+           f" LIMIT {SS.PAGE_SIZE} OFFSET {(SS.page(request.args) - 1) * SS.PAGE_SIZE}"), params)
+    total = db.scalar("SELECT COUNT(*) " + SS.FROM["seller"] + "WHERE " + " AND ".join(where), params)
     import json
     from ..domain import geo
     from ..domain import pilot as P
@@ -71,7 +74,8 @@ def index():
                            area_names=geo.known_area_names(),
                            saved=SS.mine(db, g.user["id"], "seller"), list_kind="seller",
                            current_qs=SS.query_string("seller", request.args),
-                           FORM_STATUS_LABELS=P.FORM_STATUS_LABELS)
+                           FORM_STATUS_LABELS=P.FORM_STATUS_LABELS, total=total, page=SS.page(request.args),
+                           page_size=SS.PAGE_SIZE, LM=LM, f=request.args)
 
 
 @bp.route("/new", methods=["GET", "POST"])

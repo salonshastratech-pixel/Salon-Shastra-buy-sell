@@ -1,0 +1,9 @@
+{# Temperature, category and the team's latest remark for one list row #}
+{% macro marks(r) -%}
+{% if r.lead_temperature in ('hot', 'warm', 'cold') %}<span class="badge {{ 'bad' if r.lead_temperature == 'hot' else 'warn' if r.lead_temperature == 'warm' else 'grey' }} small">{{ LMK.TEMP_LABELS[r.lead_temperature] }}</span> {% endif %}
+{% for c in LMK.categories(r.lead_category) %}<span class="badge grey small">{{ c }}</span> {% endfor %}
+{% if r.team_remark %}<div class="small muted remark" title="{{ r.team_remark }}">“{{ r.team_remark|truncate(90) }}”</div>{% endif %}
+{%- endmacro %}
+{% macro came_in(r) -%}
+{% set at = LMK.lead_at(r) %}<div class="small muted" title="{{ ('Lead came in ' ~ (at|ist)) if at else 'The sheet did not record when this lead came in' }}">{{ at|rel if at else 'date not recorded' }}</div>
+{%- endmacro %}

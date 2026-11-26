@@ -912,3 +912,6 @@ a.tile:hover, a.tile:hover *, a.wait-row:hover, a.stat-chip:hover { text-decorat
 .count, .score-l, .btn.sm { white-space: nowrap; }
 .queue-list li .badge, .nav a .count, .tile .n { flex: 0 0 auto; }
 .badge { overflow-wrap: normal; }
+
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin: 6px 0 10px; flex-wrap: wrap; }
+.remark { margin-top: 3px; font-style: italic; overflow-wrap: anywhere; }

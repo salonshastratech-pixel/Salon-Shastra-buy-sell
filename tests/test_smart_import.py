@@ -48,7 +48,9 @@ def workbook() -> bytes:
     calls.append(["30.05.2026", "Cold Caller", "9000100003", "", "not intrested", "", "", "", "", "", "", "", "", "",
                   "", "", "", "", "", "", "", "", ""])  # remark typed into the Email column
     calls.append(["30.05.2026", "Job Seeker", "9000100004", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-                  "", "", "", "", "", "looking for staff"])
+                  "", "", "", "", "", "looking for a job as hairdresser"])
+    calls.append(["30.05.2026", "Needs Staff", "9000100014", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+                  "", "", "", "", "", "need staff 2 male hairdressers for my salon"])
     lists = wb.create_sheet("Lists")
     lists.append(["Assigned To", "Lead Status", "Priority"])
     lists.append(["A", "New", "High"])
@@ -103,9 +105,14 @@ def test_plan_judges_tabs_cleans_rows_merges_and_flags_known_people(app, db):
     rows = p["rows"]
     by = lambda name: [r for r in rows if r["canon"].get("full_name") == name]  # noqa: E731
     assert by("Test")[0]["action"] == "skip"                                    # test row
-    assert "Not interested" in by("Cold Caller")[0]["reason"]                   # remark in the Email column
-    assert "staff" in by("Job Seeker")[0]["reason"].lower()
-    assert by("Not Buying")[0]["reason"].startswith("Said they are not looking")
+    cc = by("Cold Caller")[0]                                                   # remark in the Email column
+    assert cc["action"] != "skip" and cc["understood"]["meta"]["temperature"] == "cold"   # kept, marked cold
+    assert "job" in by("Job Seeker")[0]["reason"].lower() and by("Job Seeker")[0]["action"] == "skip"
+    owner = by("Needs Staff")[0]          # a salon owner who needs staff is a lead, not a job seeker
+    assert owner["action"] == "create" and owner["kind"] == "seller" and owner["needs_staff"]
+    assert "staff" in owner["understood"]["meta"]["category"]
+    nb = by("Not Buying")[0]                                                    # said no: kept, marked cold
+    assert nb["action"] != "skip" and nb["understood"]["meta"]["temperature"] == "cold"
     flipped = by("Wants To Sell")[0]
     assert flipped["kind"] == "seller" and "SELL" in flipped["reason"]
     buyer_a = [r for r in by("Buyer Alpha") if r["action"] != "merged"][0]
@@ -151,7 +158,10 @@ def test_seller_sheet_import_end_to_end_through_the_screens(app, db, login):
     lead.post(f"/imports/smart/{iid}/commit")
     imp = db.one("SELECT * FROM sheet_imports WHERE id = ?", (iid,))
     c = json.loads(imp["counts"])
-    assert imp["status"] == "committed" and c["created_seller"] == 1 and c["updated"] == 1 and c["failed"] == 0
+    assert imp["status"] == "committed" and c["created_seller"] == 3 and c["updated"] == 1 and c["failed"] == 0
+    staff = db.one("SELECT o.* FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
+                   "WHERE c.phone_normalized = '+919000100014'")       # the owner who needs staff
+    assert "staff" in staff["lead_category"] and "need staff" in (staff["team_remark"] or "")
     two = db.one("SELECT o.*, c.full_name FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
                  "WHERE c.phone_normalized = '+919000100002'")
     l2 = db.one("SELECT * FROM seller_listings WHERE opportunity_id = ?", (two["id"],))
