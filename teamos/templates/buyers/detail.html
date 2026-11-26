@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf, stage_badge %}
+{% extends "base.html" %}{% from "_lead_marks.html" import marks %}{% from "macros.html" import csrf, stage_badge %}
 {% macro bfact(label, key, kind='text') -%}
 {%- set value = mandate[key] -%}{%- set st = prov.get(key, {}).get('answer_state') -%}
 <div class="fact"><div class="k">{{ label }}</div><div class="v">
@@ -22,11 +22,12 @@
       <span>{{ mandate.preferred_city or opp.contact_city }}</span> · <span>Owner: <strong>{{ opp.owner_name or 'Unassigned' }}</strong></span>
       · <span>Source: {{ SOURCE_LABELS.get(opp.source, opp.source) }}{% if opp.source_detail %} ({{ opp.source_detail }}){% endif %}</span>
       {% if opp.is_synthetic %}<span class="badge syn">synthetic demo record</span>{% endif %}
-      {% if opp.do_not_contact %}<span class="badge bad">Do not contact</span>{% endif %}</div>
+      {% if opp.do_not_contact %}<span class="badge bad">Do not contact</span>{% endif %} {{ marks(opp) }}</div>
   </div>
   <div class="actions"><span class="badge {{ 'ok' if score.score >= 80 else 'warn' if score.score >= 60 else 'grey' }}">Seriousness {{ score.score }}/100</span>
     <span class="badge info">Requirements {{ comp.pct }}%</span></div>
 </div>
+{% set side = 'buyer' %}{% include "_edit_basics.html" %}
 
 <nav class="tabs">
   {% for k, l in [('overview','Overview'),('investor','Investor journey'),('requirements','Requirements & mandate'),('qualification','Qualification'),('matches','Matches'),('history','History')] %}

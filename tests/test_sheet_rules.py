@@ -216,3 +216,93 @@ def test_rebuild_dry_run_then_apply_from_the_admin_page(app, db, login, monkeypa
     a.post("/records/rebuild", {"links": links, "mode": "apply", "confirm": "APPLY"})   # again: nothing duplicated
     assert db.scalar("SELECT COUNT(*) FROM opportunities") == n
     assert login("seller@t.test").post("/records/rebuild", {"links": links, "mode": "dry"}).status_code in (302, 403)
+
+
+
+def test_edit_details_on_a_profile(app, db, login):
+    from conftest import user
+    from teamos.domain import buyers as B
+    from teamos.domain import sellers as S
+    admin = user(db, "admin@t.test")
+    sid = S.create_lead(db, admin, {"full_name": "Old Name", "phone": "9300300001", "salon_name": "Old Salon",
+                                    "city": "Hyderabad", "locality": "Kondapur", "source": "manual_call",
+                                    "consent_contact": "1", "owner_id": str(admin["id"])})["opportunity_id"]
+    bid = B.create_lead(db, admin, {"full_name": "Buyer B", "phone": "9300300002", "city": "Hyderabad",
+                                    "source": "referral", "consent_contact": "1", "owner_id": str(admin["id"])})["opportunity_id"]
+    c = login("seller@t.test")
+    page = c.get(f"/sellers/{sid}").data.decode()
+    assert "Edit details" in page and 'name="salon_name"' in page
+    c.post(f"/records/{sid}/basics", {"full_name": "New Name", "salon_name": "Glow Studio", "phone": "9300300009",
+                                      "alt_phone": "", "email": "a@b.in", "city": "Hyderabad", "locality": "Madhapur",
+                                      "lead_temperature": "hot", "lead_category": ["sell", "staff"],
+                                      "team_remark": "wants to sell by March"})
+    o = S.load(db, sid)
+    assert (o["contact_name"], o["salon_name"], o["locality"], o["phone_normalized"]) ==         ("New Name", "Glow Studio", "Madhapur", "+919300300009")
+    row = db.one("SELECT * FROM opportunities WHERE id = ?", (sid,))
+    assert row["lead_temperature"] == "hot" and row["lead_category"] == "sell,staff" and "March" in row["team_remark"]
+    assert "Details edited" in db.scalar("SELECT body FROM activities WHERE entity_id = ? AND kind = 'data_update' "
+                                         "ORDER BY id DESC LIMIT 1", (sid,))
+    # a number that belongs to someone else is refused
+    c.post(f"/records/{sid}/basics", {"full_name": "New Name", "salon_name": "Glow Studio", "phone": "9300300002",
+                                      "lead_temperature": "hot"})
+    assert S.load(db, sid)["phone_normalized"] == "+919300300009"
+    c.post(f"/records/{bid}/basics", {"full_name": "Buyer Bee", "phone": "9300300002", "city": "Bengaluru",
+                                      "locality": "HSR", "lead_temperature": "cold", "lead_category": ["new_salon"]})
+    b = B.load(db, bid)
+    assert b["contact_name"] == "Buyer Bee" and b["contact_city"] == "Bengaluru" and b["lead_temperature"] == "cold"
+    assert login("fin@t.test").post(f"/records/{sid}/basics", {"full_name": "x"}).status_code in (302, 403)
+
+
+def _sheet(rows):
+    return _book({"Investor calls": [["Name", "Phone Number", "Investment potential", "Call Status", "Lead type",
+                                      "Remarks"]] + rows})
+
+
+def test_sync_takes_only_what_changed_never_duplicates_never_loses(app, db, login):
+    from conftest import user
+    from teamos.domain import buyers as B
+    admin = user(db, "admin@t.test")
+
+    def run(rows):
+        with app.test_request_context():
+            return SS.commit(db, admin, SS.create_import_many(db, admin, "sync", [("calls.xlsx", _sheet(rows))]))
+
+    def mand(name):
+        return db.one("SELECT m.*, o.id AS oid, o.team_remark, o.lead_temperature FROM buyer_mandates m JOIN "
+                      "opportunities o ON o.id = m.opportunity_id JOIN contacts c ON c.id = o.contact_id "
+                      "WHERE c.full_name = ?", (name,))
+    v1 = [["Ravi Kumar", "9300400001", "under 10 lakhs", "Connected", "Warm", "call on monday"],
+          ["Sita Devi", "9300400002", "under 20 lakhs", "Connected", "", "send pictures"]]
+    c1 = run(v1)
+    assert c1["created_buyer"] == 2 and mand("Ravi Kumar")["all_in_max"] == 1000000
+    # 1. the same sheet again → nothing to do, no repeated notes
+    notes_before = db.scalar("SELECT COUNT(*) FROM activities")
+    c2 = run(v1)
+    assert c2["created_buyer"] == 0 and c2.get("unchanged") == 2 and not c2.get("changed")
+    assert db.scalar("SELECT COUNT(*) FROM activities") == notes_before
+    # 2. the team updates Ravi in the sheet → only Ravi's changed fields sync, logged old → new
+    v2 = [["Ravi Kumar", "9300400001", "under 20 lakhs", "Connected", "Hot", "will visit office saturday"], v1[1]]
+    c3 = run(v2)
+    r = mand("Ravi Kumar")
+    assert c3.get("changed") == 1 and c3.get("unchanged") == 1
+    assert r["all_in_max"] == 2000000 and r["lead_temperature"] == "hot" and "saturday" in r["team_remark"]
+    synced = db.scalar("SELECT body FROM activities WHERE entity_id = ? AND body LIKE 'From sheet%Synced from sheet%' "
+                       "ORDER BY id DESC LIMIT 1", (r["oid"],))
+    assert synced and "→" in synced
+    # 3. someone edits Ravi's budget in TeamOS; the sheet then changes it too → TeamOS keeps its value, noted
+    c = login("admin@t.test")
+    B.update_fields(db, admin, B.load(db, r["oid"]), {"all_in_max": "25L"}, "budget")
+    assert mand("Ravi Kumar")["all_in_max"] == 2500000
+    v3 = [["Ravi Kumar", "9300400001", "above 30 lakhs", "Connected", "Hot", "will visit office saturday"], v1[1],
+          ["New Person", "9300400003", "under 10 lakhs", "Connected", "", "new lead"]]
+    c4 = run(v3)
+    assert mand("Ravi Kumar")["all_in_max"] == 2500000                         # TeamOS edit not overwritten
+    assert c4.get("conflicts", 0) >= 1 and c4["created_buyer"] == 1             # only the new row is new
+    assert "TeamOS kept its value" in (db.scalar(
+        "SELECT body FROM activities WHERE entity_id = ? AND body LIKE 'The sheet and TeamOS differ%' "
+        "ORDER BY id DESC LIMIT 1", (r["oid"],)) or "")
+    # no duplicates anywhere: one record per person
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 3
+    assert db.scalar("SELECT COUNT(*) FROM (SELECT contact_id FROM opportunities GROUP BY contact_id, kind "
+                     "HAVING COUNT(*) > 1) x") == 0
+    assert c.get(f"/buyers/{r['oid']}?tab=history").status_code == 200

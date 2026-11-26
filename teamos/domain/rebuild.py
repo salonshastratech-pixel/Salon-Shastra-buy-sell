@@ -50,7 +50,8 @@ def run(db, actor: dict, urls: list[str], mode: str = "dry", remove_refs: list[s
             m = CS.GSHEET.search(u or "")
             if m and m.group(1) not in seen:
                 seen.add(m.group(1))
-                files.append(fetch(u))
+                cs = db.one("SELECT * FROM connected_sheets WHERE sheet_key = ? AND active = 1", (m.group(1),))
+                files.append((*fetch(u), CS.chosen(cs) if cs else None))
         _status(db, {"state": "running", "mode": mode, "step": f"reading {len(files)} workbooks"})
         p = SS.plan_many(db, files)
         rows = p["rows"]

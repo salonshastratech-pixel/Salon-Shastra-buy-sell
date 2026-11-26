@@ -103,12 +103,12 @@ def check(db, sheet: dict, actor: dict | None = None, fetcher=None) -> str:
         if sha == sheet["last_sha"]:
             result = "No change since the last check."
         else:
-            p = SS.plan(db, name, data)
+            p = SS.plan_many(db, [(name, data, chosen(sheet))])
             new = sum(1 for r in p["rows"] if r["action"] == "create")
             if not new:
                 result = "Checked: no new people (everyone is already in TeamOS)."
             elif sheet.get("auto_import"):
-                import_id = SS.create_import(db, actor, f"{sheet['name']} - {name}", data)
+                import_id = SS.create_import(db, actor, f"{sheet['name']} - {name}", data, chosen(sheet))
                 counts = SS.commit(db, actor, import_id, live=new <= SS.LIVE_BATCH_MAX)
                 made = counts["created_seller"] + counts["created_buyer"]
                 result = (f"{made} new lead(s) added and shared out ({counts['created_seller']} salon owner, "
@@ -120,7 +120,7 @@ def check(db, sheet: dict, actor: dict | None = None, fetcher=None) -> str:
                           "import or discard it, and the next check prepares a fresh one.")
                 sha = sheet["last_sha"]  # look again next time
             else:
-                import_id = SS.create_import(db, actor, f"{sheet['name']} - {name}", data)
+                import_id = SS.create_import(db, actor, f"{sheet['name']} - {name}", data, chosen(sheet))
                 result = f"{new} new people: preview #{import_id} is ready to review and import."
                 admins = [r["id"] for r in db.all("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin'")]
                 for uid in {sheet["created_by"], *admins}:
@@ -141,3 +141,31 @@ def check_all(db, fetcher=None) -> str:
     out = [f"{s['name']}: {check(db, s, fetcher=fetcher)}"
            for s in db.all("SELECT * FROM connected_sheets WHERE active = 1 ORDER BY id")]
     return "; ".join(out) or "no connected sheets"
+
+
+
+def chosen(sheet: dict) -> list[str] | None:
+    """The tabs picked for this sheet (None = every lead tab)."""
+    import json
+    try:
+        tabs = json.loads(sheet.get("tabs") or "null")
+    except ValueError:
+        return None
+    return tabs or None
+
+
+def tab_list(url: str, fetcher=None) -> list[dict]:
+    """Every tab inside the sheet: name, rows, and what it looks like (salon owners / investors / helper …)."""
+    name, data = (fetcher or fetch)(url)
+    _book, info, raw = SS._tab_pass(name, data)
+    SS._resolve_unsure_tabs(info, raw)
+    return [{"name": t["name"], "rows": t["rows"], "kind": t["kind"], "why": t["why"]} for t in info]
+
+
+def set_tabs(db, actor, sheet_id: int, tabs: list[str]) -> None:
+    import json
+    _need(db, actor)
+    with db:
+        db.execute("UPDATE connected_sheets SET tabs = ?, last_sha = NULL WHERE id = ?",   # re-check with the new choice
+                   (json.dumps(tabs) if tabs else None, sheet_id))
+        audit.record(db, actor["id"], "sheet.tabs", "connected_sheet", sheet_id, {"tabs": tabs})

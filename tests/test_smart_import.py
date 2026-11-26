@@ -246,7 +246,12 @@ def test_connected_sheet_prepares_a_preview_only_when_there_are_new_people(app, 
     monkeypatch.setattr(CS, "fetch", lambda u: ("google-sheet.xlsx", data["bytes"]))   # no network in tests
     r = lead.post("/imports/sheets", {"name": "Pilot responses", "link": url}, follow_redirects=True)
     page = r.data.decode()
-    assert "Sheet connected" in page and "ready to review" in page and "Pilot responses" in page
+    assert "Sheet connected" in page and "choose tabs" in page and "Lists" in page     # every tab is listed
+    assert 'value="Lists" checked' not in page and 'name="tabs" value="All calls" checked' in page  # leads ticked
+    s = db.one("SELECT * FROM connected_sheets")
+    tabs = re.findall(r'name="tabs" value="([^"]+)" checked', page)
+    page = lead.post(f"/imports/sheets/{s['id']}/tabs", {"tabs": tabs}, follow_redirects=True).data.decode()
+    assert "ready to review" in page
     s = db.one("SELECT * FROM connected_sheets")
     iid = s["last_import_id"]
     assert db.scalar("SELECT status FROM sheet_imports WHERE id = ?", (iid,)) == "preview"
@@ -291,8 +296,9 @@ def test_auto_import_sheet_brings_ad_leads_straight_in_shared_in_turn(app, db, l
     data = {"bytes": _meta_sheet(4)}
     monkeypatch.setattr(CS, "fetch", lambda u: ("google-sheet.xlsx", data["bytes"]))
     url = "https://docs.google.com/spreadsheets/d/" + "M" * 30 + "/edit"
-    page = admin.post("/imports/sheets", {"name": "Meta ad leads", "link": url, "auto": "1"},
-                      follow_redirects=True).data.decode()
+    admin.post("/imports/sheets", {"name": "Meta ad leads", "link": url, "auto": "1"})
+    page = admin.post(f"/imports/sheets/{db.scalar('SELECT id FROM connected_sheets')}/tabs",
+                      {"tabs": ["Struggling owners"]}, follow_redirects=True).data.decode()
     assert "Auto-import on" in page and "new lead(s) added" in page, page[page.find("flash"):][:400]
     opps = db.all("SELECT id, primary_owner_id, lead_created_at FROM opportunities ORDER BY id")
     assert len(opps) == 4
@@ -328,3 +334,25 @@ def test_the_ten_minute_timer_brings_ad_leads_in(app, db, login, monkeypatch):
         jobs.run_once(db)
     assert db.scalar("SELECT COUNT(*) FROM opportunities") == 3
     assert "3 new lead(s) added" in db.scalar("SELECT last_result FROM connected_sheets WHERE id = ?", (sid,))
+
+
+
+def test_choose_which_tabs_of_a_connected_sheet_come_in(app, db, login, monkeypatch):
+    from teamos.domain import connected_sheets as CS
+    monkeypatch.setattr(CS, "fetch", lambda u: ("google-sheet.xlsx", workbook()))
+    lead = login("lead@t.test")
+    url = "https://docs.google.com/spreadsheets/d/" + "K" * 30 + "/edit"
+    lead.post("/imports/sheets", {"name": "Team book", "link": url})
+    sid = db.scalar("SELECT id FROM connected_sheets")
+    page = lead.get(f"/imports/sheets/{sid}/tabs").data.decode()
+    names = re.findall(r'name="tabs" value="([^"]+)"', page)
+    assert len(names) >= 4 and "Salon owners" in page or "Buyers / investors" in page
+    one = next(n for n in names if n.startswith("Form responses"))
+    lead.post(f"/imports/sheets/{sid}/tabs", {"tabs": [one]})
+    assert CS.chosen(db.one("SELECT * FROM connected_sheets WHERE id = ?", (sid,))) == [one]
+    iid = db.scalar("SELECT last_import_id FROM connected_sheets WHERE id = ?", (sid,))
+    tabs_in = {r["tab"] for r in db.all("SELECT DISTINCT tab FROM sheet_import_rows WHERE import_id = ?", (iid,))}
+    assert tabs_in == {one}                                          # only the chosen tab was read
+    assert "Choose tabs ✓" in lead.get("/imports/").data.decode()
+    assert lead.post(f"/imports/sheets/{sid}/tabs", {}, follow_redirects=True).status_code == 200   # none ticked: refused
+    assert CS.chosen(db.one("SELECT * FROM connected_sheets WHERE id = ?", (sid,))) == [one]

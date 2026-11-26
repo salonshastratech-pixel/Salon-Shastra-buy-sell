@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Choose tabs · {{ sheet.name }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ sheet.name }} — choose tabs</h1><div class="sub">This Google Sheet has {{ tabs|length }} tab{{ 's' if tabs|length != 1 }}. Tick the ones to bring into TeamOS{% if sheet.auto_import %} (checked every 10 minutes){% endif %}.</div></div></div>
+<form method="post" class="card">{{ csrf() }}
+  <div class="table-wrap"><table>
+    <tr><th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th><th>Tab</th><th class="right">Rows</th><th>Looks like</th></tr>
+    {% for t in tabs %}<tr>
+      <td class="sel"><input type="checkbox" name="tabs" value="{{ t.name }}" {{ 'checked' if t.checked }} aria-label="Bring in {{ t.name }}"></td>
+      <td><strong>{{ t.name }}</strong></td><td class="right">{{ t.rows }}</td>
+      <td class="small">{% if t.kind == 'seller' %}<span class="badge info">Salon owners</span>{% elif t.kind == 'buyer' %}<span class="badge ok">Buyers / investors</span>{% else %}<span class="badge grey">Not leads</span>{% endif %} <span class="muted">{{ t.why }}</span></td>
+    </tr>{% endfor %}
+  </table></div>
+  <p class="small muted">{{ 'Your earlier choice is ticked.' if chosen_before else 'Tabs that look like salon owners or investors are ticked for you.' }} Unticked tabs are never imported. Everyone in the ticked tabs is judged on all of them together (cold marks, remarks, duplicates).</p>
+  <button class="btn primary">Save and check now</button> <a class="btn" href="{{ url_for('imports.index') }}#sheets">Cancel</a>
+</form>
+{% endblock %}

@@ -239,3 +239,26 @@ def rebuild_from_sheets():
     flash(("Dry run started — the report appears below in a minute or two. Nothing is changed."
            if mode == "dry" else "Rebuild started — this takes a few minutes. Progress shows below."), "ok")
     return redirect(url_for("records.manage") + "#rebuild")
+
+
+@bp.route("/<int:opp_id>/basics", methods=["POST"])
+@require("crm.edit")
+def edit_basics(opp_id):
+    """The Edit panel on a salon owner / buyer profile: name, numbers, e-mail, salon, place, hot/warm/cold, category,
+    team remark."""
+    from ..domain import basics as BA
+    db = get_db()
+    kind = db.scalar("SELECT kind FROM opportunities WHERE id = ?", (opp_id,))
+    if kind not in ("seller", "buyer"):
+        abort(404)
+    opp = (S.load(db, opp_id) if kind == "seller" else B.load(db, opp_id))
+    target = url_for("sellers.detail" if kind == "seller" else "buyers.detail", opp_id=opp_id)
+    try:
+        changed = BA.update(db, g.user, opp, request.form)
+        flash(("Saved: " + ", ".join(changed)) if changed else "Nothing changed.", "ok")
+    except ValidationError as e:
+        flash("Not saved: " + " ".join(e.errors.values()), "error")
+        return redirect(target + "?edit=1#edit")
+    except PermissionDenied:
+        abort(403)
+    return redirect(target)

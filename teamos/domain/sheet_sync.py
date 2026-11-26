@@ -266,7 +266,7 @@ def plan(db, filename: str, data: bytes) -> dict:
     return plan_many(db, [(filename, data)])
 
 
-def _tab_pass(filename: str, data: bytes) -> tuple[str, list[dict], list[dict]]:
+def _tab_pass(filename: str, data: bytes, only: list[str] | None = None) -> tuple[str, list[dict], list[dict]]:
     """First pass over one workbook: each tab's verdict and its raw rows (not judged yet)."""
     book = re.sub(r"\.(xlsx|csv)$", "", filename or "", flags=re.I)
     tabs = SI.read_workbook(filename, data)
@@ -290,6 +290,9 @@ def _tab_pass(filename: str, data: bytes) -> tuple[str, list[dict], list[dict]]:
                 mapping[i] = fld
         fields = set(mapping.values())
         verdict = classify_tab(book, name, fields)
+        if only is not None and name not in only:
+            verdict = {"kind": "skip", "flavour": None, "why": "Not selected for import (Choose tabs)"}
+            fields = set()
         body = rows[hi + 1:] if hi is not None else [r for r in rows if any(r)]
         body = [r for r in body if any(c for c in r)]
         info = {"name": name, "kind": verdict["kind"], "flavour": verdict["flavour"], "why": verdict["why"],
@@ -400,8 +403,9 @@ def _judge(x: dict) -> dict:
 def plan_many(db, files: list[tuple[str, bytes]]) -> dict:
     """Plan several workbooks as one: each person is judged on everything the team wrote about them anywhere."""
     tab_info, raw, books = [], [], []
-    for filename, data in files:
-        book, info, rows = _tab_pass(filename, data)
+    for f in files:   # (filename, data) or (filename, data, [tabs to bring in])
+        filename, data = f[0], f[1]
+        book, info, rows = _tab_pass(filename, data, f[2] if len(f) > 2 and f[2] else None)
         books.append(book)
         tab_info += info
         raw += rows
@@ -536,14 +540,14 @@ def _merge_and_sync(db, rows: list[dict]) -> None:
 
 
 # -- Persist + commit -----------------------------------------------------------------------------------------------
-def create_import(db, actor, filename: str, data: bytes) -> int:
-    return create_import_many(db, actor, filename, [(filename, data)])
+def create_import(db, actor, filename: str, data: bytes, tabs: list[str] | None = None) -> int:
+    return create_import_many(db, actor, filename, [(filename, data, tabs)])
 
 
 def create_import_many(db, actor, filename: str, files: list[tuple[str, bytes]]) -> int:
     if not user_can(db, actor, "crm.import"):
         raise PermissionDenied("crm.import")
-    data = b"".join(d for _n, d in files)
+    data = b"".join(f[1] for f in files)
     p = plan_many(db, files)
     if not any(t["kind"] != "skip" for t in p["tabs"]):
         raise ValidationError({"file": "No buyer or seller lists found in this file. "
@@ -686,14 +690,26 @@ def commit(db, actor, import_id: int, live: bool = False) -> dict:
                     counts[f"created_{r['kind']}"] += 1
                     _apply_meta(db, opp_id, u)
                     _already_spoken(db, actor, opp_id, notes, u, lt)
+                    _set_state(db, opp_id, {**_sheet_values(r["kind"], u), "__row__": _fingerprint(r["kind"], u, notes)})
                     db.update("sheet_import_rows", r["id"], {"outcome": "created", "opportunity_id": opp_id})
                 else:
                     opp_id = r["opportunity_id"]
-                    filled = _fill_gaps(db, actor, r["kind"], opp_id, u, src_tag)
-                    if filled:
-                        notes.insert(0, "Filled from sheet: " + ", ".join(filled))
+                    fp = _fingerprint(r["kind"], u, notes)
+                    if _state(db, opp_id).get("__row__") == fp:
+                        counts["unchanged"] = counts.get("unchanged", 0) + 1     # nothing new in the sheet
+                        db.update("sheet_import_rows", r["id"], {"outcome": "updated"})
+                        continue
+                    synced, conflicts = _sync_fields(db, actor, r["kind"], opp_id, u, src_tag)
+                    if synced:
+                        notes.insert(0, "Synced from sheet: " + "; ".join(synced))
+                        counts["changed"] = counts.get("changed", 0) + 1
+                    if conflicts:
+                        counts["conflicts"] = counts.get("conflicts", 0) + len(conflicts)
+                        _note_once(db, actor["id"], "opportunity", opp_id, "note",
+                                   "The sheet and TeamOS differ — TeamOS kept its value (nothing overwritten):\n"
+                                   + "\n".join(conflicts))
+                    _set_state(db, opp_id, {"__row__": fp})
                     counts["updated"] += 1
-                    _apply_meta(db, opp_id, u)
                     from .timeline import lead_time as _lt
                     _already_spoken(db, actor, opp_id, notes, u, _lt(canon.get("timestamp")))
                     from .timeline import lead_time
@@ -988,3 +1004,90 @@ def apply_understanding(db, actor, kind: str, opp_id: int, canon: dict, notes: l
                    f"TeamOS read the remarks ({res['language']}): {res['summary']}\nFrom: {ev}"[:1500])
     done.append(res["summary"])
     return done
+
+
+
+# -- Sync: three-way merge per field (sheet before → sheet now, against TeamOS now) ----------------------------------
+META_KEYS = {"lead_temperature": "Hot / warm / cold", "lead_category": "Category", "team_remark": "Team remark"}
+
+
+def _fingerprint(kind: str, u: dict, notes: list[str]) -> str:
+    import hashlib
+    payload = json.dumps({"k": kind, "f": u.get("fields"), "m": u.get("meta"), "n": notes}, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()[:32]
+
+
+def _state(db, opp_id: int) -> dict:
+    return {r["field_key"]: r["value"] for r in db.all("SELECT field_key, value FROM sheet_field_state "
+                                                       "WHERE opportunity_id = ?", (opp_id,))}
+
+
+def _set_state(db, opp_id: int, values: dict) -> None:
+    now = now_iso()
+    for k, v in values.items():
+        v = None if v is None else str(v)
+        if db.scalar("SELECT 1 FROM sheet_field_state WHERE opportunity_id = ? AND field_key = ?", (opp_id, k)):
+            db.execute("UPDATE sheet_field_state SET value = ?, updated_at = ? WHERE opportunity_id = ? AND field_key = ?",
+                       (v, now, opp_id, k))
+        else:
+            db.insert("sheet_field_state", {"opportunity_id": opp_id, "field_key": k, "value": v, "updated_at": now})
+
+
+def _sheet_values(kind: str, u: dict) -> dict:
+    keys = SFD.BY_KEY if kind == "seller" else BF.BY_KEY
+    out = {k: v for k, v in (u.get("fields") or {}).items() if k in keys and v is not None}
+    m = u.get("meta") or {}
+    out.update({"lead_temperature": m.get("temperature"), "lead_category": m.get("category")})
+    if m.get("remark"):
+        out["team_remark"] = m["remark"]
+    return out
+
+
+def _sync_fields(db, actor, kind: str, opp_id: int, u: dict, src_tag: str) -> tuple[list[str], list[str]]:
+    """For every field the sheet gives: unchanged in the sheet → nothing; empty in TeamOS → filled; changed in the
+    sheet and untouched in TeamOS since the last sync → updated (old → new is logged); changed in both → TeamOS keeps
+    its value and the difference is reported. Returns (what was synced, conflicts)."""
+    sheet = _sheet_values(kind, u)
+    base = _state(db, opp_id)
+    if kind == "seller":
+        lid = db.scalar("SELECT id FROM seller_listings WHERE opportunity_id = ?", (opp_id,))
+        current = S.load_listing(db, lid)
+        prov = S.provenance(db, lid)
+        labels = {k: SFD.BY_KEY[k].label for k in SFD.BY_KEY}
+    else:
+        current = db.one("SELECT * FROM buyer_mandates WHERE opportunity_id = ?", (opp_id,)) or {}
+        prov = {}
+        labels = {k: BF.BY_KEY[k].label for k in BF.BY_KEY}
+    current = {**current, **(db.one("SELECT lead_temperature, lead_category, team_remark FROM opportunities "
+                                    "WHERE id = ?", (opp_id,)) or {})}
+    labels.update(META_KEYS)
+    apply, meta_apply, synced, conflicts, new_base = {}, {}, [], [], {}
+    for k, v in sheet.items():
+        new = None if v is None else str(v)
+        old = base.get(k)
+        cur = current.get(k)
+        cur_s = None if cur is None else str(cur)
+        new_base[k] = new
+        if new is None or new == old or new == cur_s:
+            continue                                    # nothing new from the sheet / already the same
+        if k in prov and prov[k].get("answer_state") not in (None, "value") and cur is None:
+            conflicts.append(f"{labels.get(k, k)}: sheet says {new}; TeamOS records '{prov[k]['answer_state']}' (kept)")
+            continue
+        if cur is None or (old is not None and cur_s == old):
+            if k in META_KEYS:
+                meta_apply[k] = v
+            else:
+                apply[k] = v
+            synced.append(f"{labels.get(k, k)}: {cur_s or 'empty'} → {new}")
+        else:
+            conflicts.append(f"{labels.get(k, k)}: sheet says {new}; TeamOS has {cur_s} (kept)")
+    if apply:
+        if kind == "seller":
+            S._apply_values(db, actor, lid, {k: (v, "value") for k, v in apply.items()}, source=src_tag, bump_version=False)
+        else:
+            _buyer_fields(db, actor, opp_id, apply)
+    if meta_apply:
+        db.execute("UPDATE opportunities SET " + ", ".join(f"{k} = ?" for k in meta_apply) + " WHERE id = ?",
+                   (*meta_apply.values(), opp_id))
+    _set_state(db, opp_id, new_base)
+    return synced, conflicts

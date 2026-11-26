@@ -1,0 +1,18 @@
+{# Edit panel at the top of a salon owner / buyer profile. Needs: opp (+ salon fields for sellers), side. #}
+{% if can('crm.edit') %}
+<details class="card disclose edit-basics" id="edit" {{ 'open' if request.args.get('edit') }}><summary>✏️ Edit details</summary>
+  <form method="post" action="{{ url_for('records.edit_basics', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
+    <div class="field"><label for="eb-name">{{ 'Owner name' if side == 'seller' else 'Name' }}</label><input id="eb-name" name="full_name" value="{{ opp.contact_name or '' }}" required maxlength="120"></div>
+    {% if side == 'seller' %}<div class="field"><label for="eb-salon">Salon name</label><input id="eb-salon" name="salon_name" value="{{ opp.salon_name or '' }}" required maxlength="120"></div>{% endif %}
+    <div class="field"><label for="eb-phone">Mobile</label><input id="eb-phone" name="phone" value="{{ (opp.phone_normalized or '')[-10:] }}" inputmode="tel" required></div>
+    <div class="field"><label for="eb-alt">Alternate mobile</label><input id="eb-alt" name="alt_phone" value="{{ (opp.alt_phone_normalized or '')[-10:] }}" inputmode="tel"></div>
+    <div class="field"><label for="eb-email">E-mail</label><input id="eb-email" type="email" name="email" value="{{ opp.email or '' }}"></div>
+    <div class="field"><label for="eb-city">City</label><input id="eb-city" name="city" value="{{ (opp.city if side == 'seller' else opp.contact_city) or '' }}" maxlength="80"></div>
+    <div class="field"><label for="eb-area">Area / locality</label><input id="eb-area" name="locality" value="{{ (opp.locality if side == 'seller' else opp.contact_locality) or '' }}" maxlength="80"></div>
+    <div class="field"><label for="eb-temp">Hot / warm / cold</label><select id="eb-temp" name="lead_temperature">{% for v, l in LMK.TEMPS %}<option value="{{ v }}" {{ 'selected' if (opp.lead_temperature or 'normal') == v }}>{{ l }}</option>{% endfor %}</select></div>
+    <fieldset class="field full"><legend>Category</legend>{% set mine = (opp.lead_category or '').split(',') %}{% for v, l in LMK.CATEGORIES[side] %}<label class="check"><input type="checkbox" name="lead_category" value="{{ v }}" {{ 'checked' if v in mine }}> {{ l }}</label> {% endfor %}</fieldset>
+    <div class="field full"><label for="eb-remark">Team remark (latest)</label><textarea id="eb-remark" name="team_remark" rows="2" maxlength="400">{{ opp.team_remark or '' }}</textarea></div>
+    <div class="full"><button class="btn primary">Save details</button> <span class="small muted">Everything else (salon facts, money, lease, staff, requirements) is edited in its own section below.</span></div>
+  </form>
+</details>
+{% endif %}

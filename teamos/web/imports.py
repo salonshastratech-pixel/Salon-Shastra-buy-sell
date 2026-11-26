@@ -126,8 +126,8 @@ def sheet_connect():
     db = get_db()
     try:
         sid = CS.add(db, g.user, request.form.get("name"), request.form.get("link"), request.form.get("auto") == "1")
-        res = CS.check(db, db.one("SELECT * FROM connected_sheets WHERE id = ?", (sid,)), g.user)
-        flash("Sheet connected. First check: " + res, "ok")
+        flash("Sheet connected. Now pick the tabs to bring in.", "ok")
+        return redirect(url_for("imports.sheet_tabs", sheet_id=sid))
     except ValidationError as e:
         flash(" ".join(str(v) for v in e.errors.values()), "error")
     return redirect(url_for("imports.index") + "#sheets")
@@ -154,6 +154,35 @@ def sheet_auto(sheet_id):
     flash("Auto-import is on: new leads come straight in, shared between the team in turn, first call within "
           "10 minutes." if on else "Auto-import is off: new people wait as a preview for you to approve.", "ok")
     return redirect(url_for("imports.index") + "#sheets")
+
+
+@bp.route("/sheets/<int:sheet_id>/tabs", methods=["GET", "POST"])
+@require("crm.import")
+def sheet_tabs(sheet_id):
+    """Every tab inside a connected Google Sheet — tick the ones to bring in."""
+    from ..domain import connected_sheets as CS
+    db = get_db()
+    s = db.one("SELECT * FROM connected_sheets WHERE id = ? AND active = 1", (sheet_id,))
+    if not s:
+        abort(404)
+    if request.method == "POST":
+        picked = [t for t in request.form.getlist("tabs") if t]
+        if not picked:
+            flash("Tick at least one tab.", "error")
+            return redirect(url_for("imports.sheet_tabs", sheet_id=sheet_id))
+        CS.set_tabs(db, g.user, sheet_id, picked)
+        res = CS.check(db, db.one("SELECT * FROM connected_sheets WHERE id = ?", (sheet_id,)), g.user)
+        flash(f"{len(picked)} tab{'s' if len(picked) != 1 else ''} chosen. Checked now: {res}", "ok")
+        return redirect(url_for("imports.index") + "#sheets")
+    try:
+        tabs = CS.tab_list(s["url"])
+    except ValidationError as e:
+        flash(" ".join(str(v) for v in e.errors.values()), "error")
+        return redirect(url_for("imports.index") + "#sheets")
+    current = CS.chosen(s)
+    for t in tabs:
+        t["checked"] = (t["name"] in current) if current else t["kind"] in ("seller", "buyer")
+    return render_template("imports/sheet_tabs.html", sheet=s, tabs=tabs, chosen_before=bool(current))
 
 
 @bp.route("/sheets/<int:sheet_id>/remove", methods=["POST"])
