@@ -823,22 +823,34 @@ def add_slots(db, actor, day: str, times: list[str], minutes: int, mode: str) ->
         raise ValidationError({"mode": "Choose phone, video or office."})
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day or ""):
         raise ValidationError({"day": "Choose a date."})
-    made = 0
     from datetime import datetime
+
+    from . import appointments as AP
+    minutes = AP.minutes_for(mode)         # fixed by type: calls 10 min, office meeting 3 hours
+    made, clashes = 0, []
     with db:
         for t in times:
             if not re.fullmatch(r"\d{2}:\d{2}", t or ""):
                 continue
             local = datetime.strptime(f"{day} {t}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
             iso = to_iso(local)
-            if iso <= now_iso() or db.scalar("SELECT id FROM vikas_slots WHERE starts_at = ? AND status <> "
-                                             "'cancelled'", (iso,)):
+            if iso <= now_iso():
                 continue
-            db.insert("vikas_slots", {"starts_at": iso, "minutes": max(10, min(120, minutes or 30)), "mode": mode,
+            end = AP.end_of(iso, minutes)
+            overlapping_slot = [s for s in db.all("SELECT starts_at, minutes FROM vikas_slots WHERE status <> 'cancelled' "
+                                                  "AND starts_at < ? AND starts_at >= ?",
+                                                  (end, to_iso(local - timedelta(hours=6))))
+                                if AP.end_of(s["starts_at"], s["minutes"]) > iso]
+            busy = AP.vikas_busy(db, iso, minutes)
+            if overlapping_slot or busy:
+                clashes.append(t)
+                continue
+            db.insert("vikas_slots", {"starts_at": iso, "minutes": minutes, "mode": mode,
                                       "status": "open", "created_by": actor["id"], "created_at": now_iso()})
             made += 1
     if not made:
-        raise ValidationError({"slots": "No new future slots were added (past times or already listed)."})
+        why = f" {', '.join(clashes)} overlap(s) another time or appointment." if clashes else ""
+        raise ValidationError({"slots": "No new future slots were added (past times or already listed)." + why})
     return made
 
 
@@ -901,7 +913,10 @@ def book(db, opp: dict, slot_id: int | None, preferred: str | None, source: str,
                                                "note": (note or "")[:500] or None, "created_by": actor_id,
                                                "created_at": now_iso(), "updated_at": now_iso()})
             when = fmt_ist(slot["starts_at"], "%a %d %b, %I:%M %p")
-            text = f"Call booked with {opp.get('contact_name') or 'a salon owner'} — {when} ({slot['mode']})"
+            from . import appointments as AP
+            text = (f"Call booked with {opp.get('contact_name') or 'a salon owner'} — {when} "
+                    f"({AP.LABELS.get(slot['mode'], slot['mode']).replace(' with Vikas', '').lower()}, "
+                    f"{AP.length_label(slot['minutes'])})")
         else:
             pref = (preferred or "").strip()[:200]
             if not pref:
@@ -930,6 +945,11 @@ def update_booking(db, actor, opp, booking_id: int, status: str, outcome: str | 
         raise ValidationError({"status": "Unknown status."})
     if status == "booked" and not (starts_at or b["starts_at"]):
         raise ValidationError({"starts_at": "Set the date and time of the call."})
+    if status == "booked" and starts_at:
+        from . import appointments as AP
+        busy = AP.vikas_busy(db, starts_at, AP.minutes_for("phone"), ignore=("call", booking_id))
+        if busy:
+            raise ValidationError({"starts_at": AP.clash_message(busy)})
     with db:
         db.execute("UPDATE vikas_bookings SET status = ?, outcome_note = COALESCE(?, outcome_note), "
                    "starts_at = COALESCE(?, starts_at), updated_at = ? WHERE id = ?",
@@ -956,7 +976,8 @@ def update_booking(db, actor, opp, booking_id: int, status: str, outcome: str | 
 
 
 def bookings(db, opp_id: int) -> list[dict]:
-    return db.all("SELECT * FROM vikas_bookings WHERE opportunity_id = ? ORDER BY id DESC", (opp_id,))
+    return db.all("SELECT vb.*, s.mode, s.minutes FROM vikas_bookings vb LEFT JOIN vikas_slots s ON s.id = vb.slot_id "
+                  "WHERE vb.opportunity_id = ? ORDER BY vb.id DESC", (opp_id,))
 
 
 # -- Paid consultations ---------------------------------------------------------------------------------------------
@@ -972,8 +993,19 @@ def book_consultation(db, actor, opp, data) -> int:
     hyd = data.get("in_hyderabad", "1") == "1"
     fee = fee_for(kind, hyd)
     from ..timeutil import parse_local_input
+    from . import appointments as AP
     when = parse_local_input(data.get("scheduled_at"))
+    if when:
+        busy = AP.vikas_busy(db, when, AP.minutes_for(kind))
+        if busy:
+            raise ValidationError({"scheduled_at": AP.clash_message(busy)})
     with db:
+        if when:   # his listed free times inside this meeting/visit are no longer free
+            end = AP.end_of(when, AP.minutes_for(kind))
+            for s in db.all("SELECT id, starts_at, minutes FROM vikas_slots WHERE status = 'open' AND starts_at < ? AND "
+                            "starts_at >= ?", (end, to_iso(parse_iso(when) - timedelta(hours=6)))):
+                if AP.end_of(s["starts_at"], s["minutes"]) > when:
+                    db.execute("UPDATE vikas_slots SET status = 'cancelled' WHERE id = ?", (s["id"],))
         cid = db.insert("consultations", {"opportunity_id": opp["id"], "kind": kind, "in_hyderabad": 1 if hyd else 0,
                                           "fee": fee, "scheduled_at": when, "status": "booked",
                                           "note": (data.get("note") or "").strip()[:500] or None,
@@ -982,7 +1014,8 @@ def book_consultation(db, actor, opp, data) -> int:
         T.add_activity(db, actor["id"], "opportunity", opp["id"], "system",
                        f"Consultation booked: {dict(CONSULT_KINDS)[kind]}, "
                        f"{'Hyderabad' if hyd else 'outside Hyderabad'} — ₹{fee:,}"
-                       + (f" on {fmt_ist(when)}" if when else "") + " (+ free video by Vikas)")
+                       + (f" on {fmt_ist(when)} for {AP.length_label(AP.minutes_for(kind))}" if when else "")
+                       + " (+ free video by Vikas)")
         _alert_consultant(db, opp, f"Paid consultation booked ({dict(CONSULT_KINDS)[kind].lower()}, ₹{fee:,})"
                           + (f" — {fmt_ist(when, '%a %d %b, %I:%M %p')}" if when else ""))
         audit.record(db, actor["id"], "pilot.consultation_booked", "opportunity", opp["id"],

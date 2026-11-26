@@ -1,0 +1,51 @@
+{# Today's CRM numbers, new leads with their timing, the activity feed and the per-person table. #}
+{% from "macros.html" import contact_buttons %}
+{% macro today_kpis(n, who='') %}
+<div class="kpis day-kpis" role="list" aria-label="Today's numbers{{ ' — ' ~ who if who }}">
+  <a role="listitem" class="kpi info" href="#newleads"><b>{{ n.new_leads }}</b><span>New leads today</span></a>
+  <a role="listitem" class="kpi" href="#today"><b>{{ n.calls_to_do }}</b><span>Calls to make</span></a>
+  <span role="listitem" class="kpi"><b>{{ n.calls_made }}</b><span>Calls made</span></span>
+  <span role="listitem" class="kpi ok"><b>{{ n.productive }}</b><span>Productive{% if n.calls_made %} · {{ n.productive_pct }}%{% endif %}</span></span>
+  <a role="listitem" class="kpi" href="#today"><b>{{ n.followups_due }}</b><span>Follow-ups due</span></a>
+  <a role="listitem" class="kpi {{ 'bad' if n.missed }}" href="#overdue"><b>{{ n.missed }}</b><span>Missed · overdue</span></a>
+  <a role="listitem" class="kpi {{ 'bad' if n.waiting }}" href="#newleads"><b>{{ n.waiting }}</b><span>Waiting for first call</span></a>
+</div>
+{% endmacro %}
+
+{% macro new_leads_card(leads, show_owner=false) %}
+<div class="card" id="newleads"><div class="card-h"><h2>New leads</h2><span class="small muted">newest first · when they came in and how fast we called</span></div>
+  <ul class="tasks lead-list">{% for r in leads %}<li class="task">
+    <div>
+      <div class="t"><a href="{{ opp_url(r.kind, r.id) }}">{{ r.salon_name or r.contact_name }}</a> <span class="small muted">{{ r.ref_code }} · {{ 'Investor' if r.kind == 'buyer' else 'Salon owner' }}</span></div>
+      <div class="meta"><span title="{{ r.lead_at|ist }}">Came in {{ r.lead_at|rel }}</span> · {{ r.source_name or 'Unknown source' }}{% if show_owner %} · <strong>{{ r.owner_name or 'Unassigned' }}</strong>{% endif %}</div>
+      <div><span class="badge {{ r.speed.tone }} small">{{ r.speed.label }}</span></div>
+    </div>
+    <div class="inline">{{ contact_buttons(r.id, r.phone_normalized) }}</div>
+  </li>{% else %}<li class="empty">No leads yet.</li>{% endfor %}</ul></div>
+{% endmacro %}
+
+{% macro feed_card(items, title='Latest activity') %}
+<div class="card" id="feed"><div class="card-h"><h2>{{ title }}</h2></div>
+  <ol class="feed">{% for a in items %}<li class="feed-i k-{{ a.kind }}">
+    <span class="feed-dot" aria-hidden="true">{{ {'call': '📞', 'note': '📝', 'stage_change': '➜', 'assignment': '👤'}.get(a.kind, '•') }}</span>
+    <div><div class="small"><a href="{{ opp_url(a.opp_kind, a.entity_id) }}">{{ a.salon_name or a.contact_name }}</a>
+      {% if a.kind == 'call' %} · call: <strong>{{ CALL_OUTCOME_LABELS.get(a.call_outcome, a.call_outcome or 'logged') }}</strong>{% endif %}</div>
+      {% if a.body %}<div class="small muted clip">{{ a.body|truncate(110) }}</div>{% endif %}
+      <div class="small muted">{{ a.actor_name or 'System' }} · <span title="{{ a.at|ist }}">{{ a.at|rel }}</span></div></div>
+  </li>{% else %}<li class="empty">Nothing yet today.</li>{% endfor %}</ol></div>
+{% endmacro %}
+
+{% macro team_table(rows) %}
+<div class="card" id="team-today"><div class="card-h"><h2>Team today</h2><span class="small muted">per person · since midnight</span></div>
+  <div class="table-wrap"><table class="tbl">
+    <thead><tr><th>Person</th><th class="right">New leads</th><th class="right">Calls to make</th><th class="right">Calls made</th><th class="right">Productive</th><th class="right">Follow-ups due</th><th class="right">Missed</th><th class="right">Waiting 1st call</th></tr></thead>
+    <tbody>{% for p in rows %}<tr>
+      <td><strong>{{ p.full_name }}</strong>{% if p.status_label %}<div class="small muted">{{ p.status_label }}</div>{% endif %}</td>
+      <td class="right">{{ p.new_leads }}</td><td class="right">{{ p.calls_to_do }}</td><td class="right">{{ p.calls_made }}</td>
+      <td class="right">{{ p.productive }}{% if p.calls_made %} <span class="small muted">({{ p.productive_pct }}%)</span>{% endif %}</td>
+      <td class="right">{{ p.followups_due }}</td>
+      <td class="right">{% if p.missed %}<span class="badge bad">{{ p.missed }}</span>{% else %}0{% endif %}</td>
+      <td class="right">{% if p.waiting %}<span class="badge warn">{{ p.waiting }}</span>{% else %}0{% endif %}</td>
+    </tr>{% else %}<tr><td colspan="8" class="empty">No team members yet.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endmacro %}

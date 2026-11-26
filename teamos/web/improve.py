@@ -125,6 +125,8 @@ def learning_reset(family):
 
 # -- Tools & admin hub -----------------------------------------------------------------------------------------
 TOOLS = [  # (endpoint, title, what, capability or None for everyone with crm.view)
+    ("records.manage", "Leads & data", "Who gets new leads (salon owners / investors, in turn), and removing all leads to start fresh.",
+     "users.manage"),
     ("imports.index", "Spreadsheet import", "Bring sellers and buyers in from Excel or a Google Sheets link.",
      "crm.import"),
     ("main.dictionary", "Field dictionary", "Every field we collect, what it means and who can see it.",

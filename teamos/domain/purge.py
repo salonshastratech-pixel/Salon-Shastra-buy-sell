@@ -100,3 +100,70 @@ def delete_records(db, actor: dict, opp_ids: list[int], reason: str) -> dict:
             audit.record(db, actor["id"], "record.deleted", "opportunity", o["id"],
                          {"ref": o["ref_code"], "name": o["full_name"], "reason": reason[:200]})
     return {"records": len(opps), "rows": sum(counts.values()), "refs": [o["ref_code"] for o in opps]}
+
+
+# -- Start fresh: every lead at once ---------------------------------------------------------------------------------
+CLEAR_KEY = "clear_all_records"
+CONFIRM_WORD = "DELETE ALL"
+
+
+def clear_status(db) -> dict | None:
+    import json
+    raw = db.scalar("SELECT note FROM automation_settings WHERE key = ?", (CLEAR_KEY,))
+    try:
+        return json.loads(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def _set_status(db, st: dict) -> None:
+    import json
+
+    from ..timeutil import now_iso
+    if db.scalar("SELECT 1 FROM automation_settings WHERE key = ?", (CLEAR_KEY,)):
+        db.execute("UPDATE automation_settings SET note = ?, updated_at = ? WHERE key = ?", (json.dumps(st), now_iso(),
+                                                                                           CLEAR_KEY))
+    else:
+        db.insert("automation_settings", {"key": CLEAR_KEY, "enabled": 1, "note": json.dumps(st), "updated_at": now_iso()})
+
+
+def check_clear_all(db, actor: dict, confirm: str, reason: str) -> list[int]:
+    """Validates the request and returns every record id. Admin only; the confirmation words must be typed."""
+    if not user_can(db, actor, "users.manage"):
+        raise PermissionDenied("users.manage")
+    if (confirm or "").strip().upper() != CONFIRM_WORD:
+        raise ValidationError({"confirm": f"Type {CONFIRM_WORD} to confirm."})
+    if len((reason or "").strip()) < 3:
+        raise ValidationError({"reason": "Say why (for example: clearing test data before going live)."})
+    st = clear_status(db)
+    if st and st.get("state") == "running":
+        raise ValidationError({"confirm": "A clear-out is already running."})
+    ids = [r["id"] for r in db.all("SELECT id FROM opportunities ORDER BY id")]
+    if not ids:
+        raise ValidationError({"records": "There are no records to remove."})
+    return ids
+
+
+def clear_all(db, actor: dict, ids: list[int], reason: str) -> dict:
+    """Removes the given records (and everything linked) in batches, recording progress so the page can show it."""
+    from ..timeutil import now_iso
+    done = rows = 0
+    _set_status(db, {"state": "running", "total": len(ids), "done": 0, "by": actor["full_name"], "started": now_iso()})
+    try:
+        for i in range(0, len(ids), 40):
+            chunk = [x for x in ids[i:i + 40] if db.scalar("SELECT 1 FROM opportunities WHERE id = ?", (x,))]
+            if chunk:
+                r = delete_records(db, actor, chunk, reason)
+                rows += r["rows"]
+            done += len(ids[i:i + 40])
+            _set_status(db, {"state": "running", "total": len(ids), "done": done, "by": actor["full_name"],
+                             "started": now_iso()})
+        audit.record(db, actor["id"], "records.cleared_all", "opportunity", None, {"records": len(ids),
+                                                                                 "reason": reason[:200]})
+        st = {"state": "done", "total": len(ids), "done": len(ids), "rows": rows, "by": actor["full_name"],
+              "finished": now_iso()}
+    except Exception as e:  # noqa: BLE001 — shown on the page; whatever was removed stays removed
+        st = {"state": "failed", "total": len(ids), "done": done, "error": str(e)[:200], "by": actor["full_name"],
+              "finished": now_iso()}
+    _set_status(db, st)
+    return st

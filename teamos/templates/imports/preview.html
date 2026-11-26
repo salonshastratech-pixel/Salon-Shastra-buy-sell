@@ -16,7 +16,7 @@
   <div class="card-h"><h2>Column mapping</h2><span class="small muted">Unmapped columns are kept in the raw record but not imported.</span></div>
   <div class="form-grid">
   {% for h in headers %}<div class="field"><label>“{{ h }}”</label><select name="map_{{ loop.index0 }}"><option value="">— don't import —</option>{% for k, (label, syn) in TARGETS.items() %}<option value="{{ k }}" {{ 'selected' if mapping.get(h) == k }}>{{ label }}{{ ' *' if k in REQUIRED }}</option>{% endfor %}</select></div>{% endfor %}
-  <div class="field"><label>Owner for created leads</label><select name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == batch.owner_id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Owner for created leads</label><select name="owner_id"><option value="auto" {{ 'selected' if not batch.owner_id }}>Share between the team in turn (as set in Leads &amp; data)</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == batch.owner_id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
   </div><button class="btn">Apply mapping &amp; re-check rows</button>
 </form>
 {% endif %}

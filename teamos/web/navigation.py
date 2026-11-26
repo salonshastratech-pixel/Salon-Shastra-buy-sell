@@ -60,6 +60,7 @@ MODULES = [
     {"key": "admin", "label": "Tools & admin", "icon": "cog", "pages": [
         ("All tools", "improve.tools", {}, None),
         ("Users", "admin.users", {}, "users.manage"),
+        ("Leads & data", "records.manage", {}, "users.manage"),
         ("Automations", "workflow.automations", {}, "users.manage"),
         ("Imports", "imports.index", {}, "crm.import"),
         ("Remark dictionary", "imports.remarks", {}, "users.manage"),
@@ -87,7 +88,7 @@ ENDPOINT_MODULE = {
     "inbox.": "talk", "forms.": "talk",
     "reports.": "reports", "workflow.sources": "reports", "improve.learning": "reports",
     "admin.": "admin", "imports.": "admin", "channels.lead_ads": "admin", "workflow.automations": "admin",
-    "improve.tools": "admin", "main.dictionary": "admin", "workflow.install": "admin", "main.planned": "admin",
+    "improve.tools": "admin", "records.manage": "admin", "main.dictionary": "admin", "workflow.install": "admin", "main.planned": "admin",
 }
 # detail pages: where "up" goes when there is no earlier page to return to
 PARENT = {

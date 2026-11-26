@@ -89,9 +89,11 @@ def vikas():
                 flash("Slot removed.", "ok")
             else:
                 times = [t.strip() for t in (request.form.get("times") or "").replace(",", " ").split() if t.strip()]
-                n = P.add_slots(db, g.user, request.form.get("day"), times, int(request.form.get("minutes") or 30),
-                                request.form.get("mode") or "phone")
-                flash(f"{n} slot(s) added. Salon owners can now pick them from their booking link.", "ok")
+                n = P.add_slots(db, g.user, request.form.get("day"), times, 0, request.form.get("mode") or "phone")
+                skipped = len(times) - n
+                flash(f"{n} slot(s) added. Salon owners can now pick them from their booking link."
+                      + (f" {skipped} skipped — in the past, already listed, or overlapping another appointment."
+                         if skipped > 0 else ""), "ok")
         except PermissionDenied:
             abort(403)
         except (ValidationError, ValueError) as e:
@@ -106,7 +108,9 @@ def vikas():
                        "vb JOIN opportunities o ON o.id = vb.opportunity_id JOIN contacts c ON c.id = o.contact_id "
                        "LEFT JOIN salon_businesses b ON b.id = o.business_id WHERE vb.status = 'requested' "
                        "ORDER BY vb.created_at")
+    from ..domain import appointments as AP
     return render_template("pilot/vikas.html", slots=slots, requested=requested, consultant=P.consultant(db),
+                           appointments=AP.upcoming(db),
                            can_manage=P.can_manage_slots(db, g.user), P=P)
 
 
@@ -412,8 +416,9 @@ def _investor_form(db, token, opp):
 
 
 def _live_booking(db, opp_id):
-    return db.one("SELECT * FROM vikas_bookings WHERE opportunity_id = ? AND status IN ('requested','booked') AND "
-                  "(starts_at IS NULL OR starts_at > ?) ORDER BY id DESC LIMIT 1", (opp_id, now_iso()))
+    return db.one("SELECT vb.*, s.mode, s.minutes FROM vikas_bookings vb LEFT JOIN vikas_slots s ON s.id = vb.slot_id "
+                  "WHERE vb.opportunity_id = ? AND vb.status IN ('requested','booked') AND "
+                  "(vb.starts_at IS NULL OR vb.starts_at > ?) ORDER BY vb.id DESC LIMIT 1", (opp_id, now_iso()))
 
 
 @public_bp.route("/s/<token>/book", methods=["GET", "POST"])

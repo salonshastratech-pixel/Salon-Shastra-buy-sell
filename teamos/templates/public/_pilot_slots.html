@@ -1,5 +1,6 @@
 {% if booked %}
 <p class="flash ok">Your call with {{ P.CONSULTANT_NAME }} is {% if booked.starts_at %}booked for <strong>{{ booked.starts_at|ist('%A %d %b, %I:%M %p') }}</strong>{% else %}requested (you asked for: {{ booked.preferred_time }}) — our team will confirm the time with you{% endif %}.</p>
+{% if booked.starts_at %}{% set bm = booked.mode or 'phone' %}<p><a class="btn" href="{{ AP.gcal_url(AP.LABELS[bm] ~ ' — Salon Shastra', booked.starts_at, AP.minutes_for(bm), 'Your call with ' ~ P.CONSULTANT_NAME ~ ' from Salon Shastra (' ~ AP.length_label(AP.minutes_for(bm)) ~ ').') }}" target="_blank" rel="noopener">📅 Add to my Google Calendar</a></p>{% endif %}
 {% else %}
 <form method="post" action="{{ url_for('public_pilot.book', token=token) }}" class="book-form">
   <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
@@ -7,7 +8,7 @@
   <p class="small muted">Pick a time that suits you (Indian time):</p>
   {% set ns = namespace(day='') %}
   <div class="slot-days">{% for s in slots %}{% set d = s.starts_at|ist('%A %d %b') %}{% if d != ns.day %}{% if ns.day %}</div>{% endif %}<h3 class="slot-day">{{ d }}</h3><div class="chips">{% set ns.day = d %}{% endif %}
-    <label class="chip"><input type="radio" name="slot_id" value="{{ s.id }}" required><span>{{ s.starts_at|ist('%I:%M %p') }} · {{ {'phone': 'Phone', 'video': 'Video call', 'office': 'At our office'}[s.mode] }}</span></label>{% endfor %}</div></div>
+    <label class="chip"><input type="radio" name="slot_id" value="{{ s.id }}" required><span>{{ s.starts_at|ist('%I:%M %p') }} · {{ {'phone': 'Phone call', 'video': 'Video call', 'office': 'At our office'}[s.mode] }} ({{ AP.length_label(s.minutes) }})</span></label>{% endfor %}</div></div>
   <div class="field"><label for="bk-note">Anything you want to discuss? (optional)</label><textarea id="bk-note" name="note" rows="2" maxlength="500"></textarea></div>
   <button class="btn primary">Book this time</button>
   {% else %}

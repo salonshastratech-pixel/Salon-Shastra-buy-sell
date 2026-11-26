@@ -28,8 +28,8 @@ ROLES = (os.environ.get("QA_ROLES") or "founder,lead,shaheen,harika,accounts").s
 EXTRA = [u for u in (os.environ.get("QA_EXTRA_URLS") or "").split(",") if u]
 PER_PATTERN = int(os.environ.get("QA_PER_PATTERN", "2"))
 MAX_PAGES = int(os.environ.get("QA_MAX_PAGES", "400"))
-VIEWPORTS = [v for v in [("phone", 375, 812, True), ("small-phone", 320, 640, True), ("tablet", 768, 1024, True),
-             ("desktop", 1366, 900, False)] if v[0] in (os.environ.get("QA_VIEWPORTS") or "phone,small-phone,tablet,desktop").split(",")]
+VIEWPORTS = [v for v in [("phone", 375, 812, True), ("small-phone", 320, 640, True), ("tablet", 768, 1024, True), ("laptop", 1024, 768, False),
+             ("desktop", 1366, 900, False)] if v[0] in (os.environ.get("QA_VIEWPORTS") or "phone,small-phone,tablet,laptop,desktop").split(",")]
 SKIP = ("logout", "/static/", "mailto:", "tel:", "/f/i/", "/t/", "/cal/", "format=csv", "/documents/", "/download",
         "/saved-searches/", "/export")
 SEEDS = ["/", "/team", "/tasks/", "/tasks/?view=all", "/sellers/", "/sellers/?status=all", "/buyers/",
@@ -224,10 +224,18 @@ MEASURE = r"""(() => {
     if (!r.width || !r.height) continue;
     if ((r.right > W + 2 || r.left < -2) && !clipped(el)) bad.push(name(el) + ' →' + Math.round(r.right) + 'px');
   }
+  // short labels (badges, counts, buttons, scores) broken over two lines look squashed
+  for (const el of document.querySelectorAll('.badge, .count, .btn.sm, .score-n, .score-l, .tabs a, .subnav a')) {
+    const t = (el.textContent || '').trim();
+    if (!t || t.length > 14 || clipped(el)) continue;
+    const cs = getComputedStyle(el), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.35;
+    const r = el.getBoundingClientRect();
+    if (r.height > lh * 1.8 + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)) bad.push('squashed: ' + name(el));
+  }
   let small = 0;
   if (W < 500) for (const el of document.querySelectorAll('a,button,input,select,textarea,summary')) {
     const r = el.getBoundingClientRect(); if (r.width && r.height && r.height < 24 && !clipped(el)) small++; }
-  return {over: doc.scrollWidth - W, bad: [...new Set(bad)].slice(0, 5), small, title: document.title,
+  return {over: doc.scrollWidth - W, bad: [...new Set(bad)].slice(0, 8), small, title: document.title,
           h1: (document.querySelector('h1') || {}).textContent || ''};
 })()"""
 

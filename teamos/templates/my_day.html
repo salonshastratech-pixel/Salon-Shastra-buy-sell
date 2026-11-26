@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import task_item, csrf %}
+{% extends "base.html" %}{% from "macros.html" import task_item, csrf %}{% from "_today.html" import today_kpis, new_leads_card, feed_card, team_table with context %}
 {% block title %}My Day{% endblock %}
 {% block content %}
 <div class="ph">
@@ -11,11 +11,9 @@
 
 {% if targets %}<div class="card targets-card"><div class="card-h"><h2>Today's targets</h2><span class="small muted">{{ targets|selectattr('done')|list|length }} of {{ targets|length }} reached</span></div>
   <div class="targets">{% for t in targets %}<div class="target {{ 'done' if t.done }}"><div class="small"><strong>{{ t.label }}</strong> {{ t.got }} / {{ t.target }}{% if t.done %} ✓{% endif %}</div><progress value="{{ t.got }}" max="{{ t.target }}"></progress></div>{% endfor %}</div></div>{% endif %}
+{{ today_kpis(nums, 'you') }}
 <div class="statbar">
-  <a class="stat-chip {{ 'bad' if overdue }}" href="#overdue"><b>{{ overdue|length }}</b> overdue</a>
-  <a class="stat-chip" href="#today"><b>{{ today|length }}</b> due today</a>
-  <span class="stat-chip ok"><b>{{ done_today|length }}</b> done today</span>
-  <span class="stat-chip"><b>{{ conversations }}</b> conversations · {{ calls_today }} calls</span>
+  <span class="stat-chip ok"><b>{{ done_today|length }}</b> tasks done today</span>
   {% if stuck %}<a class="stat-chip warn" href="#stuck"><b>{{ stuck|length }}</b> not moving</a>{% endif %}
   {% for s in saved_new %}<a class="stat-chip info" href="{{ url_for('workflow.open_search', sid=s.id) }}" title="New since you last looked"><b>{{ s.new }}</b> new · {{ s.name }}</a>{% endfor %}
 </div>
@@ -28,6 +26,7 @@
     {% endif %}
     <div class="card" id="today"><div class="card-h"><h2>Today</h2><span class="badge">{{ today|length }}</span></div>
       <ul class="tasks">{% for t in today %}{{ task_item(t) }}{% else %}<li class="empty">{{ 'Nothing else due today.' if overdue else 'All clear for today. Pick something from “Coming up” or the Match Desk.' }}</li>{% endfor %}</ul></div>
+    {{ new_leads_card(new_leads, show_owner=leads_all) }}
     {% if no_next %}
     <div class="card"><div class="card-h"><h2>No next step yet</h2><span class="badge bad">{{ no_next|length }}</span></div>
       <p class="small muted">Every live record needs a next step so nothing slips.</p>
@@ -56,6 +55,7 @@
         {% if notifications %}<form method="post" action="{{ url_for('main.notifications_read') }}">{{ csrf() }}<button class="btn link small">Mark all read</button></form>{% endif %}</div>
       <ul class="tasks">{% for n in notifications %}<li class="task"><div><div class="t small">{% if n.link %}<a href="{{ n.link }}">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}</div><div class="meta">{{ n.created_at|rel }}</div></div></li>{% else %}<li class="empty">You're all caught up.</li>{% endfor %}</ul>
     </div>
+    {{ feed_card(feed, 'My latest activity') }}
     <details class="card disclose"><summary>Completed today ({{ done_today|length }})</summary>
       <ul class="tasks">{% for t in done_today %}<li class="task"><div><div class="t small">{{ t.title }}</div><div class="meta">{{ t.outcome }}</div></div></li>{% else %}<li class="empty">Nothing completed yet today.</li>{% endfor %}</ul></details>
     <form method="post" action="{{ url_for('main.digest_toggle') }}" class="card small inline">{{ csrf() }}
@@ -65,4 +65,9 @@
     </form>
   </div>
 </div>
+{% if team_nums %}
+<h2 class="section-h">Whole team today</h2>
+{{ today_kpis(team_nums, 'whole team') }}
+{{ team_table(team_rows) }}
+{% endif %}
 {% endblock %}

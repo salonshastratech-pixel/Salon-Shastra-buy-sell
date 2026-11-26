@@ -116,7 +116,12 @@ def worklog():
 def founder_desk():
     """Everything that needs the founder today, on one page."""
     from ..domain import advisor
-    return render_template("desk.html", d=advisor.desk(get_db()), STATUS_LABELS=AV.STATUS_LABELS)
+    from ..domain import dashboard as DB
+    db = get_db()
+    d = advisor.desk(db)
+    ids = DB.team_ids(db)
+    d.update(team_nums=DB.numbers(db, ids), team_rows=DB.team_rows(db), new_leads=DB.new_leads(db, ids, 12))
+    return render_template("desk.html", d=d, STATUS_LABELS=AV.STATUS_LABELS)
 
 
 

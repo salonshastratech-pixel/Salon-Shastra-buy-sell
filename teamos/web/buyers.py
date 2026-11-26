@@ -170,7 +170,8 @@ def save_section(opp_id, section):
         changed = B.update_fields(db, g.user, opp, request.form.to_dict(), section)
         flash(f"Saved {len(changed)} change(s)." if changed else "No changes.", "ok")
     except ValidationError as e:
-        flash("Not saved: " + "; ".join(f"{k.replace('_', ' ')} — {v}" for k, v in e.errors.items()), "error")
+        flash("Not saved: " + "; ".join(f"{(BFD.BY_KEY[k].label if k in BFD.BY_KEY else k.replace('_', ' '))} — {v}"
+                                          for k, v in e.errors.items()), "error")
     return _back(opp_id, "requirements")
 
 

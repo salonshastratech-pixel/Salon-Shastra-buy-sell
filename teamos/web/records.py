@@ -136,3 +136,55 @@ def export_csv(kind: str, rows: list[dict], who: dict) -> Response:
     name = "salon-owners" if kind == "seller" else "buyers-investors"
     return Response(chr(0xFEFF) + buf.getvalue(), mimetype="text/csv",  # BOM: Excel opens Telugu / ₹ correctly
                     headers={"Content-Disposition": f'attachment; filename="{name}.csv"', "Cache-Control": "no-store"})
+
+
+# -- Admin: who gets new leads, and start fresh ----------------------------------------------------------------------
+@bp.route("/manage")
+@require("users.manage")
+def manage():
+    from flask import render_template
+
+    from ..domain import progress as PR
+    db = get_db()
+    counts = {r["kind"]: r["n"] for r in db.all("SELECT kind, COUNT(*) AS n FROM opportunities GROUP BY kind")}
+    return render_template("admin/leads_data.html", split=PR.current_split(db), counts=counts,
+                           clear=purge.clear_status(db), CONFIRM_WORD=purge.CONFIRM_WORD)
+
+
+@bp.route("/split", methods=["POST"])
+@require("users.manage")
+def split():
+    from ..domain import progress as PR
+    db = get_db()
+    f = request.form
+    try:
+        moved = PR.set_split(db, g.user, [int(x) for x in f.getlist("seller_ids") if x.isdigit()],
+                             [int(x) for x in f.getlist("buyer_ids") if x.isdigit()], f.get("move_existing") == "1")
+        flash("Saved. New leads now go to the chosen people in turn — from forms, sheets, ads and imports."
+              + (f" Moved {moved['seller']} salon owner(s) and {moved['buyer']} investor(s) with their open tasks."
+                 if f.get("move_existing") == "1" else ""), "ok")
+    except ValidationError as e:
+        flash(_msg(e), "error")
+    except PermissionDenied:
+        abort(403)
+    return redirect(url_for("records.manage"))
+
+
+@bp.route("/clear-all", methods=["POST"])
+@require("users.manage")
+def clear_all():
+    from flask import current_app
+
+    from .. import background
+    db = get_db()
+    try:
+        ids = purge.check_clear_all(db, g.user, request.form.get("confirm"), request.form.get("reason"))
+    except ValidationError as e:
+        flash(_msg(e), "error")
+        return redirect(url_for("records.manage"))
+    except PermissionDenied:
+        abort(403)
+    actor, reason = dict(g.user), request.form.get("reason")
+    background.run(current_app._get_current_object(), "clear_all", lambda bdb: purge.clear_all(bdb, actor, ids, reason))
+    flash(f"Removing {len(ids)} record(s) and everything linked to them. This page shows the progress.", "ok")
+    return redirect(url_for("records.manage"))

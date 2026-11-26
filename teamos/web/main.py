@@ -18,7 +18,8 @@ STAGE_LABELS = {**SELLER_STAGE_LABELS, **BUYER_STAGE_LABELS}
 
 TASK_SELECT = (
     "SELECT t.*, u.full_name AS assignee_name, o.ref_code, o.id AS opp_id, o.kind AS opp_kind, "
-    "c.full_name AS contact_name, b.name AS salon_name, o.stage AS opp_stage "
+    "c.full_name AS contact_name, b.name AS salon_name, o.stage AS opp_stage, o.status AS opp_status, "
+    "COALESCE(o.lead_created_at, o.created_at) AS lead_at, o.first_contact_at AS opp_first_contact_at "
     "FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id "
     "LEFT JOIN opportunities o ON t.entity_type = 'opportunity' AND o.id = t.entity_id "
     "LEFT JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id ")
@@ -60,7 +61,14 @@ def my_day():
     saved_new = [s for s in SSR.mine(db, g.user["id"]) if s["new"]][:4]
     from ..domain import worklog as WL
     targets = WL.progress(db, g.user)
-    return render_template("my_day.html", targets=targets, saved_new=saved_new, overdue=overdue, today=today, upcoming=upcoming, done_today=done_today,
+    from ..domain import dashboard as DB
+    me = [g.user["id"]]
+    is_lead = g.user["role"] in ("super_admin", "team_lead")
+    return render_template("my_day.html", targets=targets, nums=DB.numbers(db, me),
+                           new_leads=DB.new_leads(db, DB.team_ids(db) if is_lead else me, 8), leads_all=is_lead,
+                           feed=DB.feed(db, me, 10),
+                           team_rows=DB.team_rows(db) if is_lead else [],
+                           team_nums=DB.numbers(db, DB.team_ids(db)) if is_lead else None, saved_new=saved_new, overdue=overdue, today=today, upcoming=upcoming, done_today=done_today,
                            calls_today=calls_today, conversations=conversations, no_next=no_next,
                            notifications=notes, STAGE_LABELS=STAGE_LABELS,
                            match_tiles=MM.my_tiles(db, g.user["id"]) if g.user["role"] != "finance" else [],

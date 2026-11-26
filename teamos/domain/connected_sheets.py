@@ -1,7 +1,9 @@
-"""Connected Google Sheets: checked every hour; new people arrive as an import preview the team approves.
+"""Connected Google Sheets: checked every 10 minutes. New people arrive as an import preview the team approves —
+or, for sheets marked "Auto-import" (Meta ad leads), straight in: shared between the team in turn with a first call due
+within 10 minutes.
 
 Works with sheets shared as "Anyone with the link can view" (Google's own export link: no Google account or API key
-is stored in TeamOS). Nothing is written to sellers/buyers until someone presses Import now on the preview.
+is stored in TeamOS). Without Auto-import, nothing is written to sellers/buyers until someone presses Import now on the preview.
 """
 from __future__ import annotations
 
@@ -28,7 +30,7 @@ def fetch(url: str) -> tuple[str, bytes]:
     export = f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=xlsx"
     try:
         with urllib.request.urlopen(urllib.request.Request(export, headers={"User-Agent": "TeamOS-import"}),
-                                    timeout=30) as r:
+                                    timeout=75) as r:   # Google often takes 10-30 s to build the file
             data, ctype = r.read(8 * 1024 * 1024 + 1), r.headers.get("Content-Type", "")
     except (urllib.error.URLError, TimeoutError) as e:
         raise ValidationError({"link": f"Could not download the sheet ({getattr(e, 'code', '') or e}). "
@@ -45,7 +47,7 @@ def _need(db, actor):
         raise PermissionDenied("crm.import")
 
 
-def add(db, actor, name: str, url: str) -> int:
+def add(db, actor, name: str, url: str, auto: bool = False) -> int:
     _need(db, actor)
     m = GSHEET.search(url or "")
     if not m:
@@ -56,13 +58,22 @@ def add(db, actor, name: str, url: str) -> int:
     with db:
         old = db.scalar("SELECT id FROM connected_sheets WHERE sheet_key = ?", (m.group(1),))
         if old:  # reconnecting a sheet that was removed earlier
-            db.update("connected_sheets", old, {"active": 1, "name": name, "url": url.strip()[:500], "last_sha": None})
+            db.update("connected_sheets", old, {"active": 1, "name": name, "url": url.strip()[:500], "last_sha": None,
+                                                "auto_import": 1 if auto else 0})
             sid = old
         else:
             sid = db.insert("connected_sheets", {"name": name, "url": url.strip()[:500], "sheet_key": m.group(1),
-                                                 "active": 1, "created_by": actor["id"], "created_at": now_iso()})
+                                                 "active": 1, "auto_import": 1 if auto else 0,
+                                                 "created_by": actor["id"], "created_at": now_iso()})
         audit.record(db, actor["id"], "sheet.connect", "connected_sheet", sid, {"name": name})
     return sid
+
+
+def set_auto(db, actor, sheet_id: int, on: bool) -> None:
+    _need(db, actor)
+    with db:
+        db.execute("UPDATE connected_sheets SET auto_import = ? WHERE id = ?", (1 if on else 0, sheet_id))
+        audit.record(db, actor["id"], "sheet.auto_import", "connected_sheet", sheet_id, {"on": on})
 
 
 def remove(db, actor, sheet_id: int) -> None:
@@ -96,6 +107,14 @@ def check(db, sheet: dict, actor: dict | None = None, fetcher=None) -> str:
             new = sum(1 for r in p["rows"] if r["action"] == "create")
             if not new:
                 result = "Checked: no new people (everyone is already in TeamOS)."
+            elif sheet.get("auto_import"):
+                import_id = SS.create_import(db, actor, f"{sheet['name']} - {name}", data)
+                counts = SS.commit(db, actor, import_id, live=new <= SS.LIVE_BATCH_MAX)
+                made = counts["created_seller"] + counts["created_buyer"]
+                result = (f"{made} new lead(s) added and shared out ({counts['created_seller']} salon owner, "
+                          f"{counts['created_buyer']} investor)" + (f", {counts['failed']} could not be added — see "
+                                                                    f"import #{import_id}" if counts["failed"] else "")
+                          + ("." if new <= SS.LIVE_BATCH_MAX else " — first calls spread over the coming days."))
             elif waiting:
                 result = (f"{new} new people. The earlier preview #{sheet['last_import_id']} is still waiting: "
                           "import or discard it, and the next check prepares a fresh one.")

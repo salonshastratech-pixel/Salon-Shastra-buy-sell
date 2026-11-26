@@ -1,4 +1,4 @@
-{% from "macros.html" import form_progress, csrf %}
+{% from "macros.html" import form_progress, csrf, gcal_btn %}
 {% set rep = inv_report %}
 <ol class="pilot-steps" aria-label="Investor steps">
   <li class="{{ 'done' if inv.screen_verdict }}"><a href="#screen">1 · Screening</a></li>
@@ -90,8 +90,11 @@
     <p class="small muted">A few minutes with Vikas after the form is filled — before the office visit.</p>
     {% for b in inv_bookings %}
     <div class="booking {{ b.status }}">
+      {% set bmode = b.mode or 'phone' %}
       <div><strong>{% if b.starts_at %}{{ b.starts_at|ist('%a %d %b, %I:%M %p') }}{% else %}Requested: {{ b.preferred_time }}{% endif %}</strong>
+        <span class="small muted">· {{ AP.LABELS[bmode] }}, {{ AP.length_label(AP.minutes_for(bmode)) }}</span>
         <span class="badge {{ 'ok' if b.status == 'done' else 'warn' if b.status in ('requested', 'booked') else 'grey' }}">{{ {'requested': 'Requested', 'booked': 'Booked', 'done': 'Held', 'cancelled': 'Cancelled', 'no_show': 'No-show'}[b.status] }}</span></div>
+      {% if b.status == 'booked' and b.starts_at %}<div>{{ gcal_btn(AP.gcal_url(AP.LABELS[bmode] ~ ' · ' ~ opp.ref_code, b.starts_at, AP.minutes_for(bmode), 'Salon Shastra — ' ~ opp.ref_code)) }}</div>{% endif %}
       {% if b.outcome_note %}<div class="small"><strong>Outcome:</strong> {{ b.outcome_note }}</div>{% endif %}
       {% if b.status in ('requested', 'booked') %}
       <details class="disclose"><summary>Update this call</summary>
@@ -105,7 +108,7 @@
     {% if not inv_bookings or inv_bookings[0].status not in ('requested', 'booked') %}
     <details class="disclose" {{ 'open' if inv.form_status == 'filled' and not inv_bookings }}><summary>Book a call with Vikas</summary>
       <form method="post" action="{{ url_for('investor.book', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
-        {% if inv_slots %}<div class="field full"><label>Free time</label><select name="slot_id"><option value="">— none suits; note a preferred time below —</option>{% for s in inv_slots %}<option value="{{ s.id }}">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} · {{ s.mode }}</option>{% endfor %}</select></div>
+        {% if inv_slots %}<div class="field full"><label>Free time</label><select name="slot_id"><option value="">— none suits; note a preferred time below —</option>{% for s in inv_slots %}<option value="{{ s.id }}">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} · {{ AP.LABELS[s.mode] }} ({{ AP.length_label(s.minutes) }})</option>{% endfor %}</select></div>
         {% else %}<p class="small muted full">No free times listed. <a href="{{ url_for('pilot.vikas') }}">Add Vikas's free times</a>, or note what the investor prefers.</p>{% endif %}
         <div class="field full"><label>Preferred time (if no slot)</label><input name="preferred" maxlength="200" placeholder="e.g. Saturday after 3 pm"></div>
         <div class="field full"><label>Note for Vikas</label><input name="note" maxlength="500" placeholder="e.g. Pursue — 30L savings, wants a running salon in Kondapur"></div>

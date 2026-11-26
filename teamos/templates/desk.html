@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "_today.html" import today_kpis, new_leads_card, team_table with context %}
 {% block title %}Founder desk{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Founder desk</h1><div class="sub">Everything that needs Vikas today, on one page. {{ d.new_today }} new lead{{ 's' if d.new_today != 1 }} came in today.</div></div></div>
@@ -11,6 +11,11 @@
   <a class="kpi" href="{{ url_for('deals.index') }}"><b>{{ d.intros }}</b><span>Introductions to approve</span></a>
   <a class="kpi" href="#waiting"><b class="{{ 'unknown' if d.waiting_total }}">{{ d.waiting_total }}</b><span>Leads not called in 24 h</span></a>
 </div>
+
+<h2 class="section-h">Team today</h2>
+{{ today_kpis(d.team_nums, 'whole team') }}
+{{ team_table(d.team_rows) }}
+{{ new_leads_card(d.new_leads, show_owner=true) }}
 
 <div class="split"><div>
   <div class="card" id="calls"><h2>Calls with Vikas</h2>

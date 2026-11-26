@@ -735,3 +735,180 @@ th.sel, td.sel { width: 32px; text-align: center; }
 .board-card { background: var(--surface, #fff); border: 1px solid var(--line, #e7ded6); border-radius: 10px; padding: 9px;
   margin-bottom: 8px; }
 .board-move select { width: 100%; margin-top: 6px; font-size: .8rem; }
+
+/* =====================================================================================================================
+   Glass & glossy theme (26 Nov 2026) — Salon Shastra brand: primary #c04000, deep brown #893815, peach #ffe3d5.
+   Frosted translucent cards on a soft warm aurora; glossy brand buttons; calm, high-contrast text. Phones get a
+   lighter blur; browsers without backdrop-filter (and people who ask for less transparency) get solid cards.
+   ===================================================================================================================== */
+:root {
+  --glass: rgba(255, 255, 255, .64);
+  --glass-strong: rgba(255, 255, 255, .82);
+  --glass-line: rgba(255, 255, 255, .75);
+  --glass-edge: rgba(137, 56, 21, .10);
+  --glass-shadow: 0 10px 30px rgba(137, 56, 21, .08), 0 2px 6px rgba(17, 17, 17, .04);
+  --glass-blur: blur(18px) saturate(160%);
+  --gloss: linear-gradient(180deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 52%);
+  --brand-grad: linear-gradient(180deg, #e2672d 0%, #c84a0c 48%, #b03a00 100%);
+  --surface-2: rgba(255, 252, 249, .55);
+}
+body {
+  background:
+    radial-gradient(900px 520px at 0% 0%, rgba(255, 213, 190, .75) 0%, rgba(255, 213, 190, 0) 60%),
+    radial-gradient(800px 600px at 100% 10%, rgba(255, 229, 214, .9) 0%, rgba(255, 229, 214, 0) 62%),
+    radial-gradient(900px 700px at 60% 100%, rgba(252, 220, 200, .65) 0%, rgba(252, 220, 200, 0) 60%),
+    linear-gradient(160deg, #fdf6f1 0%, #fbefe7 50%, #f8ece4 100%);
+  background-attachment: fixed;
+}
+/* frosted surfaces */
+.card, .stat, .kpi, .stat-chip, .board-col, .board-card, .area-count, .answered, .bulk-bar, .target, .match-card,
+details.pop .pop-body, .back {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, .85);
+}
+.card { border-radius: 18px; }
+.card:hover { box-shadow: 0 14px 38px rgba(137, 56, 21, .11), inset 0 1px 0 rgba(255, 255, 255, .9); }
+.board-col { background: rgba(255, 248, 243, .5); }
+.board-card { background: var(--glass-strong); }
+.top {
+  background: rgba(255, 251, 248, .7);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-line);
+  box-shadow: 0 6px 22px rgba(137, 56, 21, .07);
+}
+.top input[type=search] { background: rgba(255, 255, 255, .7); border: 1px solid rgba(137, 56, 21, .08); }
+/* sidebar: deep brand brown, glossy */
+.side {
+  background: linear-gradient(180deg, #4a2414 0%, #3a1c10 45%, #2c150c 100%);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, .06), 6px 0 24px rgba(58, 28, 16, .18);
+}
+.nav a.on { background: linear-gradient(90deg, rgba(255, 180, 138, .22) 0%, rgba(255, 180, 138, .08) 100%);
+  box-shadow: inset 3px 0 0 #ff8a4c; }
+/* glossy buttons */
+.btn { border-radius: 12px; background: var(--glass-strong); border: 1px solid rgba(137, 56, 21, .12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 2px rgba(17, 17, 17, .05); transition: transform .08s, box-shadow .15s, filter .15s; }
+.btn:hover { filter: brightness(1.02); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 4px 12px rgba(137, 56, 21, .10); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--brand-grad); border: 1px solid #a93700; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 6px 16px rgba(192, 64, 0, .28);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .12); }
+.btn.primary:hover { background: var(--brand-grad); filter: brightness(1.06); }
+.btn.danger { color: var(--bad); }
+.btn.link { background: none; border: 0; box-shadow: none; }
+/* inputs */
+input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea {
+  background: rgba(255, 255, 255, .78); border: 1px solid rgba(137, 56, 21, .14); border-radius: 11px; }
+input:focus, select:focus, textarea:focus { background: #fff; border-color: var(--brand); outline: 3px solid rgba(192, 64, 0, .14); }
+/* tables, badges, chips */
+th { background: rgba(255, 248, 243, .6); }
+tr.row-link:hover td, tr.is-clickable:hover td { background: rgba(255, 237, 226, .55); }
+.badge { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6); }
+.stat .n, .kpi b { background: linear-gradient(180deg, #2a160d 0%, #5a2a14 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stat.bad .n, .kpi b.bad { background: none; color: var(--bad); }
+.stat.ok .n { background: none; color: var(--ok); }
+progress { accent-color: var(--brand); }
+.flash { border-radius: 14px; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-line); box-shadow: var(--glass-shadow); }
+.flash.ok { background: rgba(230, 243, 236, .85); }
+.flash.error { background: rgba(251, 233, 233, .88); }
+/* phones: lighter blur keeps scrolling smooth */
+@media (max-width: 640px) {
+  :root { --glass-blur: blur(10px) saturate(140%); }
+}
+/* no blur support, or the person prefers less transparency: solid, still glossy */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .card, .stat, .kpi, .stat-chip, .board-col, .board-card, .top, .bulk-bar, .answered, details.pop .pop-body { background: #fffdfb; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card, .stat, .kpi, .stat-chip, .board-col, .board-card, .top, .bulk-bar, .answered, details.pop .pop-body {
+    background: #fffdfb; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* The blur sits on a background layer (::before), never on the element itself: a backdrop-filter on an element traps
+   position:fixed pop-ups inside it (the status / user menus become fixed sheets on phones). */
+.card, .top { -webkit-backdrop-filter: none; backdrop-filter: none; background: transparent; isolation: isolate; }
+.card { position: relative; }
+.card::before, .top::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+}
+.top::before { background: rgba(255, 251, 248, .72); }
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .card::before, .top::before { background: #fffdfb; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card::before, .top::before { background: #fffdfb; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ---- Today's numbers (My Day / Founder desk) ---- */
+.day-kpis { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+.day-kpis .kpi { position: relative; overflow: hidden; transition: transform .15s ease, box-shadow .15s ease; }
+.day-kpis a.kpi:hover { transform: translateY(-2px); text-decoration: none; }
+.day-kpis .kpi::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--brand-grad, var(--brand)); opacity: .55; }
+.kpi.bad b, .kpi.ok b, .kpi.info b { background: none; -webkit-background-clip: border-box; background-clip: border-box; }
+.kpi.bad b { color: var(--bad); } .kpi.ok b { color: var(--ok); } .kpi.info b { color: var(--info); }
+.kpi.bad::after { background: var(--bad); opacity: .8; } .kpi.ok::after { background: var(--ok); } .kpi.info::after { background: var(--info); }
+.section-h { margin: 22px 0 10px; font-size: 17px; }
+.lead-list .badge.small { font-size: 11px; }
+ol.feed { list-style: none; margin: 0; padding: 0; }
+.feed-i { display: grid; grid-template-columns: 26px 1fr; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.feed-i:last-child { border-bottom: 0; }
+.feed-dot { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--brand-tint); }
+.feed-i.k-call .feed-dot { background: var(--ok-soft); }
+.clip { overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .day-kpis { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .day-kpis .kpi { padding: 9px 10px; }
+  .day-kpis .kpi b { font-size: 19px; }
+  .day-kpis .kpi span { font-size: 11px; line-height: 1.25; }
+}
+.login .wordmark img { filter: none; opacity: 1; width: 160px; }
+.login .wordmark small { color: var(--muted); }
+
+/* ---- appointments: lengths and add-to-calendar ---- */
+.ev-len { font-weight: 400; color: var(--muted); }
+.ev-gcal { display: block; font-size: 11px; margin: -3px 0 8px 10px; }
+.ev-vikas_call, .ev-office { background: #fff1e8; border-left-color: var(--brand); }
+.btn.gcal { margin-top: 6px; }
+.appt-key { margin: -4px 0 10px; }
+
+/* ---- Sidebar v3: light warm glass with mahogany (brand #c04000 / #893815), real-colour logo ---- */
+:root { --side-ink: #4a1f0e; --side-muted: #9a6a55; --mahogany: #c04000; --mahogany-deep: #893815; }
+.side {
+  background: linear-gradient(180deg, rgba(255, 250, 246, .92) 0%, rgba(255, 238, 226, .9) 55%, rgba(252, 226, 210, .92) 100%);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  color: var(--side-ink);
+  border-right: 1px solid rgba(137, 56, 21, .12);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, .7), 6px 0 24px rgba(137, 56, 21, .08);
+}
+.wordmark { border-bottom: 1px solid rgba(137, 56, 21, .12); }
+.wordmark img { filter: none; opacity: 1; }
+.wordmark small { color: var(--side-muted); }
+.nav .group { color: var(--side-muted); }
+.nav a { color: var(--side-ink); opacity: 1; }
+.nav a .ico { color: var(--mahogany-deep); }
+.nav a:hover { background: rgba(192, 64, 0, .08); color: var(--mahogany-deep); }
+.nav a.on { background: linear-gradient(135deg, #c84a0c 0%, var(--mahogany) 45%, var(--mahogany-deep) 100%); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 6px 16px rgba(192, 64, 0, .25); }
+.nav a.on .ico { color: #fff; }
+.nav a.on .count { background: #fff; color: var(--mahogany); }
+.nav .nav-foot { border-top-color: rgba(137, 56, 21, .12); }
+.side-foot { color: var(--side-muted); opacity: 1; }
+@media (max-width: 960px) { .side { background: #fff6f0; box-shadow: 0 0 40px rgba(74, 31, 14, .25); } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .side { background: #fff4ec; } }
+
+/* ---- Clickable cards: no underline on hover; match-card scores stay one compact row at every width ---- */
+a.match-card:hover, a.match-card:hover *, a.kpi:hover, a.kpi:hover *, a.board-card:hover, a.board-card:hover *,
+a.tile:hover, a.tile:hover *, a.wait-row:hover, a.stat-chip:hover { text-decoration: none; }
+.mc-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: start; }
+.mc-head .scores { display: flex; flex-wrap: nowrap; gap: 14px; align-items: center; justify-content: flex-end; margin: 0; }
+.mc-head .scores > div { text-align: center; }
+@media (max-width: 1100px) {
+  .mc-head { grid-template-columns: minmax(0, 1fr); }
+  .mc-head .scores { justify-content: flex-start; gap: 12px; }
+  .mc-head .score-n { display: inline; font-size: 19px; margin-right: 3px; }
+}
+.count, .score-l, .btn.sm { white-space: nowrap; }
+.queue-list li .badge, .nav a .count, .tile .n { flex: 0 0 auto; }
+.badge { overflow-wrap: normal; }

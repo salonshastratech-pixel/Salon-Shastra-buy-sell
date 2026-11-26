@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% extends "base.html" %}{% from "macros.html" import csrf, gcal_btn %}
 {% block title %}Calendar{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Calendar</h1><div class="sub">Calls, call-backs, follow-ups and salon visits — week of {{ start.strftime('%d %b %Y') }}</div></div>
@@ -12,9 +12,10 @@
   <a class="btn sm primary" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/r?cid={{ new_link.replace('https://', 'webcal://').replace('http://', 'webcal://')|urlencode }}">Add to my Google Calendar</a><br>
   In Google Calendar: <em>Other calendars → + → From URL</em> → paste. On iPhone: <em>Settings → Calendar → Accounts → Add subscribed calendar</em>. It updates every few hours and shows only the kind of task, the reference code and the area — no customer names or numbers.</div>{% endif %}
 
+<p class="small muted appt-key">Standard lengths: phone or video call with Vikas <b>10 min</b> · meeting at our office <b>3 hours</b> · salon or place visit <b>5 hours</b>.</p>
 <div class="week">{% for d in days %}
   <div class="day {{ 'today' if d.today }}"><div class="day-h">{{ d.date.strftime('%a') }} <b>{{ d.date.strftime('%d %b') }}</b></div>
-    {% for e in d.events %}<a class="ev ev-{{ e.type }} {{ 'hi' if e.priority in ('urgent','high') }}" href="{{ e.link }}"><span class="ev-time">{{ e.time }}</span><span class="ev-t">{{ e.title }}</span>{% if e.ref %}<span class="ev-ref">{{ e.ref }}{% if e.area %} · {{ e.area }}{% endif %}</span>{% endif %}</a>
+    {% for e in d.events %}<a class="ev ev-{{ e.type }} {{ 'hi' if e.priority in ('urgent','high') }}" href="{{ e.link }}"><span class="ev-time">{{ e.time }}–{{ e.end_time }} <span class="ev-len">· {{ e.length }}</span></span><span class="ev-t">{{ e.title }}</span>{% if e.ref %}<span class="ev-ref">{{ e.ref }}{% if e.area %} · {{ e.area }}{% endif %}</span>{% endif %}</a>{% if e.kind in ('vikas_call', 'consultation', 'visit') %}<a class="ev-gcal" href="{{ e.gcal }}" target="_blank" rel="noopener">📅 Add to Google Calendar</a>{% endif %}
     {% else %}<div class="ev-empty">—</div>{% endfor %}
   </div>{% endfor %}
 </div>

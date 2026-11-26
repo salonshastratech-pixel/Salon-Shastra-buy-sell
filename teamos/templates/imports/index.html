@@ -28,19 +28,21 @@
   </table></div></div>
 </div>
 
-<div class="card" id="sheets"><div class="card-h"><h2>Connected Google Sheets</h2><span class="small muted">checked every hour</span></div>
-  <p class="small">Connect the sheets your team keeps filling (Google Form responses, ad leads). Every hour TeamOS looks for new people and prepares an import preview; you get a notification and press <strong>Import now</strong> after a quick look. Nothing is saved without that click.</p>
+<div class="card" id="sheets"><div class="card-h"><h2>Connected Google Sheets</h2><span class="small muted">checked every 10 minutes</span></div>
+  <p class="small">Connect the sheets your team keeps filling (Google Form responses, ad leads). Every 10 minutes TeamOS looks for new people. Normally it prepares an import preview and you press <strong>Import now</strong> after a quick look. For ad leads (Meta instant forms → Google Sheet) switch on <strong>Auto-import</strong>: new leads come straight in, shared between the team in turn (as set in <a href="{{ url_for('records.manage') }}">Leads &amp; data</a>), each with a first call due within 10 minutes.</p>
   {% if sheets %}<div class="table-wrap"><table class="small">
     <tr><th>Sheet</th><th>Last check</th><th>Result</th><th></th></tr>
-    {% for s in sheets %}<tr><td><strong>{{ s.name }}</strong><div class="muted">connected by {{ s.by_name }}</div></td>
+    {% for s in sheets %}<tr><td><strong>{{ s.name }}</strong><div class="muted">connected by {{ s.by_name }}</div>{% if s.auto_import %}<span class="badge ok">Auto-import on</span>{% endif %}</td>
       <td>{{ s.last_checked_at|rel if s.last_checked_at else '—' }}</td>
       <td>{{ s.last_result or '—' }}{% if s.last_import_id and s.import_status == 'preview' %} <a href="{{ url_for('imports.smart_preview', import_id=s.last_import_id) }}">Review preview #{{ s.last_import_id }}</a>{% endif %}</td>
       <td class="nowrap"><form method="post" action="{{ url_for('imports.sheet_check', sheet_id=s.id) }}" class="inline">{{ csrf() }}<button class="btn sm">Check now</button></form>
+        <form method="post" action="{{ url_for('imports.sheet_auto', sheet_id=s.id) }}" class="inline">{{ csrf() }}<input type="hidden" name="on" value="{{ '0' if s.auto_import else '1' }}"><button class="btn sm">{{ 'Turn auto-import off' if s.auto_import else 'Turn auto-import on' }}</button></form>
         <form method="post" action="{{ url_for('imports.sheet_remove', sheet_id=s.id) }}" class="inline" data-confirm="Stop checking {{ s.name }}? Records already imported stay.">{{ csrf() }}<button class="btn sm">Disconnect</button></form></td></tr>{% endfor %}
   </table></div>{% endif %}
   <form method="post" action="{{ url_for('imports.sheet_connect') }}" class="form-grid">{{ csrf() }}
     <div class="field"><label for="cs-name">Name</label><input id="cs-name" name="name" placeholder="e.g. Pilot program responses"></div>
     <div class="field"><label for="cs-link">Google Sheets link</label><input id="cs-link" name="link" required placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+    <div class="field full"><label class="check"><input type="checkbox" name="auto" value="1"> Auto-import new leads (for ad lead sheets) — no preview; shared in turn; first call within 10 minutes</label></div>
     <div class="full help">In Google Sheets: Share &gt; General access &gt; "Anyone with the link" &gt; Viewer. Anyone who has this exact link can open the sheet, so share it only with TeamOS and your team.</div>
     <div class="full"><button class="btn primary">Connect sheet</button></div></form>
 </div>

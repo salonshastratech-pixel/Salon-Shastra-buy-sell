@@ -50,7 +50,8 @@ def schedule_periodic(db) -> None:
     enqueue(db, "daily_digest", dedupe_key="daily_digest:" + n.strftime("%Y%m%d%H"))  # hourly; sends once/user/day
     enqueue(db, "stuck_sweep", dedupe_key="stuck_sweep:" + n.strftime("%Y%m%d"))  # daily; one alert per person
     enqueue(db, "learning_propose", dedupe_key="learning_propose:" + n.strftime("%G%V"))  # weekly
-    enqueue(db, "sheet_watch", dedupe_key="sheet_watch:" + n.strftime("%Y%m%d%H"))  # hourly
+    ten = n.replace(minute=(n.minute // 10) * 10, second=0)
+    enqueue(db, "sheet_watch", dedupe_key="sheet_watch:" + ten.strftime("%Y%m%d%H%M"))  # every 10 min (ad leads)
     enqueue(db, "area_retry", dedupe_key="area_retry:" + n.strftime("%Y%m%d%H"))  # hourly
     enqueue(db, "lead_time_backfill", dedupe_key="lead_time_backfill:v1")  # once
 
@@ -196,8 +197,15 @@ def lead_ads(db, payload) -> str:
 
 @handler("sheet_watch")
 def sheet_watch(db, payload) -> str:
-    """Hourly: connected Google Sheets with new people become an import preview to approve."""
+    """Every 10 minutes: connected Google Sheets — new people become a preview, or come straight in (auto-import)."""
+    from flask import current_app, has_app_context
+
+    from . import background
     from .domain import connected_sheets
+    if has_app_context():   # Google can take half a minute per sheet: never hold up the timer request
+        started = background.run(current_app._get_current_object(), "sheet_watch",
+                                 lambda bdb: connected_sheets.check_all(bdb))
+        return "checking connected sheets in the background" if started else "a check is already running"
     return connected_sheets.check_all(db)
 
 

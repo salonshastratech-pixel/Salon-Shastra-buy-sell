@@ -5,6 +5,7 @@ from ..db import get_db
 from ..domain import sellers as S
 from ..domain import tasks as T
 from ..domain.errors import ValidationError
+from ..domain import seller_fields as SF
 from ..domain.seller_fields import LISTING_CHECKLIST, SECTIONS
 from ..permissions import user_can
 from ..security import can, deny, login_required, require
@@ -178,7 +179,8 @@ def save_section(opp_id, section):
         changed = S.update_fields(db, g.user, opp, request.form.to_dict(), section)
         flash(f"Saved {len(changed)} change(s)." if changed else "No changes.", "ok")
     except ValidationError as e:
-        flash("Not saved: " + "; ".join(f"{k.replace('_', ' ')} — {v}" for k, v in e.errors.items()), "error")
+        flash("Not saved: " + "; ".join(f"{(SF.BY_KEY[k].label if k in SF.BY_KEY else k.replace('_', ' '))} — {v}"
+                                          for k, v in e.errors.items()), "error")
     return _back(opp_id, "intake")
 
 

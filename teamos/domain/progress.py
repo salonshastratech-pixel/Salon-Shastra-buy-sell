@@ -275,9 +275,12 @@ def round_robin(db, kind: str) -> int | None:
     available → the admin."""
     from .availability import away_ids
     on_leave = away_ids(db)
-    people = [p["id"] for p in db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND team IN (?, 'general') "
-                                      "AND role IN ('team_member', 'team_lead') ORDER BY id", (kind,))
-              if not is_away(p) and p["id"] not in on_leave]
+    chosen = split_ids(db, kind)      # set in Leads & data; otherwise everyone whose "Mainly works on" fits
+    rows = (db.all(f"SELECT id, away_until FROM users WHERE is_active = 1 AND id IN ({','.join('?' * len(chosen))}) "
+                   "ORDER BY id", chosen) if chosen else
+            db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND team IN (?, 'general') "
+                   "AND role IN ('team_member', 'team_lead') ORDER BY id", (kind,)))
+    people = [p["id"] for p in rows if not is_away(p) and p["id"] not in on_leave]
     if not people:
         row = db.one("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin' ORDER BY id LIMIT 1")
         return row["id"] if row else None
@@ -290,3 +293,72 @@ def round_robin(db, kind: str) -> int | None:
     else:
         db.insert("automation_settings", {"key": key, "enabled": 1, "note": str(nxt), "updated_at": now_iso()})
     return nxt
+
+
+def split_ids(db, kind: str) -> list[int]:
+    raw = db.scalar("SELECT note FROM automation_settings WHERE key = ?", (f"lead_split:{kind}",))
+    return [int(x) for x in (raw or "").split(",") if x.strip().isdigit()]
+
+
+def current_split(db) -> dict:
+    """Who new leads go to: the people chosen in Leads & data, else those whose "Mainly works on" fits."""
+    people = db.all("SELECT id, full_name, team FROM users WHERE is_active = 1 AND role IN ('team_member', 'team_lead') "
+                    "ORDER BY id")
+    out = {"people": people}
+    for kind in ("seller", "buyer"):
+        chosen = split_ids(db, kind)
+        out[kind] = ([p for p in people if p["id"] in chosen] if chosen
+                     else [p for p in people if p["team"] in (kind, "general")])
+    return out
+
+
+def set_split(db, actor, seller_ids: list[int], buyer_ids: list[int], move_existing: bool) -> dict:
+    """Decide who gets new salon owners and who gets new investors (each side in turn, round robin). With
+    move_existing, every current record of each side — and its open tasks — is shared out the same way, in turn."""
+    if not user_can(db, actor, "users.manage"):
+        raise PermissionDenied("users.manage")
+    team = {p["id"]: p for p in db.all("SELECT id, full_name FROM users WHERE is_active = 1 AND role IN "
+                                       "('team_member', 'team_lead')")}
+    seller_ids = [i for i in seller_ids if i in team]
+    buyer_ids = [i for i in buyer_ids if i in team]
+    if not seller_ids or not buyer_ids:
+        raise ValidationError({"split": "Choose at least one person for salon owners and one for investors."})
+    moved = {"seller": 0, "buyer": 0}
+    with db:
+        for uid in team:
+            side = ("general" if uid in seller_ids and uid in buyer_ids else "seller" if uid in seller_ids
+                    else "buyer" if uid in buyer_ids else None)
+            if side:
+                db.execute("UPDATE users SET team = ? WHERE id = ?", (side, uid))
+        for kind, ids in (("seller", seller_ids), ("buyer", buyer_ids)):
+            db.execute("DELETE FROM automation_settings WHERE key = ?", (f"round_robin:{kind}",))   # fresh turn
+            db.execute("DELETE FROM automation_settings WHERE key = ?", (f"lead_split:{kind}",))
+            db.insert("automation_settings", {"key": f"lead_split:{kind}", "enabled": 1,
+                                              "note": ",".join(str(i) for i in ids), "updated_at": now_iso()})
+            if not move_existing:
+                continue
+            recs = db.all("SELECT id, ref_code, primary_owner_id FROM opportunities WHERE kind = ? AND status <> 'closed' "
+                          "ORDER BY id", (kind,))
+            for n, r in enumerate(recs):
+                new = ids[n % len(ids)]
+                if r["primary_owner_id"] == new:
+                    continue
+                db.execute("UPDATE opportunities SET primary_owner_id = ?, updated_at = ? WHERE id = ?",
+                           (new, now_iso(), r["id"]))
+                db.execute("UPDATE tasks SET assignee_id = ?, updated_at = ? WHERE entity_type = 'opportunity' AND "
+                           "entity_id = ? AND status = 'open'", (new, now_iso(), r["id"]))
+                T.add_activity(db, actor["id"], "opportunity", r["id"], "assignment",
+                               f"Primary owner → {team[new]['full_name']} (work split: "
+                               f"{'salon owners' if kind == 'seller' else 'investors'})")
+                moved[kind] += 1
+        for uid in set(seller_ids + buyer_ids):
+            got = []
+            if uid in seller_ids:
+                got.append("salon owners")
+            if uid in buyer_ids:
+                got.append("investors")
+            T.notify(db, uid, "assignment", f"New {' and '.join(got)} leads now come to you"
+                     + (" — your records were updated" if move_existing else ""), "/")
+        audit.record(db, actor["id"], "work.split", "user", None, {"seller": seller_ids, "buyer": buyer_ids,
+                                                                    "moved": moved})
+    return moved

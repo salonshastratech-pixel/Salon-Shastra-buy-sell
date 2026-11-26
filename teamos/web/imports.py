@@ -76,7 +76,8 @@ def mapping(batch_id):
     headers = json.loads(batch["headers"])
     new = {h: request.form.get(f"map_{i}") for i, h in enumerate(headers) if request.form.get(f"map_{i}")}
     try:
-        I.set_mapping(db, g.user, batch_id, new, int(request.form.get("owner_id") or 0) or None)
+        o = request.form.get("owner_id") or ""
+        I.set_mapping(db, g.user, batch_id, new, "auto" if o == "auto" else (int(o) if o.isdigit() else None))
         flash("Mapping updated and every row re-checked.", "ok")
     except ValidationError as e:
         flash(" ".join(e.errors.values()), "error")
@@ -124,7 +125,7 @@ def sheet_connect():
     from ..domain import connected_sheets as CS
     db = get_db()
     try:
-        sid = CS.add(db, g.user, request.form.get("name"), request.form.get("link"))
+        sid = CS.add(db, g.user, request.form.get("name"), request.form.get("link"), request.form.get("auto") == "1")
         res = CS.check(db, db.one("SELECT * FROM connected_sheets WHERE id = ?", (sid,)), g.user)
         flash("Sheet connected. First check: " + res, "ok")
     except ValidationError as e:
@@ -141,6 +142,17 @@ def sheet_check(sheet_id):
     if not s:
         abort(404)
     flash(f"{s['name']}: " + CS.check(db, s, g.user), "ok")
+    return redirect(url_for("imports.index") + "#sheets")
+
+
+@bp.route("/sheets/<int:sheet_id>/auto", methods=["POST"])
+@require("crm.import")
+def sheet_auto(sheet_id):
+    from ..domain import connected_sheets as CS
+    on = request.form.get("on") == "1"
+    CS.set_auto(get_db(), g.user, sheet_id, on)
+    flash("Auto-import is on: new leads come straight in, shared between the team in turn, first call within "
+          "10 minutes." if on else "Auto-import is off: new people wait as a preview for you to approve.", "ok")
     return redirect(url_for("imports.index") + "#sheets")
 
 

@@ -448,7 +448,12 @@ def _raw(v) -> str:
     return str(v) if v is not None else ""
 
 
-def commit(db, actor, import_id: int) -> dict:
+LIVE_BATCH_MAX = 15   # more new rows than this at once is a backlog: spread the first calls instead
+
+
+def commit(db, actor, import_id: int, live: bool = False) -> dict:
+    """live: fresh leads (an ad sheet checked every few minutes) — first call due within 10 minutes, each owner
+    alerted per lead. Otherwise first calls are spread over the next working days."""
     if not user_can(db, actor, "crm.import"):
         raise PermissionDenied("crm.import")
     imp = db.one("SELECT * FROM sheet_imports WHERE id = ?", (import_id,))
@@ -456,7 +461,7 @@ def commit(db, actor, import_id: int) -> dict:
         raise ValidationError("This import has already been committed or discarded.")
     counts = {"created_seller": 0, "created_buyer": 0, "updated": 0, "merged": 0, "skipped": 0, "failed": 0}
     to_understand = []
-    load, due = {}, _next_morning()
+    load, due = {}, (to_iso(now_utc() + timedelta(minutes=10)) if live else _next_morning())
     src_tag = f"sheet:{import_id}"
     for r in db.all("SELECT * FROM sheet_import_rows WHERE import_id = ? ORDER BY id", (import_id,)):
         if r["outcome"] in ("created", "updated"):  # resumed after an interruption: already saved
@@ -500,7 +505,8 @@ def commit(db, actor, import_id: int) -> dict:
             counts["failed"] += 1
             msg = " ".join(str(v) for v in e.errors.values()) if isinstance(e, ValidationError) else str(e)
             db.update("sheet_import_rows", r["id"], {"outcome": "failed", "reason": (r["reason"] or "") + f" — {msg}"[:400]})
-    _schedule_first_calls(db, import_id)
+    if not live:
+        _schedule_first_calls(db, import_id)
     # after the first calls are planned: the team's remarks decide the next call (and what they need)
     for kind, opp_id, canon, notes, raw in to_understand:
         try:

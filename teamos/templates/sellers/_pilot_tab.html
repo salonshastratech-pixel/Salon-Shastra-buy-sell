@@ -1,4 +1,4 @@
-{% from "macros.html" import form_progress, csrf %}
+{% from "macros.html" import form_progress, csrf, gcal_btn %}
 {% set prof = pilot %}{% set rep = pilot_report %}
 <div class="pilot-flow">
 <ol class="pilot-steps" aria-label="Pilot program steps">
@@ -103,10 +103,13 @@
     <div class="card-h"><h2>Call with {{ P.CONSULTANT_NAME }}</h2><a class="small" href="{{ url_for('pilot.vikas') }}">His free times →</a></div>
     {% for b in pilot_bookings %}
     <div class="booking {{ b.status }}">
+      {% set bmode = b.mode or 'phone' %}
       <div><strong>{% if b.starts_at %}{{ b.starts_at|ist('%a %d %b, %I:%M %p') }}{% else %}Requested: {{ b.preferred_time }}{% endif %}</strong>
+        <span class="small muted">· {{ AP.LABELS[bmode] }}, {{ AP.length_label(AP.minutes_for(bmode)) }}</span>
         <span class="badge {{ 'ok' if b.status == 'done' else 'warn' if b.status in ('requested', 'booked') else 'grey' }}">{{ {'requested': 'Requested', 'booked': 'Booked', 'done': 'Held', 'cancelled': 'Cancelled', 'no_show': 'No-show'}[b.status] }}</span>
         <span class="small muted">· booked {{ 'by the owner' if b.source == 'link' else 'by the team' }} {{ b.created_at|rel }}</span></div>
       {% if b.note %}<div class="small">“{{ b.note }}”</div>{% endif %}
+      {% if b.status == 'booked' and b.starts_at %}<div>{{ gcal_btn(AP.gcal_url(AP.LABELS[bmode] ~ ' · ' ~ opp.ref_code, b.starts_at, AP.minutes_for(bmode), 'Salon Shastra — ' ~ opp.ref_code)) }}</div>{% endif %}
       {% if b.outcome_note %}<div class="small"><strong>Outcome:</strong> {{ b.outcome_note }}</div>{% endif %}
       {% if b.status in ('requested', 'booked') %}
       <details class="disclose"><summary>Update this call</summary>
@@ -121,7 +124,7 @@
     {% if not pilot_bookings or pilot_bookings[0].status not in ('requested', 'booked') %}
     <details class="disclose" {{ 'open' if not pilot_bookings }}><summary>Book a call for them</summary>
       <form method="post" action="{{ url_for('pilot.staff_book', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
-        {% if pilot_slots %}<div class="field full"><label>Free time</label><select name="slot_id"><option value="">— none suits; note a preferred time below —</option>{% for s in pilot_slots %}<option value="{{ s.id }}">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} · {{ s.mode }}</option>{% endfor %}</select></div>
+        {% if pilot_slots %}<div class="field full"><label>Free time</label><select name="slot_id"><option value="">— none suits; note a preferred time below —</option>{% for s in pilot_slots %}<option value="{{ s.id }}">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} · {{ AP.LABELS[s.mode] }} ({{ AP.length_label(s.minutes) }})</option>{% endfor %}</select></div>
         {% else %}<p class="small muted full">No free times are listed. <a href="{{ url_for('pilot.vikas') }}">Add his free times</a>, or note what the owner prefers.</p>{% endif %}
         <div class="field full"><label>Owner's preferred time (if no slot)</label><input name="preferred" maxlength="200" placeholder="e.g. Saturday after 3 pm"></div>
         <div class="field full"><label>Note for Vikas</label><input name="note" maxlength="500"></div>
@@ -138,7 +141,8 @@
       <div><strong>{{ dict(P.CONSULT_KINDS)[k.kind] }}</strong> · {{ 'Hyderabad' if k.in_hyderabad else 'Outside Hyderabad' }} · <strong>₹{{ '{:,}'.format(k.fee) }}</strong>
         <span class="badge {{ 'ok' if k.paid else 'warn' }}">{{ 'Paid' if k.paid else 'Not paid' }}</span>
         {% if k.status != 'booked' %}<span class="badge grey">{{ 'Held' if k.status == 'done' else 'Cancelled' }}</span>{% endif %}</div>
-      <div class="small muted">{% if k.scheduled_at %}{{ k.scheduled_at|ist('%a %d %b, %I:%M %p') }} · {% endif %}Video: {{ dict(P.VIDEO_STATUS)[k.video_status] }}{% if k.video_link %} · <a href="{{ k.video_link }}" target="_blank" rel="noopener noreferrer">watch</a>{% endif %}{% if k.paid %} · {{ dict(P.PAY_MODES).get(k.paid_mode, k.paid_mode) }}{% if k.paid_ref %} ref {{ k.paid_ref }}{% endif %}{% endif %}</div>
+      <div class="small muted">{% if k.scheduled_at %}{{ k.scheduled_at|ist('%a %d %b, %I:%M %p') }} for {{ AP.length_label(AP.minutes_for(k.kind)) }} · {% endif %}Video: {{ dict(P.VIDEO_STATUS)[k.video_status] }}{% if k.video_link %} · <a href="{{ k.video_link }}" target="_blank" rel="noopener noreferrer">watch</a>{% endif %}{% if k.paid %} · {{ dict(P.PAY_MODES).get(k.paid_mode, k.paid_mode) }}{% if k.paid_ref %} ref {{ k.paid_ref }}{% endif %}{% endif %}</div>
+      {% if k.status == 'booked' and k.scheduled_at %}<div>{{ gcal_btn(AP.gcal_url(AP.LABELS[k.kind] ~ ' · ' ~ opp.ref_code, k.scheduled_at, AP.minutes_for(k.kind), 'Salon Shastra paid consultation — ' ~ opp.ref_code, opp.locality or '')) }}</div>{% endif %}
       {% if k.note %}<div class="small">{{ k.note }}</div>{% endif %}
       <details class="disclose"><summary>Update</summary>
         <form method="post" action="{{ url_for('pilot.consultation_update', opp_id=opp.id, cid=k.id) }}" class="form-grid">{{ csrf() }}
@@ -156,7 +160,7 @@
       <form method="post" action="{{ url_for('pilot.consultation', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
         <div class="field"><label>Type</label><select name="kind">{% for v, l in P.CONSULT_KINDS %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
         <div class="field"><label>Where</label><select name="in_hyderabad"><option value="1">Within Hyderabad</option><option value="0">Outside Hyderabad</option></select></div>
-        <div class="field"><label>Date &amp; time (IST)</label><input type="datetime-local" name="scheduled_at"></div>
+        <div class="field"><label>Date &amp; time (IST)</label><input type="datetime-local" name="scheduled_at"><div class="help">Office meeting blocks 3 hours, salon visit 5 hours, in Vikas's calendar.</div></div>
         <div class="field full"><label>Note</label><input name="note" maxlength="500"></div>
         <div class="full"><table class="fee-table small"><tr><th></th><th>Hyderabad</th><th>Outside</th></tr>
           <tr><td>Office meeting</td><td>₹{{ '{:,}'.format(P.FEES[('office', 1)]) }}</td><td>₹{{ '{:,}'.format(P.FEES[('office', 0)]) }}</td></tr>

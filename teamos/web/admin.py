@@ -289,7 +289,11 @@ def integrations():
             flash(" ".join(str(v) for v in e.errors.values()), "error")
         return redirect(url_for("admin.integrations") + "#" + (request.form.get("connector") or ""))
     if act == "verify_token":
-        IG.save(db, g.user, {"WHATSAPP_VERIFY_TOKEN": IG.new_verify_token()})
+        try:
+            IG.save(db, g.user, {"WHATSAPP_VERIFY_TOKEN": IG.new_verify_token()})
+        except ValidationError as e:  # e.g. no encryption key on the server: say so instead of crashing
+            flash(" ".join(str(v) for v in e.errors.values()), "error")
+            return redirect(url_for("admin.integrations") + "#whatsapp")
         flash("A new webhook verify token was generated and saved (encrypted). Show it once below to copy into Meta.", "ok")
         return redirect(url_for("admin.integrations", show_token=1) + "#whatsapp")
     if act in ("go_live", "test_only"):

@@ -36,7 +36,7 @@
       {% for f in BF.FIELDS if f.quick and f.key != 'preferred_city' %}
       <div class="field {{ 'full' if f.key in ('need_type','all_in_max') }} {{ 'has-err' if errors[f.key] }}"><label>{{ f.label }}</label>
         {% if f.ftype == 'enum' %}<select name="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if form[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
-        {% else %}<input name="{{ f.key }}" value="{{ form[f.key] or '' }}" {% if f.ftype == 'inr' %}placeholder="e.g. 30L or 3000000"{% endif %}>{% endif %}
+        {% else %}<input name="{{ f.key }}" value="{{ form[f.key] or '' }}"{% if f.ftype == 'int' %} inputmode="numeric"{% elif f.ftype == 'pct' %} inputmode="decimal"{% endif %} {% if f.ftype == 'inr' %}placeholder="e.g. 30L or 3000000"{% endif %}>{% endif %}
         {% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}{{ err(errors, f.key) }}</div>
       {% endfor %}
     </div>

@@ -209,7 +209,7 @@
     <div>
       {% if f.ftype == 'enum' %}<select name="{{ f.key }}" data-value-for="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if mandate[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
       {% elif f.ftype == 'textarea' %}<textarea name="{{ f.key }}" data-value-for="{{ f.key }}">{{ mandate[f.key] or '' }}</textarea>
-      {% else %}<input name="{{ f.key }}" value="{{ '' if mandate[f.key] is none else mandate[f.key] }}" data-value-for="{{ f.key }}" {% if f.ftype == 'inr' %}placeholder="₹ e.g. 25L"{% endif %}>
+      {% else %}<input name="{{ f.key }}" value="{{ '' if mandate[f.key] is none else mandate[f.key] }}" data-value-for="{{ f.key }}"{% if f.ftype == 'int' %} inputmode="numeric"{% elif f.ftype == 'pct' %} inputmode="decimal"{% endif %} {% if f.ftype == 'inr' %}placeholder="₹ e.g. 25L"{% endif %}>
         {% if f.ftype == 'inr' and mandate[f.key] is not none %}<div class="help">{{ mandate[f.key]|inr(false) }}</div>{% endif %}{% endif %}
     </div>
     <div><select name="{{ f.key }}__state" title="Answer state"><option value="">Not provided</option>{% for v, l in SF.ANSWER_STATES %}<option value="{{ v }}" {{ 'selected' if p and p.answer_state == v }}>{{ l }}</option>{% endfor %}</select></div>

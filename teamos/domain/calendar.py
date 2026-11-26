@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from .. import audit
 from ..timeutil import IST, now_iso, now_utc, parse_iso, to_iso
+from . import appointments as AP
 from .tasks import TASK_TYPES
 
 TYPE_LABELS = dict(TASK_TYPES)
@@ -43,6 +44,7 @@ def events(db, user_id: int, start_date, days: int = 7) -> list[dict]:
             "WHERE t.status = 'open' AND t.assignee_id = ? AND t.due_at >= ? AND t.due_at < ? ORDER BY t.due_at",
             (user_id, a, b)):
         out.append({"kind": "task", "id": t["id"], "at": t["due_at"], "title": t["title"], "type": t["task_type"],
+                    "minutes": AP.TASK_MINUTES.get(t["task_type"], 15),
                     "type_label": TYPE_LABELS.get(t["task_type"], "Task"), "ref": t["ref_code"], "area": t["area"],
                     "priority": t["priority"], "link": f"/tasks/{t['id']}"})
     for v in db.all(
@@ -52,8 +54,38 @@ def events(db, user_id: int, start_date, days: int = 7) -> list[dict]:
             "WHERE v.status = 'scheduled' AND (d.owner_id = ? OR v.created_by = ?) AND v.scheduled_at >= ? "
             "AND v.scheduled_at < ? ORDER BY v.scheduled_at", (user_id, user_id, a, b)):
         out.append({"kind": "visit", "id": v["id"], "at": v["scheduled_at"], "title": "Salon visit", "type": "visit",
+                    "minutes": AP.minutes_for("visit"),
                     "type_label": "Salon visit", "ref": v["ref_code"], "area": v["area"], "priority": "high",
                     "link": f"/deals/{v['deal_id']}"})
+    # appointments with Vikas: on Vikas's own calendar, and on the calendar of whoever owns the record
+    from .pilot import consultant
+    c = consultant(db)
+    is_vikas = 1 if c and c["id"] == user_id else 0
+    for bk in db.all(
+            "SELECT vb.id, vb.starts_at, COALESCE(s.mode, 'phone') AS mode, o.ref_code, o.kind AS opp_kind, o.id AS opp_id, "
+            "COALESCE(bs.locality, c.locality) AS area FROM vikas_bookings vb LEFT JOIN vikas_slots s ON s.id = vb.slot_id "
+            "JOIN opportunities o ON o.id = vb.opportunity_id LEFT JOIN salon_businesses bs ON bs.id = o.business_id "
+            "LEFT JOIN contacts c ON c.id = o.contact_id WHERE vb.status = 'booked' AND vb.starts_at >= ? AND "
+            "vb.starts_at < ? AND (o.primary_owner_id = ? OR ? = 1)", (a, b, user_id, is_vikas)):
+        tab = "investor" if bk["opp_kind"] == "buyer" else "pilot"
+        out.append({"kind": "vikas_call", "id": bk["id"], "at": bk["starts_at"], "title": AP.LABELS[bk["mode"]],
+                    "type": "call", "type_label": AP.LABELS[bk["mode"]], "minutes": AP.minutes_for(bk["mode"]),
+                    "ref": bk["ref_code"], "area": bk["area"], "priority": "high",
+                    "link": f"/{'buyers' if bk['opp_kind'] == 'buyer' else 'sellers'}/{bk['opp_id']}?tab={tab}#vikas"})
+    for k in db.all(
+            "SELECT k.id, k.kind, k.scheduled_at, o.ref_code, o.kind AS opp_kind, o.id AS opp_id, "
+            "COALESCE(bs.locality, c.locality) AS area FROM consultations k JOIN opportunities o ON o.id = k.opportunity_id "
+            "LEFT JOIN salon_businesses bs ON bs.id = o.business_id LEFT JOIN contacts c ON c.id = o.contact_id "
+            "WHERE k.status = 'booked' AND k.scheduled_at >= ? AND k.scheduled_at < ? AND "
+            "(o.primary_owner_id = ? OR k.created_by = ? OR ? = 1)", (a, b, user_id, user_id, is_vikas)):
+        out.append({"kind": "consultation", "id": k["id"], "at": k["scheduled_at"], "title": AP.LABELS[k["kind"]],
+                    "type": "visit" if k["kind"] == "salon_visit" else "office", "type_label": AP.LABELS[k["kind"]],
+                    "minutes": AP.minutes_for(k["kind"]), "ref": k["ref_code"], "area": k["area"], "priority": "high",
+                    "link": f"/sellers/{k['opp_id']}?tab=pilot#consult"})
+    for e in out:
+        e["length"] = AP.length_label(e["minutes"])
+        e["gcal"] = AP.gcal_url(e["type_label"] + (f" · {e['ref']}" if e["ref"] else ""), e["at"], e["minutes"],
+                                "Salon Shastra TeamOS" + (f" — {e['ref']}" if e["ref"] else ""), e["area"] or "")
     out.sort(key=lambda e: e["at"])
     return out
 
@@ -67,6 +99,8 @@ def week(db, user_id: int, start_date) -> list[dict]:
         items = [e for e in evs if parse_iso(e["at"]).astimezone(IST).date() == d]
         for e in items:
             e["time"] = parse_iso(e["at"]).astimezone(IST).strftime("%I:%M %p").lstrip("0")
+            e["end_time"] = (parse_iso(e["at"]) + timedelta(minutes=e["minutes"])).astimezone(IST).strftime(
+                "%I:%M %p").lstrip("0")
         days.append({"date": d, "events": items, "today": d == now_utc().astimezone(IST).date()})
     return days
 
@@ -117,7 +151,7 @@ def ics(db, user: dict, base_url: str) -> str:
              "X-WR-CALNAME:Salon Shastra work", "X-PUBLISHED-TTL:PT30M"]
     for e in events(db, user["id"], start, 67):
         begin = parse_iso(e["at"])
-        minutes = 60 if e["kind"] == "visit" else 15
+        minutes = e["minutes"]
         summary = e["type_label"] + (f" · {e['ref']}" if e["ref"] else "") + (f" ({e['area']})" if e["area"] else "")
         lines += ["BEGIN:VEVENT", f"UID:teamos-{e['kind']}-{e['id']}@salonshastra", f"DTSTAMP:{stamp}",
                   "DTSTART:" + begin.strftime("%Y%m%dT%H%M%SZ"),

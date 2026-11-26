@@ -170,7 +170,7 @@ def create_batch(db, actor, filename: str, data: bytes) -> int:
         bid = db.insert("import_batches", {
             "kind": "seller", "filename": filename[:200], "file_sha256": sha, "status": "preview",
             "mapping": json.dumps(auto_map(headers)), "headers": json.dumps(headers), "total_rows": len(body),
-            "owner_id": actor["id"], "uploaded_by": actor["id"], "created_at": now_iso()})
+            "owner_id": None, "uploaded_by": actor["id"], "created_at": now_iso()})   # None = share in turn
         for i, row in enumerate(body, start=2):  # row 1 is the header, as the user sees it in Excel
             db.insert("import_rows", {"batch_id": bid, "row_no": i, "raw": json.dumps(dict(zip(headers, row))),
                                       "status": "new"})
@@ -180,14 +180,16 @@ def create_batch(db, actor, filename: str, data: bytes) -> int:
     return bid
 
 
-def set_mapping(db, actor, batch_id: int, mapping: dict, owner_id: int | None) -> None:
+def set_mapping(db, actor, batch_id: int, mapping: dict, owner_id) -> None:
+    """owner_id: a user id, "auto" (share between the team in turn — the default) or None (keep as is)."""
     batch = _editable(db, actor, batch_id)
     headers = json.loads(batch["headers"])
     clean = {h: k for h, k in mapping.items() if h in headers and k in TARGETS}
     if len(set(clean.values())) != len(clean):
         raise ValidationError({"mapping": "Each field can be mapped from only one column."})
     with db:
-        db.update("import_batches", batch_id, {"mapping": json.dumps(clean), "owner_id": owner_id or batch["owner_id"]})
+        owner = None if owner_id == "auto" else (owner_id or batch["owner_id"])
+        db.update("import_batches", batch_id, {"mapping": json.dumps(clean), "owner_id": owner})
         classify(db, batch_id)
 
 
@@ -227,7 +229,12 @@ def commit(db, actor, batch_id: int, decisions: dict[int, str], first_task_due: 
             outcome, opp_id = "skipped", None
             if decision != "skip":
                 mapped = map_row(json.loads(r["raw"]), mapping)
-                data = {**mapped, "source": "import", "owner_id": str(batch["owner_id"]), "consent_contact": "",
+                if batch["owner_id"]:
+                    owner = batch["owner_id"]
+                else:
+                    from .progress import round_robin
+                    owner = round_robin(db, "seller") or actor["id"]
+                data = {**mapped, "source": "import", "owner_id": str(owner), "consent_contact": "",
                         "source_note": f"Import #{batch_id} ({batch['filename']}) row {r['row_no']}"
                                        + (f" · {mapped['source_note']}" if mapped.get("source_note") else "")}
                 dd = None

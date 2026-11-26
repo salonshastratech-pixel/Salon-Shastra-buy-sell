@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% extends "base.html" %}{% from "macros.html" import csrf, gcal_btn %}
 {% block title %}{{ P.CONSULTANT_NAME }} · free times{% endblock %}
 {% block content %}
 <div class="ph"><div>
@@ -12,14 +12,20 @@
   <h2 class="full">Add free times</h2>
   <div class="field"><label for="sl-day">Date</label><input id="sl-day" type="date" name="day" required></div>
   <div class="field"><label for="sl-times">Start times</label><input id="sl-times" name="times" required placeholder="10:00 10:30 11:00 16:00"><div class="help">24-hour times, separated by spaces.</div></div>
-  <div class="field"><label for="sl-min">Minutes each</label><select id="sl-min" name="minutes">{% for m in [15, 20, 30, 45, 60] %}<option {{ 'selected' if m == 30 }}>{{ m }}</option>{% endfor %}</select></div>
-  <div class="field"><label for="sl-mode">How</label><select id="sl-mode" name="mode"><option value="phone">Phone call</option><option value="video">Video call</option><option value="office">At our office</option></select></div>
+  <div class="field"><label for="sl-mode">How</label><select id="sl-mode" name="mode"><option value="phone">Phone call</option><option value="video">Video call</option><option value="office">At our office</option></select><div class="help">Length is set by type: phone / video call 10 min, office meeting 3 hours. Times that overlap another appointment are skipped.</div></div>
   <div class="full"><button class="btn primary">Add times</button></div>
 </form>{% endif %}
 
-<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Coming up</h2></div><div class="table-wrap"><table>
+<div class="card" id="appointments"><div class="card-h"><h2>Vikas's appointments</h2><span class="small muted">next 30 days · calls 10 min · office 3 hours · visits 5 hours</span></div>
+  <ul class="tasks">{% for a in appointments %}<li class="task"><div>
+    <div class="t"><a href="{{ a.link }}">{{ a.type_label }} · {{ a.ref }}</a>{% if a.area %} <span class="small muted">{{ a.area }}</span>{% endif %}</div>
+    <div class="meta"><strong>{{ a.at|ist('%a %d %b, %I:%M %p') }}</strong> – {{ a.end_at|ist('%I:%M %p') }} · {{ a.length }}</div></div>
+    <div class="inline">{{ gcal_btn(a.gcal) }}</div></li>
+  {% else %}<li class="empty">Nothing booked yet.</li>{% endfor %}</ul></div>
+
+<div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Free times</h2></div><div class="table-wrap"><table>
 <tr><th>When (IST)</th><th>How</th><th>Status</th><th></th></tr>
-{% for s in slots %}<tr><td class="nowrap">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} <span class="small muted">· {{ s.minutes }} min</span></td><td>{{ s.mode }}</td>
+{% for s in slots %}<tr><td class="nowrap">{{ s.starts_at|ist('%a %d %b, %I:%M %p') }} <span class="small muted">· {{ AP.length_label(s.minutes) }}</span></td><td>{{ s.mode }}</td>
   <td>{% if s.status == 'booked' and s.opportunity_id %}<a href="{{ opp_url(s.kind, s.opportunity_id, tab=('investor' if s.kind == 'buyer' else 'pilot')) }}#vikas"><span class="badge ok">booked</span> {{ s.salon_name or s.ref_code }}</a> · {{ s.contact_name }}{% else %}<span class="badge grey">free</span>{% endif %}</td>
   <td class="right">{% if s.status == 'open' and can_manage %}<form method="post">{{ csrf() }}<button class="btn sm" name="cancel_slot" value="{{ s.id }}">Remove</button></form>{% endif %}</td></tr>
 {% else %}<tr><td colspan="4" class="empty">No free times listed. Add some above so owners can book.</td></tr>{% endfor %}

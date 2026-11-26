@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Leads &amp; data{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Leads &amp; data</h1><div class="sub">Who gets new leads, and starting fresh. {{ counts.get('seller', 0) }} salon owner(s) · {{ counts.get('buyer', 0) }} investor(s) in the system now.</div></div></div>
+
+<form method="post" action="{{ url_for('records.split') }}" class="card form-grid" id="split">{{ csrf() }}
+  <div class="card-h full"><h2>Who gets new leads</h2><span class="small muted">every new lead — open forms, connected sheets, Meta ads, imports — goes to these people in turn</span></div>
+  <div class="field"><label>Salon owners go to</label>
+    {% for p in split.people %}<label class="check"><input type="checkbox" name="seller_ids" value="{{ p.id }}" {{ 'checked' if p in split.seller }}> {{ p.full_name }}</label>{% else %}<p class="small muted">No team members yet.</p>{% endfor %}</div>
+  <div class="field"><label>Investors go to</label>
+    {% for p in split.people %}<label class="check"><input type="checkbox" name="buyer_ids" value="{{ p.id }}" {{ 'checked' if p in split.buyer }}> {{ p.full_name }}</label>{% endfor %}</div>
+  <div class="field full"><label class="check"><input type="checkbox" name="move_existing" value="1"> Also move the records already in the system (and their open tasks) the same way</label>
+    <div class="help">Ticking two people for one side shares those leads between them one by one. People marked on leave are skipped until they are back. Only ticked people get new leads — tick new team members here when they join.</div></div>
+  <div class="full"><button class="btn primary">Save</button></div>
+</form>
+
+<div class="card danger-zone" id="clear">
+  <div class="card-h"><h2>Start fresh — remove all leads</h2></div>
+  {% if clear and clear.state == 'running' %}
+    <p><strong>Removing… {{ clear.done }} of {{ clear.total }}</strong> (started by {{ clear.by }}). Refresh to see progress.</p>
+    <progress max="{{ clear.total }}" value="{{ clear.done }}"></progress>
+  {% else %}
+    {% if clear and clear.state == 'done' %}<p class="small">Last clear-out: {{ clear.total }} record(s) removed by {{ clear.by }} {{ clear.finished|rel }}.</p>{% endif %}
+    {% if clear and clear.state == 'failed' %}<p class="small unknown">Last clear-out stopped after {{ clear.done }} of {{ clear.total }}: {{ clear.error }}. You can run it again.</p>{% endif %}
+    <p class="small">Removes <strong>every salon owner and investor record</strong> and everything linked to them — calls, notes, tasks, form answers, reports, matches, deals and bookings — from every panel. Users, settings, connected sheets, templates and the audit log stay. <strong>This cannot be undone.</strong> Export the lists first if you may need them.</p>
+    <form method="post" action="{{ url_for('records.clear_all') }}" class="form-grid">{{ csrf() }}
+      <div class="field"><label>Why</label><input name="reason" required minlength="3" placeholder="e.g. clearing test data before going live"></div>
+      <div class="field"><label>Type <strong>{{ CONFIRM_WORD }}</strong> to confirm</label><input name="confirm" required autocomplete="off"></div>
+      <div class="full"><button class="btn danger">Remove all leads</button></div>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

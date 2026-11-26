@@ -253,3 +253,68 @@ def test_connected_sheet_prepares_a_preview_only_when_there_are_new_people(app, 
     lead.post(f"/imports/sheets/{s['id']}/remove")
     assert db.scalar("SELECT active FROM connected_sheets") == 0
     assert login("fin@t.test").post("/imports/sheets", {"name": "x", "link": url}).status_code in (302, 403)
+
+
+def _meta_sheet(n: int, start: int = 0) -> bytes:
+    """A sheet shaped like Meta's instant-form export (struggling salon owners)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Struggling owners"
+    ws.append(["id", "created_time", "ad_name", "campaign_name", "form_name", "platform", "full_name", "phone_number",
+               "salon_name", "city"])
+    for i in range(start, start + n):
+        ws.append([f"l:{1000 + i}", "2026-11-26T09:1%d:00+05:30" % (i % 10), "Sell your salon", "Owners Nov",
+                   "Struggling owners", "fb", f"Owner Meta {i}", f"+91 93111{i:05d}", f"Meta Salon {i}", "Hyderabad"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_auto_import_sheet_brings_ad_leads_straight_in_shared_in_turn(app, db, login, monkeypatch):
+    from teamos.domain import connected_sheets as CS
+    from teamos.domain import progress as PR
+    from teamos.timeutil import now_utc, parse_iso
+    shaheen, ravi = user(db, "seller@t.test"), user(db, "lead@t.test")
+    admin = login("admin@t.test")
+    admin.post("/records/split", {"seller_ids": [str(shaheen["id"]), str(ravi["id"])],
+                                  "buyer_ids": [str(user(db, "buyer@t.test")["id"])]})
+    data = {"bytes": _meta_sheet(4)}
+    monkeypatch.setattr(CS, "fetch", lambda u: ("google-sheet.xlsx", data["bytes"]))
+    url = "https://docs.google.com/spreadsheets/d/" + "M" * 30 + "/edit"
+    page = admin.post("/imports/sheets", {"name": "Meta ad leads", "link": url, "auto": "1"},
+                      follow_redirects=True).data.decode()
+    assert "Auto-import on" in page and "new lead(s) added" in page, page[page.find("flash"):][:400]
+    opps = db.all("SELECT id, primary_owner_id, lead_created_at FROM opportunities ORDER BY id")
+    assert len(opps) == 4
+    assert sorted(o["primary_owner_id"] for o in opps) == sorted([shaheen["id"], ravi["id"]] * 2)   # in turn
+    due = [parse_iso(t["due_at"]) for t in db.all("SELECT due_at FROM tasks WHERE task_type = 'first_contact' "
+                                                    "AND status = 'open'")]
+    assert len(due) == 4 and all((d - now_utc()).total_seconds() <= 11 * 60 for d in due)   # call within 10 minutes
+    assert all(o["lead_created_at"] for o in opps)                              # when the lead came in, from the sheet
+    # next check: only the new rows come in
+    data["bytes"] = _meta_sheet(6)
+    res = CS.check(db, db.one("SELECT * FROM connected_sheets"))
+    assert "2 new lead(s) added" in res and db.scalar("SELECT COUNT(*) FROM opportunities") == 6
+    # a backlog (many rows at once) is spread over the coming days instead
+    data["bytes"] = _meta_sheet(30)
+    assert "spread" in CS.check(db, db.one("SELECT * FROM connected_sheets"))
+    # switch off → back to previews
+    sid = db.scalar("SELECT id FROM connected_sheets")
+    admin.post(f"/imports/sheets/{sid}/auto", {"on": "0"})
+    data["bytes"] = _meta_sheet(31)
+    assert "preview" in CS.check(db, db.one("SELECT * FROM connected_sheets"))
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 30
+
+
+def test_the_ten_minute_timer_brings_ad_leads_in(app, db, login, monkeypatch):
+    from teamos import jobs
+    from teamos.domain import connected_sheets as CS
+    monkeypatch.setattr(CS, "fetch", lambda u: ("google-sheet.xlsx", _meta_sheet(3)))
+    admin = user(db, "admin@t.test")
+    sid = CS.add(db, admin, "Meta ad leads", "https://docs.google.com/spreadsheets/d/" + "T" * 30, auto=True)
+    with app.app_context():
+        jobs.schedule_periodic(db)
+        assert db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'sheet_watch'") == 1
+        jobs.run_once(db)
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 3
+    assert "3 new lead(s) added" in db.scalar("SELECT last_result FROM connected_sheets WHERE id = ?", (sid,))

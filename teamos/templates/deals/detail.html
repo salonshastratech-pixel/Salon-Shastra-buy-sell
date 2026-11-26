@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% extends "base.html" %}{% from "macros.html" import csrf, gcal_btn %}
 {% set crumbs = [(url_for('deals.index'), 'Deals')] %}
 {% block title %}{{ d.ref_code }} · {{ d.salon_name }}{% endblock %}
 {% block content %}
@@ -18,7 +18,8 @@
     <ul class="tasks">{% for t in tasks %}<li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}"><div><div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div><div class="meta">{{ t.assignee_name }} · due {{ t.due_at|ist }} ({{ t.due_at|rel }})</div></div></li>{% else %}<li class="empty">No open tasks.</li>{% endfor %}</ul></div>
 
   <div class="card"><div class="card-h"><h2>Site visits</h2></div>
-    {% for v in visits %}<div class="task-group"><div><strong>{{ v.scheduled_at|ist }}</strong> <span class="badge {{ 'ok' if v.status == 'completed' else 'grey' if v.status == 'scheduled' else 'bad' }}">{{ v.status|replace('_',' ') }}</span>{% if v.attendees %} <span class="small muted">· {{ v.attendees }}</span>{% endif %}</div>
+    {% for v in visits %}<div class="task-group"><div><strong>{{ v.scheduled_at|ist }}</strong> <span class="small muted">· {{ AP.length_label(AP.minutes_for('visit')) }}</span> <span class="badge {{ 'ok' if v.status == 'completed' else 'grey' if v.status == 'scheduled' else 'bad' }}">{{ v.status|replace('_',' ') }}</span>{% if v.attendees %} <span class="small muted">· {{ v.attendees }}</span>{% endif %}</div>
+      {% if v.status == 'scheduled' %}<div>{{ gcal_btn(AP.gcal_url('Salon visit · ' ~ d.ref_code, v.scheduled_at, AP.minutes_for('visit'), 'Salon Shastra deal ' ~ d.ref_code)) }}</div>{% endif %}
       {% if v.outcome_note %}<div class="small">{{ v.outcome_note }}</div>{% endif %}{% if v.buyer_feedback %}<div class="small muted">Buyer feedback: {{ v.buyer_feedback }}</div>{% endif %}
       {% if v.status == 'scheduled' %}<details class="disclose"><summary>Record what happened</summary>
         <form method="post" action="{{ url_for('deals.visit_outcome', visit_id=v.id) }}">{{ csrf() }}
