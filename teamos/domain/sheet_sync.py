@@ -659,6 +659,7 @@ def commit(db, actor, import_id: int, live: bool = False) -> dict:
     if not user_can(db, actor, "crm.import"):
         raise PermissionDenied("crm.import")
     imp = db.one("SELECT * FROM sheet_imports WHERE id = ?", (import_id,))
+    src = _source_key(imp)
     if not imp or imp["status"] != "preview":
         raise ValidationError("This import has already been committed or discarded.")
     counts = {"created_seller": 0, "created_buyer": 0, "updated": 0, "merged": 0, "skipped": 0, "failed": 0}
@@ -692,16 +693,16 @@ def commit(db, actor, import_id: int, live: bool = False) -> dict:
                     counts[f"created_{r['kind']}"] += 1
                     _apply_meta(db, opp_id, u)
                     _already_spoken(db, actor, opp_id, notes, u, lt)
-                    _set_state(db, opp_id, {**_sheet_values(r["kind"], u), "__row__": _fingerprint(r["kind"], u, notes)})
+                    _set_state(db, opp_id, {**_sheet_values(r["kind"], u), "__row__": _fingerprint(r["kind"], u, notes)}, src)
                     db.update("sheet_import_rows", r["id"], {"outcome": "created", "opportunity_id": opp_id})
                 else:
                     opp_id = r["opportunity_id"]
                     fp = _fingerprint(r["kind"], u, notes)
-                    if _state(db, opp_id).get("__row__") == fp:
+                    if _state(db, opp_id, src).get("__row__") == fp:
                         counts["unchanged"] = counts.get("unchanged", 0) + 1     # nothing new in the sheet
                         db.update("sheet_import_rows", r["id"], {"outcome": "updated"})
                         continue
-                    synced, conflicts = _sync_fields(db, actor, r["kind"], opp_id, u, src_tag)
+                    synced, conflicts = _sync_fields(db, actor, r["kind"], opp_id, u, src_tag, src)
                     if synced:
                         notes.insert(0, "Synced from sheet: " + "; ".join(synced))
                         counts["changed"] = counts.get("changed", 0) + 1
@@ -710,7 +711,7 @@ def commit(db, actor, import_id: int, live: bool = False) -> dict:
                         _note_once(db, actor["id"], "opportunity", opp_id, "note",
                                    "The sheet and TeamOS differ — TeamOS kept its value (nothing overwritten):\n"
                                    + "\n".join(conflicts))
-                    _set_state(db, opp_id, {"__row__": fp})
+                    _set_state(db, opp_id, {"__row__": fp}, src)
                     counts["updated"] += 1
                     from .timeline import lead_time as _lt
                     _already_spoken(db, actor, opp_id, notes, u, _lt(canon.get("timestamp")))
@@ -1019,14 +1020,25 @@ def _fingerprint(kind: str, u: dict, notes: list[str]) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:32]
 
 
-def _state(db, opp_id: int) -> dict:
-    return {r["field_key"]: r["value"] for r in db.all("SELECT field_key, value FROM sheet_field_state "
-                                                       "WHERE opportunity_id = ?", (opp_id,))}
+def _source_key(imp: dict | None) -> str:
+    """Each sheet remembers its own last values, so two sheets never undo each other. The full rebuild of all the
+    team's sheets keeps the shared memory ('')."""
+    name = (imp or {}).get("filename") or ""
+    if name.startswith("Team sheets"):
+        return ""
+    return re.sub(r"[^a-z0-9]+", "-", name.lower())[:60].strip("-") + "|"
 
 
-def _set_state(db, opp_id: int, values: dict) -> None:
+def _state(db, opp_id: int, src: str = "") -> dict:
+    rows = db.all("SELECT field_key, value FROM sheet_field_state WHERE opportunity_id = ?", (opp_id,))
+    if not src:
+        return {r["field_key"]: r["value"] for r in rows if "|" not in r["field_key"]}
+    return {r["field_key"][len(src):]: r["value"] for r in rows if r["field_key"].startswith(src)}
+
+
+def _set_state(db, opp_id: int, values: dict, src: str = "") -> None:
     now = now_iso()
-    for k, v in values.items():
+    for k, v in ((src + k, v) for k, v in values.items()):
         v = None if v is None else str(v)
         if db.scalar("SELECT 1 FROM sheet_field_state WHERE opportunity_id = ? AND field_key = ?", (opp_id, k)):
             db.execute("UPDATE sheet_field_state SET value = ?, updated_at = ? WHERE opportunity_id = ? AND field_key = ?",
@@ -1045,12 +1057,12 @@ def _sheet_values(kind: str, u: dict) -> dict:
     return out
 
 
-def _sync_fields(db, actor, kind: str, opp_id: int, u: dict, src_tag: str) -> tuple[list[str], list[str]]:
+def _sync_fields(db, actor, kind: str, opp_id: int, u: dict, src_tag: str, src: str = "") -> tuple[list[str], list[str]]:
     """For every field the sheet gives: unchanged in the sheet → nothing; empty in TeamOS → filled; changed in the
     sheet and untouched in TeamOS since the last sync → updated (old → new is logged); changed in both → TeamOS keeps
     its value and the difference is reported. Returns (what was synced, conflicts)."""
     sheet = _sheet_values(kind, u)
-    base = _state(db, opp_id)
+    base = _state(db, opp_id, src)
     if kind == "seller":
         lid = db.scalar("SELECT id FROM seller_listings WHERE opportunity_id = ?", (opp_id,))
         current = S.load_listing(db, lid)
@@ -1072,6 +1084,8 @@ def _sync_fields(db, actor, kind: str, opp_id: int, u: dict, src_tag: str) -> tu
         new_base[k] = new
         if new is None or new == old or new == cur_s:
             continue                                    # nothing new from the sheet / already the same
+        if k == "lead_temperature" and new == "normal" and cur is not None:
+            continue                                    # "no mark" in a sheet never wipes out hot / warm / cold
         if k in prov and prov[k].get("answer_state") not in (None, "value") and cur is None:
             conflicts.append(f"{labels.get(k, k)}: sheet says {new}; TeamOS records '{prov[k]['answer_state']}' (kept)")
             continue
@@ -1091,5 +1105,5 @@ def _sync_fields(db, actor, kind: str, opp_id: int, u: dict, src_tag: str) -> tu
     if meta_apply:
         db.execute("UPDATE opportunities SET " + ", ".join(f"{k} = ?" for k in meta_apply) + " WHERE id = ?",
                    (*meta_apply.values(), opp_id))
-    _set_state(db, opp_id, new_base)
+    _set_state(db, opp_id, new_base, src)
     return synced, conflicts

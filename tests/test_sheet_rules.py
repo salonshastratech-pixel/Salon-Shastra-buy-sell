@@ -306,3 +306,69 @@ def test_sync_takes_only_what_changed_never_duplicates_never_loses(app, db, logi
     assert db.scalar("SELECT COUNT(*) FROM (SELECT contact_id FROM opportunities GROUP BY contact_id, kind "
                      "HAVING COUNT(*) > 1) x") == 0
     assert c.get(f"/buyers/{r['oid']}?tab=history").status_code == 200
+
+
+def test_send_form_on_whatsapp_and_half_filled_answers_are_kept(app, db, login):
+    import re as _re
+    from conftest import user
+    from teamos.domain import buyers as B
+    from teamos.domain import pilot as P
+    from teamos.domain import sellers as S
+    admin = user(db, "admin@t.test")
+    sid = S.create_lead(db, admin, {"full_name": "Anji", "phone": "9010099928", "salon_name": "Morning Kisses",
+                                    "city": "Hyderabad", "locality": "Kondapur", "source": "import",
+                                    "consent_contact": "1", "owner_id": str(admin["id"])})["opportunity_id"]
+    bid = B.create_lead(db, admin, {"full_name": "Investor I", "phone": "9300600001", "city": "Hyderabad",
+                                    "source": "referral", "consent_contact": "1", "owner_id": str(admin["id"])})["opportunity_id"]
+    c = login("seller@t.test")
+    page = c.get(f"/sellers/{sid}").data.decode()
+    assert "📝 Send form" in page
+    r = c.post(f"/sellers/{sid}/pilot/link", {"purpose": "form", "go": "wa"})
+    assert r.status_code == 302 and r.headers["Location"].startswith("https://wa.me/919010099928?text=")
+    assert "Form link sent on WhatsApp" in db.scalar("SELECT body FROM activities WHERE entity_id = ? AND kind = 'note' "
+                                                     "ORDER BY id DESC LIMIT 1", (sid,))
+    from urllib.parse import unquote
+    link = _re.search(r"/s/([A-Za-z0-9_\-]+)", unquote(r.headers["Location"])).group(1)
+    # the owner fills a few answers and leaves without submitting → saved; opening the link again shows them
+    pub = app.test_client()
+    form = pub.get(f"/s/{link}").data.decode()
+    assert "data-autosave" in form
+    j = pub.post(f"/s/{link}/save", data={"draft": link, "chairs": "6", "monthly_rent": "45k",
+                                         "salon_name": "Morning Kisses"}).get_json()
+    assert j["ok"]
+    assert P.profile(db, sid)["form_status"] == "sent" and P.profile(db, sid)["form_answered"] >= 2
+    again = pub.get(f"/s/{link}").data.decode()
+    assert 'value="45k"' in again or "45k" in again                       # what they wrote is still there
+    # investors too
+    assert "📝 Send form" in c.get(f"/buyers/{bid}").data.decode()
+    r = c.post(f"/buyers/{bid}/investor/link", {"purpose": "form", "go": "wa"})
+    assert r.headers["Location"].startswith("https://wa.me/919300600001?text=")
+
+
+def test_two_sheets_never_undo_each_other(app, db, login):
+    from conftest import user
+    admin = user(db, "admin@t.test")
+    a = _book({"Investor calls": [["Name", "Phone Number", "Investment potential", "Call Status", "Lead type", "Remarks"],
+                                  ["Kumar", "9300700001", "under 10 lakhs", "Connected", "COLD", "time pass"]]})
+    b = _book({"Ad leads": [["full_name", "phone_number", "what_is_your_investment_budget?"],
+                            ["Kumar", "9300700001", "under_₹20_lakhs"]]})
+
+    def run(name, files):
+        with app.test_request_context():
+            return SS.commit(db, admin, SS.create_import_many(db, admin, name, files))
+    run("Team sheets — full rebuild", [("a.xlsx", a), ("b.xlsx", b)])        # judged together: cold
+    t = lambda: db.scalar("SELECT lead_temperature FROM opportunities")        # noqa: E731
+    assert t() == "cold"
+    for _ in range(3):                                                         # the ad sheet alone, every 10 minutes
+        run("Meta ad leads - google-sheet-x.xlsx", [("google-sheet-x.xlsx", b)])
+        assert t() == "cold"                                                   # a sheet with no mark never un-colds
+    assert db.scalar("SELECT COUNT(*) FROM opportunities") == 1
+    # the ad sheet changes its own budget → that change comes through (it is the sheet that changed)
+    b2 = _book({"Ad leads": [["full_name", "phone_number", "what_is_your_investment_budget?"],
+                             ["Kumar", "9300700001", "₹20_lakhs_–_₹40_lakhs"]]})
+    before = db.scalar("SELECT all_in_max FROM buyer_mandates")
+    run("Meta ad leads - google-sheet-x.xlsx", [("google-sheet-x.xlsx", b2)])
+    after = db.scalar("SELECT all_in_max FROM buyer_mandates")
+    assert after == 4000000 or "TeamOS kept its value" in (db.scalar(
+        "SELECT body FROM activities WHERE body LIKE 'The sheet and TeamOS differ%' ORDER BY id DESC LIMIT 1") or ""), \
+        (before, after)

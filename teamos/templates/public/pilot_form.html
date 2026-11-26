@@ -9,7 +9,7 @@
   {% if filled %}<p class="flash ok">We already have your answers — thank you! You can update them below and submit again.</p>{% endif %}
   {% if errors %}<p class="flash error">Please check the highlighted answers.</p>{% endif %}
 </div>
-<form method="post" novalidate data-stepper data-progress>
+<form method="post" novalidate data-stepper data-progress data-autosave="{{ url_for('public_pilot.save_progress', token=token) }}"><input type="hidden" name="draft" value="{{ token }}">
   <div class="answered card"><div class="answered-row"><strong class="answered-text">0 answered</strong><span class="small muted">Answer what you can — blanks are fine.</span></div><progress class="answered-bar" value="0" max="1"></progress></div>
   <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
   <div class="stepbar" hidden><div class="stepbar-fill"></div><span class="stepbar-text small"></span></div>

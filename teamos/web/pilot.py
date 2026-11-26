@@ -159,6 +159,11 @@ def link(opp_id):
         text = P.form_message(opp, url)
         if P.profile(db, opp_id)["form_status"] in ("not_sent", "not_filled"):
             P.set_form_status(db, g.user, opp, "sent")
+        if request.form.get("go") == "wa":   # one tap from the profile: straight to WhatsApp with the message ready
+            from ..domain import tasks as T
+            T.add_activity(db, g.user["id"], "opportunity", opp_id, "note",
+                           "Form link sent on WhatsApp (their answers so far are kept — they continue where they stopped)")
+            return redirect(_wa(opp.get("phone_normalized"), text))
     return render_template("pilot/link_ready.html", opp=opp, url=url, text=text, purpose=purpose,
                            wa=_wa(opp.get("phone_normalized"), text), P=P)
 
@@ -339,6 +344,26 @@ def form(token):
             return redirect(url_for("public_pilot.thanks", token=token))
     return _public("public/pilot_form.html", token=token, opp=opp, answers=answers, errors=errors,
                    filled=P.profile(db, opp["id"])["form_status"] == "filled")
+
+
+@public_bp.route("/s/<token>/save", methods=["POST"])
+def save_progress(token):
+    """Answers so far on a personal form link (each Next, and when they leave the page). Opening the link again
+    shows everything they already wrote."""
+    from flask import jsonify
+
+    from ..domain import investor as I
+    db = get_db()
+    opp = P.resolve(db, token)
+    if not opp:
+        return jsonify({"ok": False}), 404
+    if request.form.get("website"):
+        return jsonify({"ok": True, "draft": token})
+    mod = I if opp["kind"] == "buyer" else P
+    answers, _errors = mod.parse_answers(request.form, lenient=True)
+    if any(v not in (None, "", []) for v in answers.values()):
+        mod.save_partial(db, opp, answers)
+    return jsonify({"ok": True, "draft": token})
 
 
 @public_bp.route("/s/<token>/thanks")

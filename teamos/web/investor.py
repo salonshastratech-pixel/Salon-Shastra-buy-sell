@@ -103,6 +103,11 @@ def link(opp_id):
         text = I.form_message(opp, url)
         if I.profile(db, opp_id)["form_status"] in ("not_sent", "not_filled"):
             I.set_form_status(db, g.user, opp, "sent")
+        if request.form.get("go") == "wa":   # one tap from the profile: straight to WhatsApp with the message ready
+            from ..domain import tasks as T
+            T.add_activity(db, g.user["id"], "opportunity", opp_id, "note",
+                           "Form link sent on WhatsApp (their answers so far are kept — they continue where they stopped)")
+            return redirect(_wa(opp.get("phone_normalized"), text))
     return render_template("investor/link_ready.html", opp=opp, url=url, text=text, purpose=purpose,
                            wa=_wa(opp.get("phone_normalized"), text))
 
