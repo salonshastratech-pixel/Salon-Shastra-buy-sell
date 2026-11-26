@@ -37,7 +37,7 @@
         <li>Use Salon Shastra's own verified Meta Business account (never a personal one).</li>
         <li>In WhatsApp Manager add the company number (and each team member's number — see below).</li>
         <li>Create a system-user token and fill in the settings above.</li>
-        <li>In the Meta app, set the webhook to <span class="mono">{{ webhook_url }}</span> with the verify token
+        <li>In the Meta app, set the webhook to <code class="copy">{{ webhook_url }}</code> with the verify token
           <form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="verify_token"><button class="btn link small">generate one</button></form>, and subscribe to <em>messages</em>.</li>
         <li>Submit each message template to Meta; when approved, record its Meta name in <a href="{{ url_for('admin.templates') }}">Message templates</a>.</li>
         <li>Send a test to your own phone, then switch on live.</li>

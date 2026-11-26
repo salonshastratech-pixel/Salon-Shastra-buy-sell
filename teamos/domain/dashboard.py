@@ -34,7 +34,7 @@ def numbers(db, user_ids: list[int]) -> dict:
                    f"call_outcome IN ({pr})", day_start, *ids, *prs)
     return {
         "new_leads": n(f"SELECT COUNT(*) FROM opportunities o WHERE o.primary_owner_id IN ({m}) AND "
-                       f"{LEAD_AT} >= ?", *ids, day_start),
+                       f"o.stage != 'moved' AND {LEAD_AT} >= ?", *ids, day_start),
         "calls_to_do": n(f"SELECT COUNT(*) FROM tasks WHERE status = 'open' AND assignee_id IN ({m}) AND task_type IN "
                          f"({ct}) AND due_at IS NOT NULL AND due_at < ?", *ids, *cts, day_end),
         "calls_made": calls_made, "productive": productive,

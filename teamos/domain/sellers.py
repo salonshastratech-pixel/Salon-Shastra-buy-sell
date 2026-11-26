@@ -31,11 +31,12 @@ STAGES = [
 HOLDING = [("nurture", "Nurture"), ("unqualified", "Unqualified"), ("withdrawn", "Withdrawn"),
            ("closed_lost", "Closed lost"), ("do_not_contact", "Do not contact")]
 STAGE_LABELS = dict(STAGES + HOLDING)
+STAGE_LABELS["moved"] = "Moved to Buyers"     # closed: the person was really a buyer (see switch_side)
 OPERATIONAL = ["new", "contact_attempted", "connected", "basic_qualified", "form_sent", "form_received",
                "assessment_review", "verification_pending"]
 POST_APPROVAL = ["active_matching", "negotiation", "handover"]
 REASON_REQUIRED = {"nurture", "unqualified", "withdrawn", "closed_lost", "do_not_contact", "closed_won"}
-CLOSED_STAGES = {"unqualified", "withdrawn", "closed_lost", "do_not_contact", "closed_won"}
+CLOSED_STAGES = {"unqualified", "withdrawn", "closed_lost", "do_not_contact", "closed_won", "moved"}
 
 SOURCES = [("manual_call", "Manual call"), ("referral", "Referral"), ("meta_lead", "Meta lead form"),
            ("landing_page", "Website / landing page"), ("whatsapp", "WhatsApp enquiry"),
@@ -249,6 +250,8 @@ def _parse_fields(data: dict, keys: list[str]) -> tuple[dict, dict]:
 
 def _apply_values(db, actor, listing_id, values: dict, source: str, bump_version: bool = True) -> list[str]:
     listing = load_listing(db, listing_id)
+    from .seller_fields import drop_not_applicable
+    values = drop_not_applicable(values, listing)      # e.g. no sale price for an owner who only wants help
     prov = provenance(db, listing_id)
     changed = []
     now = now_iso()

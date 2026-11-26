@@ -73,7 +73,7 @@ def desk(db) -> dict:
     team = db.all("SELECT id, full_name, work_status, work_status_at FROM users WHERE is_active = 1 AND role IN "
                   "('team_member', 'team_lead') ORDER BY full_name")
     from .lead_marks import LEAD_AT
-    new_today = db.scalar(f"SELECT COUNT(*) FROM opportunities o WHERE {LEAD_AT} >= ?",
+    new_today = db.scalar(f"SELECT COUNT(*) FROM opportunities o WHERE o.stage != 'moved' AND {LEAD_AT} >= ?",
                           (day_start,)) or 0
     return {"calls": calls, "swot": swot, "inv_reports": inv_reports, "hot": hot, "sellers": sellers,
             "ready": ready, "intros": intros, "fees_consult": fees_consult, "fees_reg": fees_reg,

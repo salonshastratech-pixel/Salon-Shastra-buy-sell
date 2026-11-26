@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}Move {{ opp.ref_code }}{% endblock %}
+{% block content %}
+{% set label = SW.SIDE_LABEL[to] %}
+<div class="ph"><div><h1>Move {{ opp.contact_name|nice }} to {{ label }}</h1>
+  <div class="sub">Now in {{ SW.SIDE_LABEL[opp.kind] }} as {{ opp.ref_code }}{% if then %} · then send: <strong>{{ SW.FORM_LABEL[then] }}</strong>{% endif %}</div></div></div>
+
+{% if errors %}<div class="flash error">{{ errors.values()|join(' ') }}</div>{% endif %}
+<form method="post" class="card move-form">{{ csrf() }}
+  <input type="hidden" name="to" value="{{ to }}"><input type="hidden" name="then" value="{{ then }}">
+  <p class="small muted">A new {{ label }} record is made for the same person. Their calls, notes, open tasks, WhatsApp chats, hot/warm/cold, team remark and lead date come along. The old record is closed as “Moved” with a link — nothing is deleted.</p>
+  <div class="form-grid">
+  {% if to == 'seller' %}
+    <label>Salon name <input name="salon_name" value="{{ values.salon_name }}" required placeholder="e.g. Glow Unisex Salon"></label>
+  {% endif %}
+    <label>City <input name="city" value="{{ values.city }}" required></label>
+    <label>Area / locality <input name="locality" value="{{ values.locality }}" {{ 'required' if to == 'seller' }}></label>
+  </div>
+  <fieldset class="checks-inline"><legend>What do they want?</legend>
+    {% for k, l in cats %}<label><input type="checkbox" name="lead_category" value="{{ k }}" {{ 'checked' if k in (values.categories or []) or (then == 'owner_sell' and k == 'sell') or (then == 'owner_checkup' and k == 'help') or (then == 'investor' and k == 'investor') or (then == 'buyer_full' and k == 'buy_salon') }}> {{ l }}</label>{% endfor %}
+  </fieldset>
+  <label>Why move? (optional) <input name="reason" value="{{ values.reason }}" placeholder="e.g. owns a salon in Kukatpally, answered the investor ad" maxlength="200"></label>
+  <label class="small"><input type="checkbox" name="keep_old" value="1"> They are both — keep the {{ SW.SIDE_LABEL[opp.kind] }} record open too</label>
+  <div class="inline"><button class="btn primary">Move to {{ label }}{% if then %} and send the form{% endif %}</button>
+    <a class="btn link" href="{{ url_for('sellers.detail' if opp.kind == 'seller' else 'buyers.detail', opp_id=opp.id) }}">Cancel</a></div>
+</form>
+{% endblock %}

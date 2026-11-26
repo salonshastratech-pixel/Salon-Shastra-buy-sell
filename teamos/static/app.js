@@ -36,12 +36,23 @@
     if (src.type === 'radio') { var c = document.querySelector('[name="' + name + '"]:checked'); return c ? c.value : ''; }
     return src.value;
   }
+  function hiddenSource(name) {
+    var src = document.querySelector('[name="' + name + '"]'), box = src && src.closest('[data-show-if]');
+    return !!(box && box.classList.contains('hide'));
+  }
   function refresh() {
-    document.querySelectorAll('[data-show-if]').forEach(function (el) {
-      var parts = el.dataset.showIf.split('='), v = valueOf(parts[0]);
-      if (v === null) return;
-      el.classList.toggle('hide', v !== parts[1]);
-    });
+    for (var pass = 0; pass < 3; pass++) {      // a few passes so "depends on a hidden question" settles
+      document.querySelectorAll('[data-show-if]').forEach(function (el) {
+        var known = false, show = false;
+        el.dataset.showIf.split(';').forEach(function (cond) {
+          var parts = cond.split('='), v = valueOf(parts[0]);
+          if (v === null) return;
+          known = true;
+          if (!hiddenSource(parts[0]) && parts[1].split('|').indexOf(v) !== -1) show = true;
+        });
+        if (known) el.classList.toggle('hide', !show);
+      });
+    }
   }
   document.addEventListener('change', refresh);
   refresh();
@@ -393,4 +404,46 @@
     });
   }
   render();
+})();
+
+// -- Copy buttons: next to every link or ready-made message shown for sharing (form links, report links, teaser and
+//    progress links, calendar feed, webhook address). One tap copies it; the button says "Copied". -----------------
+(function () {
+  var sel = '.link-box, code.copy, textarea.msg-preview, [data-copy]';
+  function text(el) { return (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') ? el.value : el.textContent.trim(); }
+  function copy(value) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(value).catch(function () { return classic(value); });
+    }
+    return classic(value);
+  }
+  function classic(value) {
+    return new Promise(function (ok, fail) {              // older phones / blocked clipboard: the classic way
+      var t = document.createElement('textarea');
+      t.value = value; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy') ? ok() : fail(); } catch (e) { fail(e); }
+      document.body.removeChild(t);
+    });
+  }
+  document.querySelectorAll(sel).forEach(function (el) {
+    if (el.closest('.public') || el.dataset.copyReady) return;
+    el.dataset.copyReady = '1';
+    var isMsg = el.tagName === 'TEXTAREA' || /\s/.test(text(el).trim());
+    var label = el.getAttribute('data-copy-label') || (isMsg ? 'Copy message' : 'Copy link');
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn sm copy-btn'; b.textContent = '📋 ' + label;
+    b.addEventListener('click', function () {
+      copy(text(el)).then(function () {
+        b.textContent = '✓ Copied'; b.classList.add('done');
+        setTimeout(function () { b.textContent = '📋 ' + label; b.classList.remove('done'); }, 2000);
+      }).catch(function () {
+        var r = document.createRange(); r.selectNodeContents(el);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        b.textContent = 'Selected — press Ctrl+C';
+      });
+    });
+    var wrap = document.createElement('span'); wrap.className = 'copy-wrap';
+    el.parentNode.insertBefore(wrap, el.nextSibling); wrap.appendChild(b);
+  });
 })();

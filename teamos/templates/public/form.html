@@ -1,7 +1,7 @@
 {% extends "public/layout.html" %}
 {% macro chips(name, options, current, required_id=None) %}<div class="chips" role="radiogroup">{% for ov, ol in options %}<label class="chip"><input type="radio" name="{{ name }}" value="{{ ov }}" {{ 'checked' if current == ov }}{% if required_id and loop.first %} id="{{ required_id }}"{% endif %}><span>{{ _(ol) }}</span></label>{% endfor %}</div>{% endmacro %}
 {% macro q(key) %}{% set f = FT.field_def(kind, key) %}{% set a = answers.get(key) or {} %}
-<div class="field qf {{ 'has-err' if errors.get(key) }}" {% if f.show_if %}data-show-if="{{ f.show_if[0] }}={{ f.show_if[1] }}"{% endif %}>
+<div class="field qf {{ 'has-err' if errors.get(key) }}" {% if f.show_if %}data-show-if="{{ f.show_attr }}"{% endif %}>
   <label for="q-{{ key }}" class="qlabel">{{ _(FT.label(kind, key)) }}{% if f.unit %} <span class="muted">({{ _(f.unit) }})</span>{% endif %}
     {% if f.privacy == 'restricted' %}<span class="badge warn">{{ _('Private - only Salon Shastra sees this') }}</span>{% endif %}</label>
   {% if FT.RESPONDENT_HELP.get(key) %}<div class="help">{{ _(FT.RESPONDENT_HELP[key]) }}</div>{% endif %}

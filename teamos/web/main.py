@@ -14,7 +14,7 @@ from ..timeutil import ist_day_bounds, now_iso, now_utc, to_iso
 bp = Blueprint("main", __name__)
 
 # Shared screens list sellers and buyers together; stage codes like 'new' mean the same in both funnels.
-STAGE_LABELS = {**SELLER_STAGE_LABELS, **BUYER_STAGE_LABELS}
+STAGE_LABELS = {**SELLER_STAGE_LABELS, **BUYER_STAGE_LABELS, "moved": "Moved to the other side"}
 
 TASK_SELECT = (
     "SELECT t.*, u.full_name AS assignee_name, o.ref_code, o.id AS opp_id, o.kind AS opp_kind, "

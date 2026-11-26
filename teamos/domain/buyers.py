@@ -34,7 +34,8 @@ STAGES = [
 HOLDING = [("nurture", "Nurture"), ("exploring_only", "Exploring only"), ("unqualified", "Unqualified"),
            ("closed_lost", "Closed lost"), ("do_not_contact", "Do not contact")]
 STAGE_LABELS = dict(STAGES + HOLDING)
-CLOSED_STAGES = {"unqualified", "closed_lost", "do_not_contact", "closed_won"}
+STAGE_LABELS["moved"] = "Moved to Salon Owners"   # closed: the person was really a salon owner (see switch_side)
+CLOSED_STAGES = {"unqualified", "closed_lost", "do_not_contact", "closed_won", "moved"}
 HOLDING_STAGES = {"nurture", "exploring_only"}
 REASON_REQUIRED = {"nurture", "exploring_only", "unqualified", "closed_lost", "do_not_contact", "closed_won"}
 # Stages that need modules not built yet. Blocked with an honest reason instead of being simulated.
@@ -143,6 +144,9 @@ def _audit_ignored(db, actor_id, opp_id, attempted: list[str], channel: str) -> 
 def _apply_values(db, actor_id, mandate_id, values: dict, source: str, evidence: str,
                   bump_version: bool = True) -> list[str]:
     mandate = load_mandate(db, mandate_id)
+    from .buyer_fields import BY_KEY as _BK
+    from .seller_fields import drop_not_applicable
+    values = drop_not_applicable(values, mandate, _BK, gate_keys=("need_type",))   # takeover questions need a takeover
     prov = provenance(db, mandate_id)
     changed = []
     now = now_iso()

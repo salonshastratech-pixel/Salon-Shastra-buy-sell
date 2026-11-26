@@ -36,7 +36,7 @@
       <div class="field {{ 'has-err' if errors.city }}"><label>City *</label><input name="city" value="{{ form.city or 'Hyderabad' }}" required>{{ err(errors, 'city') }}</div>
       <div class="field {{ 'has-err' if errors.locality }}"><label>Locality *</label><input name="locality" value="{{ form.locality or '' }}" placeholder="e.g. Kondapur" required>{{ err(errors, 'locality') }}</div>
       {% for f in SF.FIELDS if f.quick %}
-      <div class="field {{ 'has-err' if errors[f.key] }}"><label>{{ f.label }}</label>
+      <div class="field {{ 'has-err' if errors[f.key] }}" {% if f.show_if %}data-show-if="{{ f.show_attr }}"{% endif %}><label>{{ f.label }}</label>
         {% if f.ftype == 'enum' %}<select name="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if form[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
         {% else %}<input name="{{ f.key }}" value="{{ form[f.key] or '' }}"{% if f.ftype == 'int' %} inputmode="numeric"{% elif f.ftype == 'pct' %} inputmode="decimal"{% endif %} {% if f.ftype == 'inr' %}placeholder="e.g. 20L or 2000000"{% endif %}>{% endif %}
         {% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}{{ err(errors, f.key) }}</div>

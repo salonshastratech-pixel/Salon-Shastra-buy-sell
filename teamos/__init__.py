@@ -96,14 +96,27 @@ def create_app(overrides: dict | None = None) -> Flask:
             "default-src 'self'; img-src 'self' data: https://www.salonshastra.com; "
             "style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
             "script-src 'self'; frame-ancestors 'none'")
-        if g.get("user"):
+        if request.endpoint == "static":
+            # styles, script, logo, icons: kept by the browser. Their address carries a fingerprint of the file
+            # (?v=…), so a new version after a deploy is fetched at once and an old one is never shown.
+            resp.headers["Cache-Control"] = ("public, max-age=31536000, immutable" if request.args.get("v")
+                                             else "public, max-age=3600")
+        elif g.get("user"):
             resp.headers["Cache-Control"] = "no-store"
+        _compress(resp)
         if request.endpoint != "static" and not app.config.get("TESTING"):
             access_log.info("request", extra={
                 "method": request.method, "path": request.path, "status": resp.status_code,
                 "ms": round((time.monotonic() - g.get("request_started", time.monotonic())) * 1000),
                 "user_id": g.user["id"] if g.get("user") else None})
         return resp
+
+    @app.url_defaults
+    def _static_fingerprint(endpoint, values):
+        if endpoint == "static" and "filename" in values and "v" not in values:
+            v = _fingerprint(app.static_folder, values["filename"])
+            if v:
+                values["v"] = v
 
     @app.errorhandler(500)
     def _err500(e):
@@ -131,6 +144,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.globals.update(
         can=can, SF=SF, BF=BF, FT=FT, opp_url=_opp_url, CALL_OUTCOME_LABELS=_call_labels(), AP=_appointments(), LMK=_lead_marks(), ROLE_LABELS=ROLE_LABELS, CAPABILITIES=CAPABILITIES, app_version=__version__, data_notice=os.environ.get("DATA_NOTICE") or "synthetic demo data",
         now_iso=timeutil.now_iso,
+        SWITCH=_switch_side(), get_db_=get_db,
         _=lambda s: s,  # customer forms pass a translating `_`; everywhere else text is shown as written
         # A global (not context variable) so imported macros can read it.
         csrf_value=lambda: g.session["csrf_token"] if g.get("session") else "",
@@ -233,3 +247,48 @@ def _short_action(text, *names) -> str:
     if ":" in t and any(n and str(n).lower() in low for n in names):
         return t.split(":")[0]
     return t
+
+
+def _switch_side():
+    from .domain import switch_side
+    return switch_side
+
+
+_FINGERPRINTS: dict = {}
+_COMPRESSIBLE = ("text/html", "text/css", "text/plain", "text/csv", "application/javascript", "text/javascript",
+                 "application/json", "application/manifest+json", "image/svg+xml")
+
+
+def _fingerprint(folder: str, filename: str) -> str | None:
+    """Short hash of a static file's content (computed once per file and process)."""
+    if filename not in _FINGERPRINTS:
+        import hashlib
+        path = os.path.join(folder, filename)
+        try:
+            with open(path, "rb") as fh:
+                _FINGERPRINTS[filename] = hashlib.sha1(fh.read()).hexdigest()[:10]
+        except OSError:
+            _FINGERPRINTS[filename] = None
+    return _FINGERPRINTS[filename]
+
+
+def _compress(resp) -> None:
+    """Gzip pages, styles and scripts (a lead list goes from ~150 KB to ~15 KB on the wire)."""
+    if resp.status_code != 200 or "Content-Encoding" in resp.headers or (resp.is_streamed and not resp.direct_passthrough):
+        return
+    if "gzip" not in (request.headers.get("Accept-Encoding") or "").lower():
+        return
+    if (resp.mimetype or "") not in _COMPRESSIBLE:
+        return
+    resp.direct_passthrough = False          # static files are sent as a file stream; read them to compress
+    data = resp.get_data()
+    if len(data) < 1024:
+        return
+    import gzip
+    resp.set_data(gzip.compress(data, compresslevel=6))
+    resp.headers["Content-Encoding"] = "gzip"
+    resp.headers["Content-Length"] = str(len(resp.get_data()))
+    vary = resp.headers.get("Vary")
+    resp.headers["Vary"] = (vary + ", Accept-Encoding") if vary and "accept-encoding" not in vary.lower() else (
+        vary or "Accept-Encoding")
+

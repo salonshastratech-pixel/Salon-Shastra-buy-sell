@@ -957,3 +957,23 @@ ul.plain.checks label { display: flex; gap: 10px; align-items: center; cursor: p
 .push-state { font-weight: 600; }
 .push-devices { margin-top: 14px; }
 .bulk-inline { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Send form chooser + move */
+.send-form > summary { list-style: none; cursor: pointer; }
+.send-form > summary::-webkit-details-marker { display: none; }
+.send-form[open] { flex-basis: 100%; }
+.send-form-body { display: grid; gap: 12px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.send-form-body form { display: grid; gap: 8px; }
+.form-choice { display: grid; gap: 2px; text-align: left; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg, #fff); cursor: pointer; font: inherit; color: inherit; }
+.form-choice:hover, .form-choice:focus-visible { border-color: var(--brand, #c04000); }
+.form-choice.chosen { border-color: var(--brand, #c04000); box-shadow: 0 0 0 3px rgba(192, 64, 0, .15); }
+.form-choice.other { border-style: dashed; }
+.checks-inline { border: 0; padding: 0; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.checks-inline legend { font-weight: 600; margin-bottom: 6px; }
+.checks-inline label, .move-form label.small { display: flex; gap: 8px; align-items: center; }
+.move-form { display: grid; gap: 12px; max-width: 720px; }
+
+/* Copy buttons */
+.copy-wrap { display: inline-flex; margin: 6px 0 0 6px; vertical-align: middle; }
+.link-box + .copy-wrap, textarea.msg-preview + .copy-wrap { display: flex; margin: 8px 0 0; }
+.copy-btn.done { border-color: #2f855a; color: #2f855a; }

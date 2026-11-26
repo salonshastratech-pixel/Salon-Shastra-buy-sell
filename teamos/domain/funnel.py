@@ -51,7 +51,7 @@ def build(db, kind: str = "seller", period: str = "month") -> dict:
     steps = BUYER_STEPS if kind == "buyer" else SELLER_STEPS
     since = _since(period)
     from .lead_marks import LEAD_AT
-    where = "o.kind = ?" + (f" AND {LEAD_AT} >= ?" if since else "")
+    where = "o.kind = ? AND o.stage != 'moved'" + (f" AND {LEAD_AT} >= ?" if since else "")
     params = [kind] + ([since] if since else [])
     cols = ", ".join(f"SUM(CASE WHEN {cond} THEN 1 ELSE 0 END) AS s_{key}" for key, _l, cond in steps)
 

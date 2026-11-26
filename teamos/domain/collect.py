@@ -44,7 +44,7 @@ def gaps(db, opp: dict, limit: int = 8) -> dict:
     items = []
     for k in keys:
         fd = defs[k]
-        if fd.show_if and rec.get(fd.show_if[0]) != fd.show_if[1]:
+        if not SF.is_applicable(fd, rec, defs):     # e.g. no sale price for an owner who only wants help
             continue
         p = prov.get(k)
         state = p["answer_state"] if p else None

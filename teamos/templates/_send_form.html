@@ -1,0 +1,33 @@
+{% from "macros.html" import csrf %}
+{# "Send form" on a profile: choose which form goes to the person on WhatsApp. Forms of the other side first move the
+   lead there (e.g. a salon owner who answered a buyer ad). #}
+{% macro send_form(opp) %}{% set FORMS = SWITCH.FORMS %}{% set chosen = request.args.get('send') %}
+<details class="send-form" id="send-form" {{ 'open' if chosen }}><summary class="btn sm wa-btn">📝 Send form ▾</summary>
+  <div class="send-form-body">
+    <form method="post" action="{{ url_for('records.send_form', opp_id=opp.id) }}" target="_blank">{{ csrf() }}
+      <div class="small muted">Opens WhatsApp with their personal link. Whatever they fill is saved — they can stop and continue later.</div>
+      {% for k, side, label, when in FORMS if side == opp.kind %}
+      <button class="form-choice {{ 'chosen' if chosen == k }}" name="form" value="{{ k }}"><strong>{{ label }}</strong><span class="small muted">{{ when }}</span></button>
+      {% endfor %}
+    </form>
+    <form method="post" action="{{ url_for('records.send_form', opp_id=opp.id) }}">{{ csrf() }}
+      <div class="small muted">Wrong list? {{ 'A buyer or investor, not a salon owner' if opp.kind == 'seller' else 'Actually a salon owner who wants to sell or needs help' }} — these move the lead to {{ SWITCH.SIDE_LABEL['buyer' if opp.kind == 'seller' else 'seller'] }} first:</div>
+      {% for k, side, label, when in FORMS if side != opp.kind %}
+      <button class="form-choice other" name="form" value="{{ k }}"><strong>{{ label }}</strong><span class="small muted">{{ when }}</span></button>
+      {% endfor %}
+    </form>
+  </div>
+</details>
+{% endmacro %}
+
+{# Shown on a record closed as "moved", and the "move to the other side" link for the right column. #}
+{% macro moved_banner(opp) %}{% set m = SWITCH.moved_to(get_db_(), opp) %}{% if m %}
+<div class="flash warn">This lead was moved to {{ SWITCH.SIDE_LABEL[m.kind] }} — <a href="{{ url_for('sellers.detail' if m.kind == 'seller' else 'buyers.detail', opp_id=m.id) }}"><strong>open {{ m.ref_code }}</strong></a>. Calls, notes and tasks are there now.</div>
+{% endif %}{% endmacro %}
+
+{% macro move_card(opp) %}{% if can('crm.edit') and opp.stage != 'moved' %}{% set other = 'buyer' if opp.kind == 'seller' else 'seller' %}
+<div class="card"><h2>Wrong list?</h2>
+  <p class="small muted">{{ 'Is this person really a buyer or investor?' if opp.kind == 'seller' else 'Is this person really a salon owner who wants to sell or needs help?' }} Move them — calls, notes and tasks come along, nothing is deleted.</p>
+  <a class="btn sm" href="{{ url_for('records.move', opp_id=opp.id, to=other) }}">Move to {{ SWITCH.SIDE_LABEL[other] }}</a>
+</div>
+{% endif %}{% endmacro %}

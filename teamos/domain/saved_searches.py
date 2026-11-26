@@ -184,7 +184,7 @@ def delete(db, actor: dict, sid: int) -> None:
 
 
 
-PAGE_SIZE = 100
+PAGE_SIZE = 50   # lighter pages: quicker to load and draw, especially on phones
 
 
 def page(args) -> int:

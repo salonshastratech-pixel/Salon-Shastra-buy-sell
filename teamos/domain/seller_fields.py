@@ -49,8 +49,19 @@ class FieldDef:
     matching: bool = False          # input to matching / coverage
     quick: bool = False             # part of quick screen
     help: str = ""
-    show_if: tuple | None = None    # (field_key, value) conditional display
+    show_if: tuple | None = None    # ask only when: (key, value or (values…)), or a list of such — any one is enough
     unit: str = ""
+
+    def conditions(self) -> list[tuple[str, frozenset]]:
+        if not self.show_if:
+            return []
+        conds = self.show_if if isinstance(self.show_if, list) else [self.show_if]
+        return [(k, frozenset(v if isinstance(v, (tuple, list, set, frozenset)) else (v,))) for k, v in conds]
+
+    @property
+    def show_attr(self) -> str:
+        """For the page's script: 'sale_purpose=sell_entire|partnership;negotiable=yes' (any one condition)."""
+        return ";".join(f"{k}={'|'.join(sorted(v))}" for k, v in self.conditions())
 
 
 SECTIONS = [
@@ -70,6 +81,9 @@ SECTIONS = [
 ]
 
 F = FieldDef
+# What the owner wants (sale_purpose) decides whether sale questions are asked at all
+SELLING_PURPOSES = ("sell_entire", "partnership", "franchise_transfer")
+SELLING = ("sale_purpose", SELLING_PURPOSES)
 FIELDS: list[FieldDef] = [
     # Quick screen (§6.2) — city/locality/salon name live on the business record
     F("operating_status", "Operating status", "quick", "enum",
@@ -81,21 +95,23 @@ FIELDS: list[FieldDef] = [
       [("sell_entire", "Sell entire salon"), ("partnership", "Partnership / part stake"),
        ("franchise_transfer", "Franchise transfer"), ("seek_help", "Seeking help / turnaround"),
        ("unsure", "Unsure")], quick=True, matching=True, material=True,
-      help="A distressed owner seeking only help must not be treated as a confirmed seller."),
+      help="A distressed owner seeking only help must not be treated as a confirmed seller. Sale questions "
+           "(price, timeline, reason, terms) appear only once they want to sell."),
     F("asking_price", "Approximate asking price", "quick", "inr", quick=True, matching=True, material=True,
-      help="Net consideration the seller expects. Deposit, stock and fees are captured separately."),
+      help="Net consideration the seller expects. Deposit, stock and fees are captured separately.", show_if=SELLING),
     F("sale_timeline", "Sale timeline", "quick", "enum",
       [("immediate", "Immediately"), ("within_3m", "Within 3 months"), ("3_6m", "3–6 months"),
-       ("6_12m", "6–12 months"), ("no_rush", "No fixed timeline")], quick=True, matching=True),
+       ("6_12m", "6–12 months"), ("no_rush", "No fixed timeline")], quick=True, matching=True, show_if=SELLING),
     F("preferred_callback", "Preferred callback time", "quick", "text", quick=True),
 
     F("legal_name", "Legal / registered business name", "ownership", "text"),
-    F("signatory_name", "Who signs the sale?", "ownership", "text"),
+    F("signatory_name", "Who signs the sale?", "ownership", "text", show_if=SELLING),
     F("owners_count", "Number of owners / partners", "ownership", "int"),
     F("outlets_count", "Outlets operated by this owner", "ownership", "int"),
     F("transfer_authority", "Respondent has authority to transfer?", "ownership", "enum", YES_NO_UNKNOWN,
-      matching=True, material=True),
-    F("existing_broker", "Already listed with another broker?", "ownership", "enum", YES_NO_UNKNOWN),
+      matching=True, material=True, show_if=SELLING),
+    F("existing_broker", "Already listed with another broker?", "ownership", "enum", YES_NO_UNKNOWN,
+      show_if=SELLING),
 
     F("operating_years", "Years in operation", "profile", "int", matching=True, unit="years"),
     F("started_year", "Year the salon started", "profile", "int", help="e.g. 2018. Used with years in operation."),
@@ -188,27 +204,27 @@ FIELDS: list[FieldDef] = [
     F("sale_reason", "Reason for sale (category)", "reason", "enum",
       [("relocation", "Relocation"), ("new_venture", "New venture"), ("partnership_change", "Partnership change"),
        ("retirement", "Retirement"), ("financial_pressure", "Financial pressure"), ("personal", "Personal"),
-       ("other", "Other")]),
+       ("other", "Other")], show_if=SELLING),
     F("sale_reason_note", "Private context (only if volunteered)", "reason", "textarea", privacy="restricted",
-      help="Optional. Visible only to the primary owner, approvers and explicit grantees."),
-    F("desired_exit_date", "Desired exit date", "reason", "date", matching=True),
+      help="Optional. Visible only to the primary owner, approvers and explicit grantees.", show_if=SELLING),
+    F("desired_exit_date", "Desired exit date", "reason", "date", matching=True, show_if=SELLING),
     F("transition_support", "Will the owner support transition?", "reason", "enum",
-      [("yes", "Yes"), ("no", "No"), ("negotiable", "Negotiable")], matching=True),
+      [("yes", "Yes"), ("no", "No"), ("negotiable", "Negotiable")], matching=True, show_if=SELLING),
 
-    F("negotiable", "Is the price negotiable?", "commercial", "enum", YES_NO_UNKNOWN, matching=True),
+    F("negotiable", "Is the price negotiable?", "commercial", "enum", YES_NO_UNKNOWN, matching=True, show_if=SELLING),
     F("negotiable_min_price", "Lowest acceptable price (if volunteered)", "commercial", "inr",
       privacy="restricted", show_if=("negotiable", "yes"),
       help="Never shown to buyers. Used internally to identify near matches."),
     F("sale_structure", "Sale structure", "commercial", "enum",
       [("entity", "Entire business / entity"), ("asset", "Asset sale"), ("partial_stake", "Partial stake"),
        ("management", "Management agreement"), ("franchise_transfer", "Franchise transfer")],
-      matching=True, material=True),
+      matching=True, material=True, show_if=SELLING),
     F("stock_value_separate", "Stock / inventory payable separately", "commercial", "inr", matching=True,
-      material=True, help="Use 'Not applicable' if stock is included in the asking price."),
+      material=True, help="Use 'Not applicable' if stock is included in the asking price.", show_if=SELLING),
     F("franchise_transfer_fee", "Franchise transfer fee", "commercial", "inr", matching=True, material=True,
       show_if=("business_model", "franchise")),
-    F("working_capital_estimate", "Working capital / handover cost estimate", "commercial", "inr", matching=True),
-    F("expected_handover_weeks", "Expected handover period", "commercial", "int", unit="weeks"),
+    F("working_capital_estimate", "Working capital / handover cost estimate", "commercial", "inr", matching=True, show_if=SELLING),
+    F("expected_handover_weeks", "Expected handover period", "commercial", "int", unit="weeks", show_if=SELLING),
 ]
 
 BY_KEY = {f.key: f for f in FIELDS}
@@ -228,11 +244,29 @@ def option_label(key: str, value) -> str:
     return str(value)
 
 
-def is_applicable(fd: FieldDef, listing: dict) -> bool:
-    if not fd.show_if:
+def is_applicable(fd: FieldDef, rec: dict, defs: dict | None = None) -> bool:
+    """Should this question be asked for this record? Any one of its conditions is enough, and the question it
+    depends on must itself be asked (e.g. 'lowest price' needs 'negotiable = yes', which needs a sale)."""
+    conds = fd.conditions()
+    if not conds:
         return True
-    k, v = fd.show_if
-    return listing.get(k) == v
+    defs = BY_KEY if defs is None else defs
+    for k, vals in conds:
+        parent = defs.get(k)
+        if rec.get(k) in vals and (parent is None or is_applicable(parent, rec, defs)):
+            return True
+    return False
+
+
+def drop_not_applicable(values: dict, current: dict, defs: dict | None = None, gate_keys=("sale_purpose",)) -> dict:
+    """Answers for questions that do not apply are not saved — but only once the deciding answer is actually given
+    (e.g. the owner said 'seeking help'). Nothing already stored is erased, and imports with the deciding answer
+    still unknown keep everything."""
+    defs = BY_KEY if defs is None else defs
+    merged = {**current, **{k: v[0] if isinstance(v, tuple) else v for k, v in values.items()}}
+    if not any(merged.get(g) not in (None, "") for g in gate_keys):
+        return values
+    return {k: v for k, v in values.items() if k not in defs or is_applicable(defs[k], merged, defs)}
 
 
 LISTING_CHECKLIST = [

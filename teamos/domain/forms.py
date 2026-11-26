@@ -104,9 +104,13 @@ def create_invitation(db, actor: dict, opp_id: int, template_key: str, channel: 
     link = f"{link_base.rstrip('/')}/f/i/{token}"
     comm = None
     with db:
+        carried = None
         if template_key != "targeted":  # one live deep link per record: older ones stop working
             for old in db.all("SELECT id FROM form_invitations WHERE opportunity_id = ? AND template_key = ? AND "
-                              "status IN ('sent','opened','started')", (opp_id, template_key)):
+                              "status IN ('sent','opened','started') ORDER BY id DESC", (opp_id, template_key)):
+                d = draft_for(db, old)
+                if d and not carried:
+                    carried = d["id"]      # their half-filled answers move to the new link — nothing to retype
                 db.update("form_invitations", old["id"], {"status": "revoked", "closed_at": now})
         inv_id = db.insert("form_invitations", {
             "token_hash": _hash(token), "template_key": template_key, "template_version": t["version"],
@@ -115,6 +119,9 @@ def create_invitation(db, actor: dict, opp_id: int, template_key: str, channel: 
             "doc_types": json.dumps(doc_types) if template_key == "targeted" else None,
             "purpose": (purpose or "").strip()[:500] or None, "channel": channel, "status": "sent",
             "expires_at": expires, "created_by": actor["id"], "created_at": now})
+        if carried:
+            db.execute("UPDATE form_submissions SET invitation_id = ? WHERE id = ?", (inv_id, carried))
+            db.update("form_invitations", inv_id, {"status": "started"})
         label = "detailed form" if template_key != "targeted" else f"request for {len(field_keys)} detail(s)" + \
             (f" and {len(doc_types)} document(s)" if doc_types else "")
         if channel == "whatsapp_mock":

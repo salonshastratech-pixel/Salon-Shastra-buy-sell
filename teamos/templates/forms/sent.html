@@ -10,6 +10,7 @@
   <h2>The link</h2>
   <p class="small">This is the only time the full link is shown — it is stored only as a fingerprint. If it gets lost, revoke it and create a new one.</p>
   <div class="link-box">{{ link }}</div>
+  {% if wa %}<p class="inline"><a class="btn primary" href="{{ wa }}" target="_blank" rel="noopener">Open in WhatsApp</a> <span class="small muted">opens their chat with the message and link ready — you press send</span></p>{% endif %}
   <p class="small muted">Anyone with this link can fill in the form for this record. Share it only with {{ opp.contact_name }}.</p>
 </div>
 

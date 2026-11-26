@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_lead_marks.html" import marks %}{% from "macros.html" import csrf, stage_badge %}
+{% extends "base.html" %}{% from "_lead_marks.html" import marks %}{% from "macros.html" import csrf, stage_badge %}{% from "_send_form.html" import send_form, moved_banner, move_card %}
 {% macro bfact(label, key, kind='text') -%}
 {%- set value = mandate[key] -%}{%- set st = prov.get(key, {}).get('answer_state') -%}
 <div class="fact"><div class="k">{{ label }}</div><div class="v">
@@ -14,6 +14,7 @@
 {%- endmacro %}
 {% block title %}{{ opp.ref_code }} · {{ opp.contact_name }}{% endblock %}
 {% block content %}
+{{ moved_banner(opp) }}
 <div class="ph">
   <div>
     <h1>{{ opp.contact_name|nice }}</h1>
@@ -118,7 +119,7 @@
     <div class="card">
       <h2>Contact</h2>
       <p><strong>{{ opp.contact_name }}</strong><br>{% if opp.phone_normalized and not opp.do_not_contact %}<a class="mono tel" href="{{ opp.phone_normalized|tel }}" data-call-log>{{ opp.phone_normalized }}</a>{% else %}<span class="mono">{{ opp.phone_normalized }}</span>{% endif %}{% if opp.email %}<br>{{ opp.email }}{% endif %}</p>
-      {% if opp.phone_normalized and not opp.do_not_contact %}<div class="inline"><a class="btn sm primary" href="{{ opp.phone_normalized|tel }}" data-call-log>Call</a><form method="post" action="{{ url_for('inbox.wa_open', opp_id=opp.id) }}" target="_blank">{{ csrf() }}<button class="btn sm wa-btn">WhatsApp</button></form><form method="post" action="{{ url_for('investor.link', opp_id=opp.id) }}" target="_blank">{{ csrf() }}<input type="hidden" name="purpose" value="form"><input type="hidden" name="go" value="wa"><button class="btn sm wa-btn" title="Opens WhatsApp to their number with their personal form link — anything they fill is saved, even if they stop half-way">📝 Send form</button></form></div>{% endif %}
+      {% if opp.phone_normalized and not opp.do_not_contact %}<div class="inline"><a class="btn sm primary" href="{{ opp.phone_normalized|tel }}" data-call-log>Call</a><form method="post" action="{{ url_for('inbox.wa_open', opp_id=opp.id) }}" target="_blank">{{ csrf() }}<button class="btn sm wa-btn">WhatsApp</button></form>{{ send_form(opp) }}</div>{% endif %}
       <h3>Consent</h3>
       {% for purpose, label in [('service_contact','Service contact'),('share_teaser','Share criteria with sellers'),('marketing','Marketing')] %}{% set c = consents.get(purpose) %}
       <div class="small">{{ label }}: {% if c and c.granted %}<span class="badge ok">Granted</span> <span class="muted">{{ c.captured_at|ist('%d %b %Y') }} · {{ c.source }}</span>{% elif c %}<span class="badge bad">Refused / withdrawn</span>{% else %}<span class="badge grey">Not recorded</span>{% endif %}</div>{% endfor %}
@@ -153,6 +154,7 @@
         <div class="field"><label>Context for the new owner</label><input name="reason" required></div>
         <button class="btn">Reassign</button></form></div>
     {% endif %}
+    {{ move_card(opp) }}
     {% if can('users.manage') %}<details class="card danger-zone"><summary>Delete this record (admin)</summary>
       <form method="post" action="{{ url_for('records.delete_one', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
         <p class="small full">Removes {{ opp.ref_code }} and everything linked to it — calls, tasks, form answers, reports, bookings, matches. This cannot be undone. The audit log keeps a line saying who deleted it.</p>

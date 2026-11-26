@@ -11,7 +11,7 @@
 <td>{{ f.ftype }}{% if f.options %}<div class="small muted">{{ f.options|map('last')|join(' / ') }}</div>{% endif %}</td>
 <td>{% if f.privacy == 'restricted' %}<span class="badge warn">Restricted</span>{% else %}<span class="badge grey">Operational</span>{% endif %}</td>
 <td>{{ 'Yes' if f.material else '—' }}</td><td>{{ 'Yes' if f.matching else '—' }}</td>
-<td class="small">{{ f.show_if[0] ~ ' = ' ~ f.show_if[1] if f.show_if else 'Always' }}</td><td class="small muted">{{ f.help }}</td></tr>{% endfor %}
+<td class="small">{{ f.show_attr.replace(';', ' or ').replace('=', ' = ').replace('|', ' / ') if f.show_if else 'Always' }}</td><td class="small muted">{{ f.help }}</td></tr>{% endfor %}
 </table></div></div>
 {% endfor %}
 <h2>Buyer / investor mandate</h2>

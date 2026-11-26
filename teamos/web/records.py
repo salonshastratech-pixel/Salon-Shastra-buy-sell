@@ -282,3 +282,91 @@ def wa_chats():
             db.insert("automation_settings", {"key": WL.ALL_CHATS_KEY, "enabled": on, "updated_at": now_iso()})
     flash("Every new WhatsApp chat now becomes a lead." if on else "Only chats from Meta ads become leads.", "ok")
     return redirect(url_for("records.manage") + "#wa")
+
+
+# -- Send the right form / move a lead to the right side ----------------------------------------------------------
+def _wa(phone, text):
+    from urllib.parse import quote
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    return f"https://wa.me/{digits}?text={quote(text)}" if digits else f"https://wa.me/?text={quote(text)}"
+
+
+def _detail(kind, opp_id):
+    return url_for("sellers.detail" if kind == "seller" else "buyers.detail", opp_id=opp_id)
+
+
+@bp.route("/<int:opp_id>/send-form", methods=["POST"])
+@require("crm.view")
+def send_form(opp_id):
+    """'Send form' on a profile: the chosen form opens in WhatsApp, ready to send. A form for the other side first
+    asks to move the lead there (a salon owner who answered a buyer ad, or the other way round)."""
+    from .. import messaging
+    from ..domain import forms as F
+    from ..domain import investor as I
+    from ..domain import pilot as P
+    from ..domain import switch_side as SW
+    db = get_db()
+    opp = SW.load_any(db, opp_id)
+    if not opp:
+        abort(404)
+    key = request.form.get("form") or ""
+    if key not in SW.FORM_SIDE:
+        flash("Choose a form to send.", "error")
+        return redirect(_detail(opp["kind"], opp_id))
+    if SW.FORM_SIDE[key] != opp["kind"]:
+        return redirect(url_for("records.move", opp_id=opp_id, to=SW.FORM_SIDE[key], then=key))
+    base = messaging.public_base(request)
+    try:
+        if key in ("owner_checkup", "investor"):
+            M = P if key == "owner_checkup" else I
+            token = P.create_link(db, g.user, opp)     # one personal link: form, report and booking with Vikas
+            text = M.form_message(opp, f"{base}/s/{token}")
+            if M.profile(db, opp_id)["form_status"] in ("not_sent", "not_filled"):
+                M.set_form_status(db, g.user, opp, "sent")
+        else:
+            r = F.create_invitation(db, g.user, opp_id, "seller_deep" if key == "owner_sell" else "buyer_deep",
+                                    "copy_link", link_base=base)
+            text = SW.deep_form_message(opp, r["link"], key)
+    except PermissionDenied:
+        abort(403)
+    except ValidationError as e:
+        flash(_msg(e), "error")
+        return redirect(_detail(opp["kind"], opp_id))
+    T.add_activity(db, g.user["id"], "opportunity", opp_id, "note",
+                   f"Sent on WhatsApp: {SW.FORM_LABEL[key]} (answers are kept if they stop half-way)")
+    return redirect(_wa(opp.get("phone_normalized"), text))
+
+
+@bp.route("/<int:opp_id>/move", methods=["GET", "POST"])
+@require("crm.edit")
+def move(opp_id):
+    from flask import render_template
+
+    from ..domain import switch_side as SW
+    from ..domain.lead_marks import CATEGORIES
+    db = get_db()
+    opp = SW.load_any(db, opp_id)
+    if not opp:
+        abort(404)
+    to = request.values.get("to") or ("buyer" if opp["kind"] == "seller" else "seller")
+    then = request.values.get("then") or ""
+    then = then if SW.FORM_SIDE.get(then) == to else ""
+    errors, values = {}, SW.defaults(db, opp)
+    if request.method == "POST":
+        values = {"salon_name": request.form.get("salon_name", ""), "city": request.form.get("city", ""),
+                  "locality": request.form.get("locality", ""),
+                  "categories": request.form.getlist("lead_category"), "reason": request.form.get("reason", "")}
+        try:
+            new_id = SW.move(db, g.user, opp_id, to, request.form, keep_old=request.form.get("keep_old") == "1")
+        except PermissionDenied:
+            abort(403)
+        except ValidationError as e:
+            errors = e.errors if isinstance(e.errors, dict) else {"to": str(e.errors)}
+        else:
+            ref = db.scalar("SELECT ref_code FROM opportunities WHERE id = ?", (new_id,))
+            flash(f"Moved to {SW.SIDE_LABEL[to]} as {ref}. Calls, notes and tasks came along.", "ok")
+            if then:   # they chose a form of this side: the profile opens with that form ready to send
+                return redirect(_detail(to, new_id) + f"?send={then}#send-form")
+            return redirect(_detail(to, new_id))
+    return render_template("records/move.html", opp=opp, to=to, then=then, values=values, errors=errors,
+                           SW=SW, cats=CATEGORIES[to])

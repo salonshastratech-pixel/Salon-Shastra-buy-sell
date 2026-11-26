@@ -128,9 +128,9 @@ def test_lists_page_through_more_than_a_hundred(app, db, login):
                                   "source": "referral", "consent_contact": "1", "owner_id": str(admin["id"])})
     c = login("admin@t.test")
     p1 = c.get("/buyers/").data.decode()
-    assert "130 records" in p1 and "page 1 of 2" in p1 and "Next →" in p1
-    p2 = c.get("/buyers/?page=2").data.decode()
-    assert p2.count("Paged ") >= 30 and "← Previous" in p2
+    assert "130 records" in p1 and "page 1 of 3" in p1 and "Next →" in p1          # 50 per page
+    p3 = c.get("/buyers/?page=3").data.decode()
+    assert p3.count("Paged ") >= 30 and "← Previous" in p3
     assert json.dumps  # keep import used
 
 

@@ -221,10 +221,10 @@ def recompute_one(cid):
 
 def _stale_check_in_background(db) -> int:
     """The Match Desk shows the stored count at once; the full staleness check runs off the request (at most once a
-    minute per process)."""
+    10 minutes per process; the timer's jobs run it too)."""
     import time
     from .. import background
-    if time.time() - M._LAST_STALE_CHECK["at"] >= 60:
+    if time.time() - M._LAST_STALE_CHECK["at"] >= 600:   # heavy (loads every matched record): every 10 minutes
         M._LAST_STALE_CHECK["at"] = time.time()
         background.run(current_app._get_current_object(), "mark_stale", M.mark_stale)
     return db.scalar("SELECT COUNT(*) FROM match_candidates WHERE stale = 1") or 0
@@ -245,7 +245,7 @@ def record_matches(db, opp: dict) -> dict:
     stored = {r[fp_col] for r in db.all(f"SELECT DISTINCT {fp_col} FROM match_candidates WHERE {side_col} = ?",
                                         (opp["id"],))}
     updating = False
-    if rec and (not stored or stored != {rec["fp"]}):
+    if rec and (not stored or stored != {rec["fp"]}) and not M.already_scored(db, opp["id"], rec["fp"]):
         updating = background.run(current_app._get_current_object(), "rescore", _rescore, opp["kind"],  # one at a time
                                   opp["id"]) and not current_app.config.get("TESTING")
     rows = db.all(M.CAND_SELECT + f"WHERE mc.{side_col} = ? AND " + M.ACTIVE_WHERE +

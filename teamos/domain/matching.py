@@ -721,6 +721,15 @@ def refresh(db, buyer_id: int | None = None, seller_id: int | None = None, force
             actor_id: int | None = None) -> dict:
     """Incremental re-evaluation. Only pairs whose input fingerprints changed are recomputed (unless force)."""
     load_weights(db)
+    # one record that cannot be matched yet (too little known): note it and stop — no need to load the other side
+    if buyer_id or seller_id:
+        one = load_buyer(db, buyer_id) if buyer_id else load_seller(db, seller_id)
+        col = "buyer_opp_id" if buyer_id else "seller_opp_id"
+        if one and not force and not (buyer_eligible(one) if buyer_id else seller_eligible(one)) and not db.scalar(
+                f"SELECT 1 FROM match_candidates WHERE {col} = ? LIMIT 1", (buyer_id or seller_id,)):
+            with db:
+                remember_scored(db, buyer_id or seller_id, one["fp"])
+            return {"evaluated": 0, "new": 0, "unchanged": 0, "not_ready": 1}
     if buyer_id:
         buyers = [x for x in [load_buyer(db, buyer_id)] if x]
     else:
@@ -731,6 +740,7 @@ def refresh(db, buyer_id: int | None = None, seller_id: int | None = None, force
     else:
         sellers = [load_seller(db, r["id"]) for r in db.all("SELECT id FROM opportunities WHERE kind = 'seller' "
                                                              "AND status = 'active'")]
+    single = {i: x[0]["fp"] for i, x in ((buyer_id, buyers), (seller_id, sellers)) if i and x}
     buyers = [b for b in buyers if buyer_eligible(b)]
     sellers = [s for s in sellers if seller_eligible(s)]
     existing = {}
@@ -761,7 +771,19 @@ def refresh(db, buyer_id: int | None = None, seller_id: int | None = None, force
                 _notify_strong(db, cid, b, s, r)
                 stats["evaluated"] += 1
                 stats["new"] += 0 if cand else 1
+        # this record has now been compared with everyone at what we know about it today
+        for one, fp in single.items():
+            remember_scored(db, one, fp)
     return stats
+
+
+def remember_scored(db, opp_id: int, fp: str) -> None:
+    db.execute("DELETE FROM match_scored WHERE opportunity_id = ?", (opp_id,))
+    db.insert("match_scored", {"opportunity_id": opp_id, "fp": fp, "scored_at": now_iso()})
+
+
+def already_scored(db, opp_id: int, fp: str) -> bool:
+    return db.scalar("SELECT fp FROM match_scored WHERE opportunity_id = ?", (opp_id,)) == fp
 
 
 _LAST_STALE_CHECK = {"at": 0.0, "n": 0}

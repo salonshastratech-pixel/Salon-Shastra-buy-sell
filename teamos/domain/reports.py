@@ -51,9 +51,9 @@ def _n(db, sql, *params):
 def build(db, user, p: dict) -> dict:
     s, e = p["start"], p["end"]
     from .lead_marks import LEAD_AT   # when the lead really came in (an import's own date, never the import day)
-    leads = db.all(f"SELECT o.kind, o.source, COUNT(*) AS n FROM opportunities o WHERE {LEAD_AT} >= ? AND {LEAD_AT} < ? "
+    leads = db.all(f"SELECT o.kind, o.source, COUNT(*) AS n FROM opportunities o WHERE o.stage != 'moved' AND {LEAD_AT} >= ? AND {LEAD_AT} < ? "
                    "GROUP BY o.kind, o.source ORDER BY o.kind, n DESC", (s, e))
-    new_opps = db.all(f"SELECT o.id, {LEAD_AT} AS created_at FROM opportunities o WHERE {LEAD_AT} >= ? AND {LEAD_AT} < ?",
+    new_opps = db.all(f"SELECT o.id, {LEAD_AT} AS created_at FROM opportunities o WHERE o.stage != 'moved' AND {LEAD_AT} >= ? AND {LEAD_AT} < ?",
                       (s, e))
     reached = 0
     speeds = []
@@ -178,7 +178,7 @@ def sources(db, user, p: dict) -> dict:
     s, e = p["start"], p["end"]
     from .lead_marks import LEAD_AT
     opps = db.all(f"SELECT o.id, o.kind, o.source, o.source_detail, {LEAD_AT} AS created_at, o.stage FROM opportunities o "
-                  f"WHERE {LEAD_AT} >= ? AND {LEAD_AT} < ?", (s, e))
+                  f"WHERE o.stage != 'moved' AND {LEAD_AT} >= ? AND {LEAD_AT} < ?", (s, e))
     ids = [o["id"] for o in opps]
     if not ids:
         return {"rows": [], "campaigns": [], "total": None, "STEPS": STEPS, "LABELS": STEP_LABELS, "fees": False}

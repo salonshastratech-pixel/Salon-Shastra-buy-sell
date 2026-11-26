@@ -127,7 +127,18 @@ def send(opp_id):
     inv = db.one("SELECT * FROM form_invitations WHERE id = ?", (r["invitation_id"],))
     comm = db.one("SELECT * FROM messages WHERE id = ?", (r["communication"]["id"],)) \
         if r["communication"] and r["communication"].get("id") else None
-    return render_template("forms/sent.html", opp=opp, inv=inv, link=r["link"], comm=comm,
+    from urllib.parse import quote
+
+    from ..domain import switch_side as SW
+    if f.get("template_key") != "targeted":
+        text = SW.deep_form_message(opp, r["link"], "owner_sell" if opp["kind"] == "seller" else "buyer_full")
+    else:
+        first = (opp["contact_name"] or "").split(" ")[0] or "Sir/Madam"
+        text = (f"Hello {first}, please share a few more details for Salon Shastra here:\n{r['link']}\n\n"
+                "— Team Salon Shastra")
+    digits = "".join(ch for ch in (opp.get("phone_normalized") or "") if ch.isdigit())
+    wa = f"https://wa.me/{digits}?text={quote(text)}" if digits and not opp.get("do_not_contact") else None
+    return render_template("forms/sent.html", opp=opp, inv=inv, link=r["link"], comm=comm, text=text, wa=wa,
                            back=F.opp_path(opp), MOCK_LABEL=messaging.PROVIDER_LABEL)
 
 

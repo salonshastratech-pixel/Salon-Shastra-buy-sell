@@ -6,7 +6,7 @@ import hmac
 import os
 import time
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from ..db import get_db
 
@@ -21,9 +21,12 @@ def tick():
     given = given.replace(" ", "+")
     if len(expected) < 16 or not hmac.compare_digest(given.encode(), expected.encode()):
         return jsonify({"ok": False}), 404  # looks like any unknown page to strangers
-    from .. import jobs
+    from .. import background, jobs
     db = get_db()
     started = time.monotonic()
     jobs.schedule_periodic(db)
-    done = jobs.run_once(db, limit=30)
-    return jsonify({"ok": True, "jobs_run": done, "ms": int((time.monotonic() - started) * 1000)})
+    # The jobs (sheet sync, alerts, chasers…) run after this reply, on their own connection — never holding a web
+    # worker for tens of seconds. A tick that arrives while the previous one is still working simply skips.
+    started_jobs = background.run(current_app._get_current_object(), "tick_jobs",
+                                  lambda bdb: jobs.run_once(bdb, limit=30))
+    return jsonify({"ok": True, "jobs_started": started_jobs, "ms": int((time.monotonic() - started) * 1000)})

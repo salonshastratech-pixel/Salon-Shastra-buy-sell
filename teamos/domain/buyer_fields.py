@@ -56,12 +56,15 @@ SECTIONS = [
 ]
 
 B = BuyerFieldDef
+# Questions about taking over a RUNNING salon (its price, sales, lease, staff, liabilities) are asked only when that is
+# on the table: a resale need, still exploring, or a new-salon buyer who said yes to a takeover.
+TAKEOVER = [("need_type", tuple(sorted(RESALE_NEEDS | {"exploring"}))), ("consider_takeover", "yes")]
 FIELDS: list[BuyerFieldDef] = [
     B("need_type", "What does the buyer want?", "intent", "enum", NEED_TYPES, quick=True, matching=True,
       material=True, help="'Open a new salon' is a separate need: never matched to resale listings without the "
                           "buyer's explicit confirmation."),
     B("consider_takeover", "If opening new: would they consider taking over a running salon?", "intent", "enum",
-      YES_NO, matching=True, help="Yes = also match them with salons for sale (often faster and cheaper than "
+      YES_NO, matching=True, show_if=("need_type", "new_salon"), help="Yes = also match them with salons for sale (often faster and cheaper than "
                                    "starting new). Ask before setting it."),
     B("investor_type", "Buyer type", "intent", "enum",
       [("individual", "Individual"), ("partnership", "Partnership"), ("company", "Company"),
@@ -76,10 +79,10 @@ FIELDS: list[BuyerFieldDef] = [
     B("all_in_max", "Hard maximum ALL-IN cash outlay", "budget", "inr", quick=True, matching=True, material=True,
       help="Total cash the buyer can put in: price + deposit + stock + working capital + transfer fees. "
            "This is a hard ceiling for matching."),
-    B("budget_min", "Acquisition price — from", "budget", "inr", matching=True),
-    B("budget_max", "Acquisition price — up to", "budget", "inr", matching=True, material=True),
+    B("budget_min", "Acquisition price — from", "budget", "inr", matching=True, show_if=TAKEOVER),
+    B("budget_max", "Acquisition price — up to", "budget", "inr", matching=True, material=True, show_if=TAKEOVER),
     B("includes_deposit", "Does the ceiling already cover a rent deposit?", "budget", "enum", YES_NO, matching=True),
-    B("includes_stock", "…cover stock / inventory?", "budget", "enum", YES_NO, matching=True),
+    B("includes_stock", "…cover stock / inventory?", "budget", "enum", YES_NO, matching=True, show_if=TAKEOVER),
     B("includes_working_capital", "…cover working capital?", "budget", "enum", YES_NO, matching=True),
     B("finance_dependence", "Depends on a loan or outside finance?", "budget", "enum",
       [("none", "No — own funds"), ("partial", "Partly"), ("full", "Fully")], matching=True, material=True),
@@ -105,20 +108,20 @@ FIELDS: list[BuyerFieldDef] = [
       [("car", "Car parking needed"), ("bike", "Two-wheeler parking is enough"), ("not_needed", "Not needed")],
       matching=True, importance=True),
     B("staff_continuity_need", "Existing staff should stay?", "salon", "enum",
-      [("yes", "Yes"), ("partial", "Key staff at least"), ("no", "Not needed")], matching=True, importance=True),
+      [("yes", "Yes"), ("partial", "Key staff at least"), ("no", "Not needed")], matching=True, importance=True, show_if=TAKEOVER),
     B("clientele_note", "Target clientele / service strengths", "salon", "textarea"),
 
-    B("min_monthly_sales", "Minimum monthly sales", "business", "inr", matching=True, importance=True),
+    B("min_monthly_sales", "Minimum monthly sales", "business", "inr", matching=True, importance=True, show_if=TAKEOVER),
     B("min_operating_years", "Minimum years in operation", "business", "int", matching=True, unit="years",
-      importance=True),
-    B("turnaround_ok", "Open to a turnaround / loss-making salon?", "business", "enum", YES_NO, matching=True),
+      importance=True, show_if=TAKEOVER),
+    B("turnaround_ok", "Open to a turnaround / loss-making salon?", "business", "enum", YES_NO, matching=True, show_if=TAKEOVER),
     B("max_monthly_rent", "Maximum monthly rent + maintenance", "business", "inr", matching=True, importance=True,
       help="Compared with the salon's rent plus maintenance (CAM) charges."),
     B("min_lease_years_left", "Minimum lease remaining", "business", "int", matching=True, unit="years",
-      importance=True),
+      importance=True, show_if=TAKEOVER),
     B("renovation_budget", "Budget for renovation / refit", "business", "inr", matching=True),
     B("liability_tolerance", "Tolerance for existing liabilities", "business", "enum",
-      [("none", "None"), ("low", "Low"), ("moderate", "Moderate")], matching=True),
+      [("none", "None"), ("low", "Low"), ("moderate", "Moderate")], matching=True, show_if=TAKEOVER),
 
     B("purchase_window", "Wants to buy within", "timing", "enum",
       [("30d", "30 days"), ("90d", "90 days"), ("180d", "180 days"), ("later", "Later / no fixed time")],
@@ -129,7 +132,7 @@ FIELDS: list[BuyerFieldDef] = [
     B("visit_availability", "Available for site visits?", "timing", "enum",
       [("yes", "Yes, weekdays"), ("weekends", "Weekends only"), ("no", "Not yet")], matching=True),
     B("transition_support_need", "Needs seller transition support?", "timing", "enum",
-      [("yes", "Yes"), ("nice", "Nice to have"), ("no", "No")], matching=True, importance=True),
+      [("yes", "Yes"), ("nice", "Nice to have"), ("no", "No")], matching=True, importance=True, show_if=TAKEOVER),
 
     B("payment_approver", "Who approves the payment?", "authority", "text", material=True),
     B("other_partners", "Other partners / family involved", "authority", "text"),
