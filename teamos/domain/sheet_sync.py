@@ -415,6 +415,7 @@ def plan_many(db, files: list[tuple[str, bytes]]) -> dict:
             raise ValidationError({"file": f"More than {SI.MAX_ROWS} rows per workbook — split it."})
     _resolve_unsure_tabs(tab_info, raw)
     rows_out = [_judge(x) for x in raw if x["info"]["kind"] in ("seller", "buyer")]
+    _one_side_per_person(rows_out)
     _cold_and_marks(rows_out)
     from .purge import exclusions
     ex = exclusions(db)
@@ -427,6 +428,44 @@ def plan_many(db, files: list[tuple[str, bytes]]) -> dict:
     for t in tab_info:
         t.pop("unsure", None)
     return {"book": " + ".join(books), "tabs": tab_info, "rows": rows_out}
+
+
+def _buyer_evidence(r: dict) -> bool:
+    """Does this row itself say the person wants to buy / open a salon (not just: it sits in a buyer-looking tab)?"""
+    c = r["canon"]
+    for k in BUYER_ONLY:
+        v = (c.get(k) or "").strip()
+        if not v:
+            continue
+        # call trackers sometimes type other things into a "Timeline" column ("male hairdresser"): only a real time
+        if k == "timeline" and not re.search(r"\d|day|week|month|year|immediat|asap|soon|now|later|not sure|undecided|"
+                                             r"plan|ready", v, re.I):
+            continue
+        return True
+    return bool(re.search(r"planning to open|new salon|start a salon|want(s)? to buy|buy a salon|invest",
+                          (c.get("describes_you") or "").replace("_", " "), re.I))
+
+
+def _one_side_per_person(rows: list[dict]) -> None:
+    """A salon owner who is also listed in a mixed call list (e.g. a tab that looks like buyers because many of its
+    numbers are buyers) must not become a buyer too. When the same person has salon-owner rows AND buyer rows, the
+    buyer rows that give no buyer answer of their own (no budget, timeline, new-salon choice…) join the owner record.
+    Someone who really is both (an owner who also says they want to buy) keeps both."""
+    by_phone: dict[str, list] = {}
+    for r in rows:
+        if r["phone"] and r["action"] != "skip":
+            by_phone.setdefault(r["phone"], []).append(r)
+    for group in by_phone.values():
+        sellers = [r for r in group if r["kind"] == "seller"]
+        if not sellers:
+            continue
+        flavour = next((r["flavour"] for r in sellers if r["flavour"]), "seek_help")
+        for r in group:
+            if r["kind"] == "buyer" and not _buyer_evidence(r):
+                r["kind"], r["flavour"] = "seller", flavour
+                r["reason"] = (f"Also on a salon-owner list ('{sellers[0]['tab']}') and nothing here says they want to "
+                               "buy — kept as a salon owner")
+                r["understood"] = understand("seller", flavour, r["canon"])
 
 
 def _cold_and_marks(rows: list[dict]) -> None:

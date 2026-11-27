@@ -168,3 +168,97 @@ def deep_form_message(opp: dict, link: str, key: str) -> str:
     return (f"Hello {first}, thank you for speaking with Salon Shastra.\n\nPlease share {what} here:\n{link}\n\n"
             "Your answers are saved as you go — you can stop and continue later from the same link.\n\n"
             "— Team Salon Shastra")
+
+
+# -- Same person filed on both sides by an import: fold the extra record into the right one ------------------------
+def merge_into(db, actor: dict, from_id: int, into_id: int, why: str) -> None:
+    """Fold record `from_id` into `into_id` (same person): calls, notes, open tasks, chats and bookings move over,
+    empty facts are filled from it, and it is closed as Moved (kept, never deleted)."""
+    src, dst = load_any(db, from_id), load_any(db, into_id)
+    if not src or not dst or src["id"] == dst["id"]:
+        raise ValidationError({"record": "Both records must exist."})
+    if src.get("stage") == MOVED_STAGE:
+        return
+    now = now_iso()
+    with db:
+        db.execute("UPDATE activities SET entity_id = ? WHERE entity_type = 'opportunity' AND entity_id = ?",
+                   (into_id, from_id))
+        for t in db.all("SELECT id, task_type FROM tasks WHERE entity_type = 'opportunity' AND entity_id = ? AND "
+                        "status = 'open'", (from_id,)):
+            if t["task_type"] == "first_contact":       # the owner record has its own first call / next step
+                db.execute("UPDATE tasks SET status = 'cancelled', outcome = ?, updated_at = ? WHERE id = ?",
+                           (f"Same person as {dst['ref_code']}", now, t["id"]))
+            else:
+                db.execute("UPDATE tasks SET entity_id = ?, updated_at = ? WHERE id = ?", (into_id, now, t["id"]))
+        db.execute("UPDATE communications SET opportunity_id = ? WHERE opportunity_id = ?", (into_id, from_id))
+        db.execute("UPDATE vikas_bookings SET opportunity_id = ? WHERE opportunity_id = ?", (into_id, from_id))
+        for cl in db.all("SELECT conversation_id FROM conversation_links WHERE opportunity_id = ?", (from_id,)):
+            if db.scalar("SELECT 1 FROM conversation_links WHERE conversation_id = ? AND opportunity_id = ?",
+                         (cl["conversation_id"], into_id)):
+                db.execute("DELETE FROM conversation_links WHERE conversation_id = ? AND opportunity_id = ?",
+                           (cl["conversation_id"], from_id))
+            else:
+                db.execute("UPDATE conversation_links SET opportunity_id = ? WHERE conversation_id = ? AND "
+                           "opportunity_id = ?", (into_id, cl["conversation_id"], from_id))
+        heat = {"hot": 3, "warm": 2, "normal": 1, "cold": 0}
+        fill = {}
+        if heat.get(src.get("lead_temperature") or "normal", 1) > heat.get(dst.get("lead_temperature") or "normal", 1):
+            fill["lead_temperature"] = src["lead_temperature"]
+        if src.get("team_remark") and src["team_remark"] not in (dst.get("team_remark") or ""):
+            fill["team_remark"] = ((dst.get("team_remark") + " · ") if dst.get("team_remark") else "") + src["team_remark"]
+        for k, pick in (("first_contact_at", min), ("lead_created_at", min), ("last_contact_at", max)):
+            vals = [v for v in (src.get(k), dst.get(k)) if v]
+            if vals and pick(vals) != dst.get(k):
+                fill[k] = pick(vals)
+        if fill:
+            db.execute("UPDATE opportunities SET " + ", ".join(f"{k} = ?" for k in fill) + ", updated_at = ? WHERE id = ?",
+                       (*fill.values(), now, into_id))
+        db.execute("UPDATE opportunities SET stage = ?, status = 'closed', closed_reason = ?, next_action = NULL, "
+                   "next_action_due = NULL, updated_at = ? WHERE id = ?",
+                   (MOVED_STAGE, f"Same person as {dst['ref_code']} — {why}"[:300], now, from_id))
+        db.insert("stage_history", {"opportunity_id": from_id, "from_stage": src.get("stage"), "to_stage": MOVED_STAGE,
+                                    "reason": f"Same person as {dst['ref_code']}", "actor_id": actor["id"], "at": now})
+        T.add_activity(db, actor["id"], "opportunity", into_id, "system",
+                       f"{src['ref_code']} ({SIDE_LABEL[src['kind']]}) was the same person — {why}; its calls, notes "
+                       "and tasks are here now")
+        T.add_activity(db, actor["id"], "opportunity", from_id, "system", f"Merged into {dst['ref_code']} — {why}")
+        T.refresh_next_action(db, "opportunity", into_id)
+        audit.record(db, actor["id"], "record.merged_side", "opportunity", from_id, {"into": into_id, "why": why})
+
+
+def fix_side_duplicates(db, actor: dict, phones: list[str], keep: str = "seller", dry: bool = True,
+                        why: str = "a salon owner (pilot Tracker)") -> dict:
+    """For people known to be on one side (`keep`), fold the other-side records an import made for them. A record on
+    the other side that holds real answers of that side (budget, a filled investor form, a deal) is left alone and
+    reported instead."""
+    other = "buyer" if keep == "seller" else "seller"
+    out = {"merged": [], "kept_both": [], "not_found": []}
+    for ph in phones:
+        rows = db.all("SELECT o.* FROM opportunities o JOIN contacts c ON c.id = o.contact_id WHERE "
+                      "(c.phone_normalized = ? OR c.alt_phone_normalized = ?) AND o.stage <> ? ORDER BY o.id",
+                      (ph, ph, MOVED_STAGE))
+        main = next((r for r in rows if r["kind"] == keep), None)
+        extras = [r for r in rows if r["kind"] == other]
+        if not main or not extras:
+            out["not_found"].append(ph)
+            continue
+        for x in extras:
+            real = False
+            if other == "buyer":
+                m = db.one("SELECT * FROM buyer_mandates WHERE opportunity_id = ?", (x["id"],)) or {}
+                real = any(m.get(k) is not None for k in ("all_in_max", "budget_max", "budget_min")) or bool(
+                    db.scalar("SELECT 1 FROM investor_profiles WHERE opportunity_id = ? AND form_status = 'filled'",
+                              (x["id"],))) or bool(db.scalar("SELECT 1 FROM deals WHERE buyer_opp_id = ?", (x["id"],)))
+            else:
+                lst = db.one("SELECT * FROM seller_listings WHERE opportunity_id = ?", (x["id"],)) or {}
+                real = lst.get("asking_price") is not None or bool(db.scalar(
+                    "SELECT 1 FROM pilot_profiles WHERE opportunity_id = ? AND form_status = 'filled'", (x["id"],))) or bool(
+                    db.scalar("SELECT 1 FROM swot_reports WHERE opportunity_id = ?", (x["id"],))) or bool(
+                    db.scalar("SELECT 1 FROM deals WHERE seller_opp_id = ?", (x["id"],)))
+            if real or x["source"] != "import":
+                out["kept_both"].append(f"{x['ref_code']} (has its own {other} details — please check)")
+                continue
+            if not dry:
+                merge_into(db, actor, x["id"], main["id"], why)
+            out["merged"].append(f"{x['ref_code']} → {main['ref_code']}")
+    return out

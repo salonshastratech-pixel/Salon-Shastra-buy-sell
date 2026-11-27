@@ -257,6 +257,25 @@ def lead_time_backfill(db, payload) -> str:
     return f"{timeline.backfill_lead_times(db)} lead times filled"
 
 
+@handler("fix_side_duplicates")
+def fix_side_duplicates(db, payload) -> str:
+    """Once, started by an admin: people an import filed on both sides (e.g. salon owners also made buyers from a
+    mixed call list) — the extra record is folded into the right one. dry=true only reports."""
+    import json as _json
+
+    from .domain import switch_side
+    actor = db.one("SELECT * FROM users WHERE id = ? AND is_active = 1", (int(payload.get("actor_id") or 0),)) or db.one(
+        "SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    res = switch_side.fix_side_duplicates(db, actor, payload.get("phones") or [], payload.get("keep") or "seller",
+                                          dry=bool(payload.get("dry", True)), why=payload.get("why") or "same person")
+    summary = (f"{'Would merge' if payload.get('dry', True) else 'Merged'} {len(res['merged'])}; kept both "
+               f"{len(res['kept_both'])}; nothing to do {len(res['not_found'])}")
+    if not payload.get("dry", True):
+        for a in db.all("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin'"):
+            T.notify(db, a["id"], "system", f"Duplicate clean-up: {summary}", "/admin/jobs")
+    return summary + " · " + _json.dumps(res)[:3500]
+
+
 @handler("noop")
 def noop(db, payload) -> str:
     if payload.get("fail"):
