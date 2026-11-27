@@ -6,7 +6,7 @@
   <div class="card"><h2>Smart import</h2>
     <form method="post" enctype="multipart/form-data" action="{{ url_for('imports.smart_upload') }}">{{ csrf() }}
       <div class="field"><label for="sm-file">Excel (.xlsx, all tabs) or CSV — up to 8 MB</label><input id="sm-file" type="file" name="file" accept=".csv,.xlsx"></div>
-      <div class="field"><label for="sm-link">…or a Google Sheets link</label><input id="sm-link" name="link" placeholder="https://docs.google.com/spreadsheets/d/…">
+      <div class="field"><label for="sm-link">…or a Google Sheets / Google Drive Excel link</label><input id="sm-link" name="link" placeholder="https://docs.google.com/spreadsheets/d/… or https://drive.google.com/file/d/…">
         <div class="help">The sheet must be shared as "Anyone with the link can view". Private sheets: File → Download → Microsoft Excel (.xlsx), then upload the file.</div></div>
       <button class="btn primary">Read &amp; preview</button></form>
     <h3>What it does for you</h3>
@@ -42,9 +42,9 @@
   </table></div>{% endif %}
   <form method="post" action="{{ url_for('imports.sheet_connect') }}" class="form-grid">{{ csrf() }}
     <div class="field"><label for="cs-name">Name</label><input id="cs-name" name="name" placeholder="e.g. Pilot program responses"></div>
-    <div class="field"><label for="cs-link">Google Sheets link</label><input id="cs-link" name="link" required placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+    <div class="field"><label for="cs-link">Google Sheets or Google Drive Excel / CSV link</label><input id="cs-link" name="link" required placeholder="https://docs.google.com/spreadsheets/d/… or https://drive.google.com/file/d/…"></div>
     <div class="field full"><label class="check"><input type="checkbox" name="auto" value="1"> Auto-import new leads (for ad lead sheets) — no preview; shared in turn; first call within 10 minutes</label></div>
-    <div class="full help">In Google Sheets: Share &gt; General access &gt; "Anyone with the link" &gt; Viewer. Anyone who has this exact link can open the sheet, so share it only with TeamOS and your team.</div>
+    <div class="full help">Works with Google Sheets and with Excel (.xlsx) or CSV files kept in Google Drive — TeamOS checks them every 10 minutes. In Drive or Sheets: Share &gt; General access &gt; "Anyone with the link" &gt; Viewer, then copy the link. Anyone who has this exact link can open the file, so share it only with TeamOS and your team. An Excel file on someone's own computer cannot be checked — save it in Google Drive first (Google Drive for desktop does this automatically).</div>
     <div class="full"><button class="btn primary">Connect sheet</button></div></form>
 </div>
 

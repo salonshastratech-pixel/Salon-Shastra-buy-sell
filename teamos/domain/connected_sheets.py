@@ -1,4 +1,4 @@
-"""Connected Google Sheets: checked every 10 minutes. New people arrive as an import preview the team approves —
+"""Connected Google Sheets — and Excel / CSV files kept in Google Drive: checked every 10 minutes. New people arrive as an import preview the team approves —
 or, for sheets marked "Auto-import" (Meta ad leads), straight in: shared between the team in turn with a first call due
 within 10 minutes.
 
@@ -20,26 +20,55 @@ from . import tasks as T
 from .errors import PermissionDenied, ValidationError
 
 GSHEET = re.compile(r"docs\.google\.com/spreadsheets/d/([A-Za-z0-9_\-]{20,})")
+# Excel / CSV files kept in Google Drive (uploaded as .xlsx, not converted to Google Sheets)
+DRIVE = re.compile(r"drive\.google\.com/(?:file/d/|open\?(?:[^#\s]*&)?id=|uc\?(?:[^#\s]*&)?id=)([A-Za-z0-9_\-]{20,})")
+LINK_HELP = ("Paste a Google Sheets link (docs.google.com/spreadsheets/…) or a Google Drive file link "
+             "(drive.google.com/file/d/…) of an Excel or CSV file.")
+MAX_BYTES = 8 * 1024 * 1024
+
+
+def sheet_key(url: str | None) -> str | None:
+    """The Google file id inside a Sheets or Drive link (the same file always gives the same key)."""
+    m = GSHEET.search(url or "") or DRIVE.search(url or "")
+    return m.group(1) if m else None
+
+
+def _download(url: str) -> tuple[bytes, str]:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "TeamOS-import"}),
+                                timeout=75) as r:   # Google often takes 10-30 s to build the file
+        return r.read(MAX_BYTES + 1), r.headers.get("Content-Type", "")
 
 
 def fetch(url: str) -> tuple[str, bytes]:
-    """Download a Google Sheet shared as 'Anyone with the link can view' as Excel (all tabs)."""
-    m = GSHEET.search(url or "")
-    if not m:
-        raise ValidationError({"link": "Paste a Google Sheets link (docs.google.com/spreadsheets/...)."})
-    export = f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=xlsx"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(export, headers={"User-Agent": "TeamOS-import"}),
-                                    timeout=75) as r:   # Google often takes 10-30 s to build the file
-            data, ctype = r.read(8 * 1024 * 1024 + 1), r.headers.get("Content-Type", "")
-    except (urllib.error.URLError, TimeoutError) as e:
-        raise ValidationError({"link": f"Could not download the sheet ({getattr(e, 'code', '') or e}). "
-                                       "Share it as 'Anyone with the link can view', or download it as Excel "
-                                       "(File > Download > .xlsx) and upload the file."})
-    if "spreadsheetml" not in ctype and not data.startswith(b"PK"):
-        raise ValidationError({"link": "Google asked for a sign-in, so the sheet is private. Share it as 'Anyone with "
-                                       "the link can view', or download it as Excel and upload the file."})
-    return f"google-sheet-{m.group(1)[:8]}.xlsx", data
+    """Download a shared sheet: a Google Sheet (exported as Excel, all tabs), or an Excel / CSV file kept in Google
+    Drive. The file must be shared as 'Anyone with the link can view'."""
+    key = sheet_key(url)
+    if not key:
+        raise ValidationError({"link": LINK_HELP})
+    drive = [f"https://drive.usercontent.google.com/download?id={key}&export=download&confirm=t",
+             f"https://drive.google.com/uc?export=download&id={key}"]
+    # a docs.google.com link may also be an Excel file opened in Google's editor: then the plain download works
+    tries = ([f"https://docs.google.com/spreadsheets/d/{key}/export?format=xlsx"] if GSHEET.search(url or "") else []) + drive
+    last = None
+    for u in tries:
+        try:
+            data, ctype = _download(u)
+        except (urllib.error.URLError, TimeoutError) as e:
+            last = f"could not download ({getattr(e, 'code', '') or e})"
+            continue
+        if len(data) > MAX_BYTES:
+            raise ValidationError({"link": "The file is larger than 8 MB. Split it, or remove old tabs, and try again."})
+        if data.startswith(b"PK"):                                  # .xlsx (a zip)
+            return f"google-sheet-{key[:8]}.xlsx", data
+        if data.startswith(b"\xd0\xcf\x11\xe0"):                    # old .xls
+            raise ValidationError({"link": "This is an old Excel file (.xls). In Google Drive open it, then "
+                                           "File > Save as Google Sheets (or save it as .xlsx) and use that link."})
+        head = data[:600].lstrip().lower()
+        if "text/csv" in ctype or ("text/plain" in ctype and b"<html" not in head):
+            return f"google-sheet-{key[:8]}.csv", data
+        last = "Google asked for a sign-in, so the file is private"
+    raise ValidationError({"link": f"{last or 'Could not download the file'}. Share it as 'Anyone with the link can "
+                                   "view' (Share > General access), or download it and upload the file here."})
 
 
 def _need(db, actor):
@@ -49,20 +78,20 @@ def _need(db, actor):
 
 def add(db, actor, name: str, url: str, auto: bool = False) -> int:
     _need(db, actor)
-    m = GSHEET.search(url or "")
-    if not m:
-        raise ValidationError({"link": "Paste a Google Sheets link (docs.google.com/spreadsheets/...)."})
+    key = sheet_key(url)
+    if not key:
+        raise ValidationError({"link": LINK_HELP})
     name = (name or "").strip()[:80] or "Google Sheet"
-    if db.scalar("SELECT id FROM connected_sheets WHERE sheet_key = ? AND active = 1", (m.group(1),)):
+    if db.scalar("SELECT id FROM connected_sheets WHERE sheet_key = ? AND active = 1", (key,)):
         raise ValidationError({"link": "This sheet is already connected."})
     with db:
-        old = db.scalar("SELECT id FROM connected_sheets WHERE sheet_key = ?", (m.group(1),))
+        old = db.scalar("SELECT id FROM connected_sheets WHERE sheet_key = ?", (key,))
         if old:  # reconnecting a sheet that was removed earlier
             db.update("connected_sheets", old, {"active": 1, "name": name, "url": url.strip()[:500], "last_sha": None,
                                                 "auto_import": 1 if auto else 0})
             sid = old
         else:
-            sid = db.insert("connected_sheets", {"name": name, "url": url.strip()[:500], "sheet_key": m.group(1),
+            sid = db.insert("connected_sheets", {"name": name, "url": url.strip()[:500], "sheet_key": key,
                                                  "active": 1, "auto_import": 1 if auto else 0,
                                                  "created_by": actor["id"], "created_at": now_iso()})
         audit.record(db, actor["id"], "sheet.connect", "connected_sheet", sid, {"name": name})

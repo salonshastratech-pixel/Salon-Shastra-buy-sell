@@ -200,7 +200,7 @@ def test_only_import_role_and_nothing_relevant_is_refused(app, db, login):
                                   content_type="multipart/form-data", follow_redirects=True)
     assert b"No buyer or seller lists found" in r.data
     r = login("lead@t.test").post("/imports/smart", {"link": "https://example.com/not-a-sheet"}, follow_redirects=True)
-    assert b"Paste a Google Sheets link" in r.data
+    assert b"Paste a Google Sheets link" in r.data or b"Google Drive file link" in r.data
 
 
 def test_unknown_city_does_not_block_a_match(app, db):

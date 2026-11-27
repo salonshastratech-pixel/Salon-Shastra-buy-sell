@@ -111,9 +111,6 @@ def discard(batch_id):
 
 
 # -- Smart import: any workbook, sellers and buyers, synced ------------------------------------------------------
-GSHEET = __import__("re").compile(r"docs\.google\.com/spreadsheets/d/([A-Za-z0-9_\-]{20,})")
-
-
 def _fetch_google_sheet(url: str) -> tuple[str, bytes]:
     from ..domain import connected_sheets as CS
     return CS.fetch(url)
