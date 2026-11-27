@@ -65,3 +65,32 @@ def test_link_pages_offer_whatsapp_and_copy(db, login):
     assert 'class="link-box"' in page and "https://wa.me/919300600002?text=" in page and "Open in WhatsApp" in page
     js = c.get("/static/app.js").data.decode()
     assert "Copy link" in js and ".link-box, code.copy, textarea.msg-preview" in js
+
+
+def test_redirects_never_leave_the_site(app, login):
+    from conftest import PW
+    c = app.test_client()
+    for bad in ("//evil.test/x", "/\\evil.test", "https://evil.test/", "/%0d%0aSet-Cookie:x", "javascript:alert(1)"):
+        r = c.post(f"/login?next={bad}", data={"email": "seller@t.test", "password": PW})
+        assert r.status_code == 302 and "evil" not in r.headers["Location"] and r.headers["Location"].startswith("/"), bad
+        c = app.test_client()
+    r = c.post("/login?next=/sellers/", data={"email": "seller@t.test", "password": PW})
+    assert r.headers["Location"].endswith("/sellers/")                      # a normal page still works
+    with app.test_request_context("/", base_url="http://team.test"):
+        from teamos.security import safe_next
+        assert safe_next("http://team.test/buyers/?q=1", "/") == "/buyers/?q=1"
+        assert safe_next("http://other.test/buyers/", "/") == "/" and safe_next("/a\tb", "/") == "/"
+
+
+def test_app_and_browser_icons_use_the_hat(app, login):
+    c = login("seller@t.test")
+    m = c.get("/manifest.webmanifest").get_json()
+    kinds = {(i["src"].split("?")[0].rsplit("/", 1)[-1], i["purpose"]) for i in m["icons"]}
+    assert ("maskable-512.png", "maskable") in kinds and ("icon-512.png", "any") in kinds
+    page = c.get("/").data.decode()
+    assert "icons/favicon-32.png" in page and "icons/apple-touch-icon.png" in page
+    assert "icons/favicon-32.png" in app.test_client().get("/login").data.decode()
+    ico = app.test_client().get("/favicon.ico")
+    assert ico.status_code == 200 and ico.mimetype == "image/x-icon"
+    for name in ("icon-192.png", "icon-512.png", "maskable-512.png", "apple-touch-icon.png", "favicon-16.png"):
+        assert app.test_client().get(f"/static/icons/{name}").status_code == 200

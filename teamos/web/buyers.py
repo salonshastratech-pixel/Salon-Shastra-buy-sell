@@ -7,7 +7,7 @@ from ..domain import buyers as B
 from ..domain import tasks as T
 from ..domain.errors import ValidationError
 from ..permissions import user_can
-from ..security import can, deny, login_required, require
+from ..security import can, deny, login_required, require, safe_next
 from ..timeutil import parse_local_input
 from .sellers import _active_users, _link_chat
 
@@ -159,8 +159,8 @@ def _run(opp_id, fn, ok_msg, tab=None):
     except ValidationError as e:
         flash(" ".join(str(v) for v in e.errors.values()), "error")
     nxt = request.form.get("next") or ""
-    if nxt.startswith("/") and not nxt.startswith("//"):  # e.g. back to the pipeline board
-        return redirect(nxt)
+    if safe_next(nxt, ""):  # e.g. back to the pipeline board
+        return redirect(safe_next(nxt, ""))
     return _back(opp_id, tab)
 
 

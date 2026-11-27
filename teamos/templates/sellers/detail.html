@@ -169,7 +169,7 @@
   <div class="intake-row"><div class="lbl">Locality</div><div><input name="locality" value="{{ opp.locality }}"></div><div></div><div></div></div>
   {% endif %}
   {% for f in SF.fields_in(sk) if f.key not in hidden %}{% set p = prov.get(f.key) %}
-  <div class="intake-row" {% if f.show_if %}data-show-if="{{ f.show_attr }}"{% endif %}>
+  <div class="intake-row" {% if f.show_if %}data-show-if="{{ f.show_attr }}"{% endif %}{% if f.also_if %} data-also-if="{{ f.also_attr }}"{% endif %}>
     <div class="lbl">{{ f.label }}{% if f.unit %} <span class="muted">({{ f.unit }})</span>{% endif %}{% if f.privacy == 'restricted' %} <span class="badge warn">Restricted</span>{% endif %}{% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}</div>
     <div>
       {% if f.ftype == 'enum' %}<select name="{{ f.key }}" data-value-for="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if listing[f.key] == v }}>{{ l }}</option>{% endfor %}</select>

@@ -1,7 +1,7 @@
 from flask import Blueprint, current_app, g, redirect, render_template, request, url_for
 
 from ..db import get_db
-from ..security import COOKIE, authenticate, end_session, start_session
+from ..security import COOKIE, authenticate, end_session, safe_next, start_session
 
 bp = Blueprint("auth", __name__)
 
@@ -20,7 +20,7 @@ def login():
                 from ..domain import worklog
                 worklog.on_login(db, user)
             nxt = request.args.get("next") or ""
-            dest = nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("main.my_day")
+            dest = safe_next(nxt, url_for("main.my_day"))
             if user.get("must_change_password"):
                 dest = url_for("auth.change_password", first=1)
             resp = redirect(dest)

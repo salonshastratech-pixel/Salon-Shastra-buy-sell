@@ -15,7 +15,7 @@ from ..domain import sellers as S
 from ..domain import tasks as T
 from ..domain.errors import PermissionDenied, ValidationError
 from ..permissions import user_can
-from ..security import login_required, require
+from ..security import login_required, require, safe_next
 from ..timeutil import parse_local_input
 
 bp = Blueprint("records", __name__, url_prefix="/records")
@@ -23,8 +23,8 @@ bp = Blueprint("records", __name__, url_prefix="/records")
 
 def _back(kind: str):
     nxt = request.form.get("next") or ""
-    if nxt.startswith("/") and not nxt.startswith("//"):
-        return redirect(nxt)
+    if safe_next(nxt, ""):
+        return redirect(safe_next(nxt, ""))
     return redirect(url_for("buyers.index" if kind == "buyer" else "sellers.index"))
 
 

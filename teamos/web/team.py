@@ -5,7 +5,7 @@ from ..db import get_db
 from ..domain import availability as AV
 from ..domain.errors import PermissionDenied, ValidationError
 from ..permissions import user_can
-from ..security import login_required, require
+from ..security import login_required, require, safe_next
 
 bp = Blueprint("team", __name__)
 
@@ -64,7 +64,7 @@ def status():
     except ValidationError as e:
         flash(_err(e), "error")
     nxt = request.form.get("next") or ""
-    return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("main.my_day"))
+    return redirect(safe_next(nxt, url_for("main.my_day")))
 
 
 @bp.route("/team/availability")

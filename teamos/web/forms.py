@@ -10,7 +10,7 @@ from ..domain import form_templates as FT
 from ..domain import forms as F
 from ..domain.errors import ValidationError
 from ..permissions import user_can
-from ..security import can, deny, login_required, require
+from ..security import can, deny, login_required, require, safe_next
 
 bp = Blueprint("forms", __name__, url_prefix="/forms")
 
@@ -163,10 +163,14 @@ def revoke(inv_id):
 @login_required
 def document(doc_id):
     db = get_db()
+    from ..files import UploadRejected
     try:
         doc, data = F.open_document(db, g.user, doc_id)
     except ValidationError:
         abort(404)
+    except UploadRejected as e:          # key missing/changed, or the file is gone: explain instead of crashing
+        flash(f"Could not open the document: {e}", "error")
+        return redirect(safe_next(request.referrer, url_for("main.my_day")))
     resp = Response(data, mimetype=doc["content_type"])
     safe = "".join(ch for ch in doc["original_name"] if ch.isalnum() or ch in "._- ")[:80] or "document"
     resp.headers["Content-Disposition"] = f'attachment; filename="{safe}"'
@@ -186,7 +190,7 @@ def document_review(doc_id):
         flash("Document review saved.", "ok")
     except ValidationError as e:
         flash(" ".join(str(v) for v in e.errors.values()), "error")
-    return redirect(request.referrer or F.opp_path(F.load_opportunity(db, doc["opportunity_id"])))
+    return redirect(safe_next(request.referrer, F.opp_path(F.load_opportunity(db, doc["opportunity_id"]))))
 
 
 @bp.app_context_processor

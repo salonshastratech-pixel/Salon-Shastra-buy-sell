@@ -6,7 +6,7 @@ from ..domain import progress as P
 from ..domain import tasks as T
 from ..domain.buyers import STAGE_LABELS as BUYER_STAGE_LABELS
 from ..domain.sellers import STAGE_LABELS as SELLER_STAGE_LABELS
-from ..security import login_required, require
+from ..security import login_required, require, safe_next
 from datetime import timedelta
 
 from ..timeutil import ist_day_bounds, now_iso, now_utc, to_iso
@@ -153,7 +153,7 @@ def search():
 def notifications_read():
     get_db().execute("UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL",
                      (now_iso(), g.user["id"]))
-    return redirect(request.referrer or url_for("main.my_day"))
+    return redirect(safe_next(request.referrer, url_for("main.my_day")))
 
 
 @bp.route("/dictionary")

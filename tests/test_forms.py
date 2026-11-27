@@ -233,9 +233,10 @@ def test_uploads_are_encrypted_and_only_authorised_people_can_download(app, db, 
                content_type="multipart/form-data")
     assert b"Thank you" in r.data
     doc = db.one("SELECT * FROM documents")
-    raw = (app.config["UPLOAD_DIR"] + "/" + doc["stored_name"])
-    with open(raw, "rb") as fh:
-        assert PDF not in fh.read()  # encrypted at rest
+    blob = db.scalar("SELECT data FROM document_blobs WHERE stored_name = ?", (doc["stored_name"],))
+    assert blob and PDF.decode("latin-1") not in blob  # kept in the database, encrypted at rest
+    import os
+    assert not os.path.exists(os.path.join(app.config["UPLOAD_DIR"], doc["stored_name"]))  # nothing on the disk
     assert doc["content_type"] == "application/pdf" and doc["encrypted"] == 1 and doc["opportunity_id"] == opp_id
     assert c.get(f"/forms/documents/{doc['id']}").data == PDF  # primary owner
     assert login("admin@t.test").get(f"/forms/documents/{doc['id']}").data == PDF
@@ -313,3 +314,31 @@ def test_customer_forms_never_show_internal_staff_guidance(app, db, login):
         for h in staff_help:
             assert h.replace("'", "&#39;") not in html and h not in html, h
         assert "respondent" not in html.lower()
+
+
+def test_documents_survive_a_wiped_server_disk_and_missing_files_are_explained(app, db, login):
+    import shutil
+    c, opp_id = new_seller(login, db)
+    token, _ = send(c, opp_id, "targeted", docs=["lease_agreement"])
+    public(app).post(f"/f/i/{token}", data={"doc__lease_agreement": (io.BytesIO(PDF), "lease.pdf"), "action": "submit"},
+                     content_type="multipart/form-data")
+    doc = db.one("SELECT * FROM documents")
+    shutil.rmtree(app.config["UPLOAD_DIR"], ignore_errors=True)       # what a redeploy on free hosting does
+    assert c.get(f"/forms/documents/{doc['id']}").data == PDF
+    db.execute("DELETE FROM document_blobs")                          # truly gone
+    r = c.get(f"/forms/documents/{doc['id']}", headers={"Referer": f"/sellers/{opp_id}"}, follow_redirects=True)
+    assert r.status_code == 200 and "no longer available" in r.data.decode()
+
+
+def test_deleting_a_lead_also_deletes_its_uploaded_files(app, db, login):
+    from conftest import user
+
+    from teamos.domain import purge
+    c, opp_id = new_seller(login, db)
+    token, _ = send(c, opp_id, "targeted", docs=["lease_agreement"])
+    public(app).post(f"/f/i/{token}", data={"doc__lease_agreement": (io.BytesIO(PDF), "lease.pdf"), "action": "submit"},
+                     content_type="multipart/form-data")
+    assert db.scalar("SELECT COUNT(*) FROM document_blobs") == 1
+    with app.test_request_context():
+        purge.delete_records(db, user(db, "admin@t.test"), [opp_id], "test", remember=False)
+    assert db.scalar("SELECT COUNT(*) FROM documents") == 0 and db.scalar("SELECT COUNT(*) FROM document_blobs") == 0

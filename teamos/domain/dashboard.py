@@ -54,7 +54,7 @@ def new_leads(db, user_ids: list[int], limit: int = 10) -> list[dict]:
         return []
     m, ids = _in(user_ids)
     rows = db.all(f"SELECT o.id, o.kind, o.ref_code, o.source, o.source_detail, o.lead_created_at, o.created_at, "
-                  f"o.first_contact_at, o.status, o.source, o.lead_temperature, o.lead_category, o.team_remark, "
+                  f"o.first_contact_at, o.status, o.lead_temperature, o.lead_category, o.team_remark, "
                   f"c.full_name AS contact_name, c.phone_normalized, b.name AS salon_name, "
                   f"u.full_name AS owner_name FROM opportunities o JOIN contacts c ON c.id = o.contact_id LEFT JOIN "
                   f"salon_businesses b ON b.id = o.business_id LEFT JOIN users u ON u.id = o.primary_owner_id WHERE "

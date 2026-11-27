@@ -67,7 +67,11 @@ def store(data: bytes, original_name: str) -> dict:
     if not ctype:
         raise UploadRejected("Only PDF, PNG or JPG files can be uploaded.")
     stored = secrets.token_hex(16) + ".bin"
-    (storage_dir() / stored).write_bytes(f.encrypt(data))
+    from .db import get_db
+    from .timeutil import now_iso
+    # kept in the database (survives deploys; the server disk on free hosting does not)
+    get_db().insert("document_blobs", {"stored_name": stored, "data": f.encrypt(data).decode("ascii"),
+                                       "created_at": now_iso()})
     name = os.path.basename(original_name or "document")[:120] or "document"
     return {"stored_name": stored, "content_type": ctype, "size_bytes": len(data),
             "sha256": hashlib.sha256(data).hexdigest(), "original_name": name, "encrypted": 1}
@@ -79,4 +83,16 @@ def read(stored_name: str) -> bytes:
         raise UploadRejected("FILES_KEY missing — cannot decrypt.")
     if "/" in stored_name or "\\" in stored_name or ".." in stored_name:
         raise UploadRejected("Invalid file reference.")
-    return f.decrypt((storage_dir() / stored_name).read_bytes())
+    from cryptography.fernet import InvalidToken
+
+    from .db import get_db
+    token = get_db().scalar("SELECT data FROM document_blobs WHERE stored_name = ?", (stored_name,))
+    try:
+        if token:
+            return f.decrypt(token.encode("ascii"))
+        path = storage_dir() / stored_name          # files saved before documents moved into the database
+        if path.exists():
+            return f.decrypt(path.read_bytes())
+    except InvalidToken:
+        raise UploadRejected("This file cannot be opened with the server's current key (FILES_KEY changed).")
+    raise UploadRejected("This file is no longer available on the server.")

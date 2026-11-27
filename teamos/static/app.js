@@ -37,20 +37,26 @@
     return src.value;
   }
   function hiddenSource(name) {
-    var src = document.querySelector('[name="' + name + '"]'), box = src && src.closest('[data-show-if]');
+    var src = document.querySelector('[name="' + name + '"]'), box = src && src.closest('[data-show-if], [data-also-if]');
     return !!(box && box.classList.contains('hide'));
+  }
+  // one rule "a=x|y;b=z": true when ANY part holds (null when none of its questions is on this page)
+  function rule(text) {
+    var known = false, ok = false;
+    text.split(';').forEach(function (cond) {
+      var parts = cond.split('='), v = valueOf(parts[0]);
+      if (v === null) return;
+      known = true;
+      if (!hiddenSource(parts[0]) && parts[1].split('|').indexOf(v || '') !== -1) ok = true;
+    });
+    return known ? ok : null;
   }
   function refresh() {
     for (var pass = 0; pass < 3; pass++) {      // a few passes so "depends on a hidden question" settles
-      document.querySelectorAll('[data-show-if]').forEach(function (el) {
-        var known = false, show = false;
-        el.dataset.showIf.split(';').forEach(function (cond) {
-          var parts = cond.split('='), v = valueOf(parts[0]);
-          if (v === null) return;
-          known = true;
-          if (!hiddenSource(parts[0]) && parts[1].split('|').indexOf(v) !== -1) show = true;
-        });
-        if (known) el.classList.toggle('hide', !show);
+      document.querySelectorAll('[data-show-if], [data-also-if]').forEach(function (el) {
+        var a = el.dataset.showIf ? rule(el.dataset.showIf) : true, b = el.dataset.alsoIf ? rule(el.dataset.alsoIf) : true;
+        if (a === null && b === null) return;
+        el.classList.toggle('hide', a === false || b === false);
       });
     }
   }

@@ -29,14 +29,15 @@ db.commit()
 qa_batch = q("SELECT MAX(id) FROM batches")[0]
 seller_doc = q("SELECT d.id FROM documents d JOIN opportunities o ON o.id = d.opportunity_id WHERE o.kind='seller'")
 buyer_doc = q("SELECT d.id FROM documents d JOIN opportunities o ON o.id = d.opportunity_id WHERE o.kind='buyer'")
+# Founder decision D-85 (24 Nov 2026): team members can do everything except Finance, users and settings.
 PROBES = [  # (label, method, url, data, privileged roles that MAY do it, state check sql)
-    ("approve listing", "POST", "/sellers/2/decision", {"decision": "approved"}, {"founder"},
+    ("approve listing", "POST", "/sellers/2/decision", {"decision": "approved"}, {"founder", "lead", "shaheen", "harika"},
      "SELECT approval_state FROM seller_listings WHERE opportunity_id = 2"),
-    ("record funding review", "POST", "/buyers/10/funding", {"status": "verified", "note": "forged"}, {"founder", "lead"},
+    ("record funding review", "POST", "/buyers/10/funding", {"status": "verified", "note": "forged"}, {"founder", "lead", "shaheen", "harika"},
      "SELECT funding_status FROM buyer_mandates WHERE opportunity_id = 10"),
-    ("approve match to approach", "POST", "/matches/11/stage", {"to": "approved_to_approach"}, {"founder", "lead"},
+    ("approve match to approach", "POST", "/matches/11/stage", {"to": "approved_to_approach"}, {"founder", "lead", "shaheen", "harika"},
      "SELECT stage FROM match_candidates WHERE id = 11"),
-    ("close deal as won", "POST", "/deals/1/stage", {"to": "closed_won"}, {"founder"},
+    ("close deal as won", "POST", "/deals/1/stage", {"to": "closed_won"}, {"founder", "lead", "shaheen", "harika"},
      "SELECT stage FROM deals WHERE id = 1"),
     ("record fee agreement", "POST", "/admin/finance/agreement",
      {"deal_id": "1", "payer": "buyer", "fee_type": "other", "basis": "fixed", "fixed_amount": "1",
@@ -47,9 +48,9 @@ PROBES = [  # (label, method, url, data, privileged roles that MAY do it, state 
     ("grant capability", "POST", "/admin/grants",
      {"user_id": "2", "capability": "finance.view", "reason": "forged"}, {"founder"},
      "SELECT COUNT(*) FROM user_grants"),
-    ("approve teaser", "POST", "/deals/teasers/1/approve", {}, {"founder"}, "SELECT status FROM teasers WHERE id = 1"),
+    ("approve teaser", "POST", "/deals/teasers/1/approve", {}, {"founder", "lead", "shaheen", "harika"}, "SELECT status FROM teasers WHERE id = 1"),
     # Milestone 7
-    ("approve message batch", "POST", f"/inbox/batches/{qa_batch}", {"action": "approve"}, {"founder", "lead"},
+    ("approve message batch", "POST", f"/inbox/batches/{qa_batch}", {"action": "approve"}, {"founder", "lead", "shaheen", "harika"},
      f"SELECT status FROM batches WHERE id = {qa_batch}"),
     ("send WhatsApp reply", "POST", "/inbox/1/send", {"mode": "text", "text": "forged"},
      {"founder", "lead", "shaheen", "harika"}, "SELECT COUNT(*) FROM messages"),
@@ -72,9 +73,9 @@ PROBES = [  # (label, method, url, data, privileged roles that MAY do it, state 
 ]
 if intro:
     PROBES.append(("approve introduction", "POST", f"/deals/introductions/{intro[0]}", {"decision": "approved"},
-                   {"founder"}, f"SELECT status FROM introductions WHERE id = {intro[0]}"))
+                   {"founder", "lead", "shaheen", "harika"}, f"SELECT status FROM introductions WHERE id = {intro[0]}"))
 GETS = [("open Admin Finance", "/admin/finance", {"founder", "accounts"}),
-        ("open audit log", "/admin/audit", {"founder"}),
+        ("open audit log", "/admin/audit", {"founder", "lead", "shaheen", "harika"}),
         ("open user admin", "/admin/users", {"founder"}),
         ("open WhatsApp inbox", "/inbox/", {"founder", "lead", "shaheen", "harika"}),
         ("open integrations", "/admin/integrations", {"founder"}),

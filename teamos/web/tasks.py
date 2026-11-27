@@ -3,7 +3,7 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 from ..db import get_db
 from ..domain import tasks as T
 from ..domain.errors import ValidationError
-from ..security import can, deny, login_required
+from ..security import can, deny, login_required, safe_next
 from ..timeutil import ist_day_bounds, now_iso, parse_local_input
 from .main import TASK_SELECT, _sort
 
@@ -92,7 +92,7 @@ def complete(task_id):
         flash(" ".join(e.errors.values()), "error")
         return redirect(url_for("tasks.detail", task_id=task_id))
     nxt = f.get("return_to") or ""
-    return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("main.my_day"))
+    return redirect(safe_next(nxt, url_for("main.my_day")))
 
 
 @bp.route("/<int:task_id>/reassign", methods=["POST"])

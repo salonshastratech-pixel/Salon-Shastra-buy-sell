@@ -207,7 +207,7 @@
 <form method="post" action="{{ url_for('buyers.save_section', opp_id=opp.id, section=sk) }}" class="card">{{ csrf() }}
   <div class="card-h"><h2>{{ slabel }}</h2><span class="small muted">{{ comp.sections[sk].answered }}/{{ comp.sections[sk].total }}</span></div>
   {% for f in BF.fields_in(sk) %}{% set p = prov.get(f.key) %}
-  <div class="intake-row">
+  <div class="intake-row" {% if f.show_if %}data-show-if="{{ f.show_attr }}"{% endif %}{% if f.also_if %} data-also-if="{{ f.also_attr }}"{% endif %}>
     <div class="lbl">{{ f.label }}{% if f.unit %} <span class="muted">({{ f.unit }})</span>{% endif %}{% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}</div>
     <div>
       {% if f.ftype == 'enum' %}<select name="{{ f.key }}" data-value-for="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if mandate[f.key] == v }}>{{ l }}</option>{% endfor %}</select>

@@ -182,3 +182,21 @@ def check_csrf() -> None:
     sent = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     if not sess or not sent or not secrets.compare_digest(sent, sess["csrf_token"]):
         abort(400, description="Security token missing or expired. Reload the page and try again.")
+
+
+def safe_next(target: str | None, default: str) -> str:
+    """Where to send someone after an action: only a page on THIS site. Rejects other sites written as //host or
+    with a backslash (browsers read it as a slash), full addresses to another host, and control characters."""
+    from urllib.parse import urlparse
+    t = (target or "").strip()
+    if not t:
+        return default
+    if t.startswith(("http://", "https://")):
+        u = urlparse(t)
+        if u.netloc != request.host:
+            return default
+        t = (u.path or "/") + (("?" + u.query) if u.query else "")
+    if (not t.startswith("/") or t.startswith("//") or "\\" in t or any(ord(ch) < 32 for ch in t)):
+        return default
+    return t
+

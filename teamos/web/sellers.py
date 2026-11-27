@@ -8,7 +8,7 @@ from ..domain.errors import ValidationError
 from ..domain import seller_fields as SF
 from ..domain.seller_fields import LISTING_CHECKLIST, SECTIONS
 from ..permissions import user_can
-from ..security import can, deny, login_required, require
+from ..security import can, deny, login_required, require, safe_next
 from ..timeutil import parse_local_input
 
 bp = Blueprint("sellers", __name__, url_prefix="/sellers")
@@ -167,8 +167,8 @@ def _run(opp_id, fn, ok_msg, tab=None):
     except ValidationError as e:
         flash(" ".join(e.errors.values()), "error")
     nxt = request.form.get("next") or ""
-    if nxt.startswith("/") and not nxt.startswith("//"):  # e.g. back to the pipeline board
-        return redirect(nxt)
+    if safe_next(nxt, ""):  # e.g. back to the pipeline board
+        return redirect(safe_next(nxt, ""))
     return _back(opp_id, tab)
 
 

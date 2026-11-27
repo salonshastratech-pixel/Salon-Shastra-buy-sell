@@ -51,6 +51,7 @@ class FieldDef:
     help: str = ""
     show_if: tuple | None = None    # ask only when: (key, value or (values…)), or a list of such — any one is enough
     unit: str = ""
+    also_if: tuple | None = None    # and ALSO this must hold: (key, value or (values…)); '' means "not answered yet"
 
     def conditions(self) -> list[tuple[str, frozenset]]:
         if not self.show_if:
@@ -62,6 +63,16 @@ class FieldDef:
     def show_attr(self) -> str:
         """For the page's script: 'sale_purpose=sell_entire|partnership;negotiable=yes' (any one condition)."""
         return ";".join(f"{k}={'|'.join(sorted(v))}" for k, v in self.conditions())
+
+    def also_conditions(self) -> list[tuple[str, frozenset]]:
+        if not self.also_if:
+            return []
+        k, v = self.also_if
+        return [(k, frozenset(v if isinstance(v, (tuple, list, set, frozenset)) else (v,)))]
+
+    @property
+    def also_attr(self) -> str:
+        return ";".join(f"{k}={'|'.join(sorted(v))}" for k, v in self.also_conditions())
 
 
 SECTIONS = [
@@ -84,6 +95,8 @@ F = FieldDef
 # What the owner wants (sale_purpose) decides whether sale questions are asked at all
 SELLING_PURPOSES = ("sell_entire", "partnership", "franchise_transfer")
 SELLING = ("sale_purpose", SELLING_PURPOSES)
+# trading figures (sales, bills, salaries…) are asked unless the salon is said to be not operating
+TRADING = ("operating_status", ("operating", ""))
 FIELDS: list[FieldDef] = [
     # Quick screen (§6.2) — city/locality/salon name live on the business record
     F("operating_status", "Operating status", "quick", "enum",
@@ -157,39 +170,39 @@ FIELDS: list[FieldDef] = [
     F("deposit_treatment", "How is the deposit handled in the sale?", "lease", "enum",
       [("included_in_asking", "Included in asking price"), ("buyer_pays_separately", "Buyer pays separately"),
        ("not_applicable", "No deposit")], matching=True, material=True,
-      help="Drives the all-in buyer cash requirement. Unknown keeps the total incomplete."),
+      help="Drives the all-in buyer cash requirement. Unknown keeps the total incomplete.", show_if=SELLING),
     F("lease_expiry", "Lease expiry date", "lease", "date", matching=True, material=True),
     F("lease_renewal", "Renewal possible?", "lease", "enum",
       [("yes", "Yes"), ("no", "No"), ("negotiable", "Negotiable")], matching=True),
     F("lease_transfer_status", "Lease transferability", "lease", "enum",
       [("unchecked", "Unchecked"), ("landlord_pending", "Landlord discussion pending"),
        ("confirmed_transferable", "Confirmed transferable"), ("not_permitted", "Not permitted")],
-      matching=True, material=True),
+      matching=True, material=True, show_if=SELLING),
     F("rent_escalation_pct", "Annual rent escalation", "lease", "pct", unit="%"),
     F("rent_arrears", "Rent arrears", "lease", "inr", matching=True),
 
-    F("avg_monthly_bills", "Average monthly bills / visits", "customers", "int", matching=True),
-    F("avg_ticket", "Average ticket size", "customers", "inr"),
-    F("repeat_customer_pct", "Repeat customers", "customers", "int", unit="%"),
+    F("avg_monthly_bills", "Average monthly bills / visits", "customers", "int", matching=True, show_if=TRADING),
+    F("avg_ticket", "Average ticket size", "customers", "inr", show_if=TRADING),
+    F("repeat_customer_pct", "Repeat customers", "customers", "int", unit="%", show_if=TRADING),
     F("prepaid_liabilities", "Outstanding memberships / prepaid services", "customers", "inr", matching=True),
     F("top_services", "Main services (what customers come for)", "customers", "text"),
     F("google_rating", "Google rating and number of reviews", "customers", "text", help="e.g. 4.5 (320 reviews)"),
     F("booking_software", "Billing / booking software used", "customers", "text"),
 
     F("avg_monthly_sales", "Average monthly sales (declared)", "operations", "inr", matching=True, material=True,
-      help="Summary claim. Month-by-month figures and evidence go in Financials."),
+      help="Summary claim. Month-by-month figures and evidence go in Financials.", show_if=TRADING),
     F("avg_monthly_expenses", "Average monthly operating expenses (declared)", "operations", "inr",
-      matching=True, material=True),
+      matching=True, material=True, show_if=TRADING),
     F("electricity_monthly", "Average monthly electricity bill", "operations", "inr"),
-    F("monthly_salaries", "Total staff salaries per month", "operations", "inr"),
+    F("monthly_salaries", "Total staff salaries per month", "operations", "inr", show_if=TRADING),
 
     F("staff_headcount", "Total staff", "staff", "int", matching=True),
     F("key_staff_dependence", "Dependence on key staff", "staff", "enum",
-      [("high", "High"), ("medium", "Medium"), ("low", "Low")], matching=True),
+      [("high", "High"), ("medium", "Medium"), ("low", "Low")], matching=True, show_if=TRADING),
     F("owner_involvement", "Owner involvement", "staff", "enum",
-      [("full_time", "Full-time"), ("part_time", "Part-time"), ("absentee", "Absentee")], matching=True),
+      [("full_time", "Full-time"), ("part_time", "Part-time"), ("absentee", "Absentee")], matching=True, show_if=TRADING),
     F("staff_continuity", "Staff expected to stay after sale?", "staff", "enum",
-      [("yes", "Yes"), ("partial", "Partially"), ("no", "No")], matching=True),
+      [("yes", "Yes"), ("partial", "Partially"), ("no", "No")], matching=True, show_if=SELLING, also_if=TRADING),
 
     F("trade_licence", "Trade licence", "licences", "enum", LICENCE),
     F("gst_registered", "GST registration", "licences", "enum", LICENCE),
@@ -247,26 +260,31 @@ def option_label(key: str, value) -> str:
 def is_applicable(fd: FieldDef, rec: dict, defs: dict | None = None) -> bool:
     """Should this question be asked for this record? Any one of its conditions is enough, and the question it
     depends on must itself be asked (e.g. 'lowest price' needs 'negotiable = yes', which needs a sale)."""
-    conds = fd.conditions()
-    if not conds:
-        return True
     defs = BY_KEY if defs is None else defs
-    for k, vals in conds:
+
+    def holds(k, vals):
         parent = defs.get(k)
-        if rec.get(k) in vals and (parent is None or is_applicable(parent, rec, defs)):
-            return True
-    return False
+        return (rec.get(k) or "") in vals and (parent is None or is_applicable(parent, rec, defs))
+    if any(not holds(k, v) for k, v in fd.also_conditions()):
+        return False
+    conds = fd.conditions()
+    return not conds or any(holds(k, v) for k, v in conds)
 
 
-def drop_not_applicable(values: dict, current: dict, defs: dict | None = None, gate_keys=("sale_purpose",)) -> dict:
-    """Answers for questions that do not apply are not saved — but only once the deciding answer is actually given
-    (e.g. the owner said 'seeking help'). Nothing already stored is erased, and imports with the deciding answer
-    still unknown keep everything."""
+def drop_not_applicable(values: dict, current: dict, defs: dict | None = None, gate_keys=None) -> dict:
+    """Answers for questions that do not apply are not saved — but only when what decides it has actually been
+    answered (e.g. the owner said 'seeking help'). If the deciding answer is still blank, the value is kept. Nothing
+    already stored is erased."""
     defs = BY_KEY if defs is None else defs
     merged = {**current, **{k: v[0] if isinstance(v, tuple) else v for k, v in values.items()}}
-    if not any(merged.get(g) not in (None, "") for g in gate_keys):
-        return values
-    return {k: v for k, v in values.items() if k not in defs or is_applicable(defs[k], merged, defs)}
+    out = {}
+    for k, v in values.items():
+        fd = defs.get(k)
+        deciders = [c for c, _v in (fd.conditions() + fd.also_conditions())] if fd else []
+        if fd and any(merged.get(c) not in (None, "") for c in deciders) and not is_applicable(fd, merged, defs):
+            continue
+        out[k] = v
+    return out
 
 
 LISTING_CHECKLIST = [

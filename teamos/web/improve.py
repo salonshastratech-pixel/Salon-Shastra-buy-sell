@@ -7,7 +7,7 @@ from ..domain import progress as P
 from ..domain import summaries as S
 from ..domain.errors import PermissionDenied, ValidationError
 from ..permissions import user_can
-from ..security import login_required, require
+from ..security import login_required, require, safe_next
 
 bp = Blueprint("improve", __name__)
 
@@ -56,7 +56,7 @@ def set_away():
               else "Marked as available again.", "ok")
     except (ValidationError, PermissionDenied) as e:
         flash(_err(e) if isinstance(e, ValidationError) else str(e), "error")
-    return redirect(request.form.get("next") or url_for("main.team_board") + "#workload")
+    return redirect(safe_next(request.form.get("next"), url_for("main.team_board") + "#workload"))
 
 
 @bp.route("/team/hand-over", methods=["POST"])

@@ -7,7 +7,7 @@ from ..domain import forms as F
 from ..domain import matching as M
 from ..domain.errors import ValidationError
 from ..permissions import user_can
-from ..security import login_required, require
+from ..security import login_required, require, safe_next
 from ..timeutil import parse_local_input
 from .sellers import _active_users
 
@@ -66,7 +66,7 @@ def recompute():
                    seller_id=int(f["seller"]) if f.get("seller", "").isdigit() else None,
                    force=f.get("force") == "1", actor_id=g.user["id"])
     flash(f"Matches refreshed: {st['evaluated']} evaluated ({st['new']} new), {st['unchanged']} unchanged.", "ok")
-    return redirect(request.referrer or url_for("matches.desk"))
+    return redirect(safe_next(request.referrer, url_for("matches.desk")))
 
 
 @bp.route("/<int:cid>")
@@ -130,7 +130,7 @@ def stage(cid):
     except ValidationError as e:
         flash(_msg(e), "error")
     back = request.form.get("return_to") or ""
-    return redirect(back if back.startswith("/") and not back.startswith("//") else url_for("matches.detail", cid=cid))
+    return redirect(safe_next(back, url_for("matches.detail", cid=cid)))
 
 
 @bp.route("/<int:cid>/tasks", methods=["POST"])

@@ -271,7 +271,9 @@ def personal(token):
                "accepted": "Thank you — your answers have been reviewed.",
                "more_info_required": "Thank you. Our team will contact you about a few more details.",
                "expired": "This link has expired. Please ask your Salon Shastra contact for a new one.",
-               "revoked": "This link is no longer active. Please ask your Salon Shastra contact for a new one."}
+               "revoked": "This link has been replaced by a newer one. Please open the latest link Salon Shastra sent "
+                          "you on WhatsApp — your answers so far are kept there. If you can't find it, ask your "
+                          "Salon Shastra contact to send it again."}
         return _page("public/message.html", 410 if inv["status"] in ("expired", "revoked") else 200,
                      title="Form closed" if inv["status"] in ("expired", "revoked") else "Thank you",
                      message=msg.get(inv["status"], "This link is no longer active."))

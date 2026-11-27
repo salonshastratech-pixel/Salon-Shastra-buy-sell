@@ -82,3 +82,47 @@ def test_customer_form_and_new_lead_form_show_price_only_for_sellers(db, login):
     assert 'data-show-if="sale_purpose=franchise_transfer|partnership|sell_entire"' in page
     js = c.get("/static/app.js").data.decode()
     assert "split(';')" in js and "split('|')" in js
+
+
+def test_more_rules_closed_salons_and_cash():
+    sell_open = {"sale_purpose": "sell_entire", "operating_status": "operating"}
+    sell_closed = {"sale_purpose": "sell_entire", "operating_status": "non_operating"}
+    help_open = {"sale_purpose": "seek_help", "operating_status": "operating"}
+    sales = SF.BY_KEY["avg_monthly_sales"]
+    assert SF.is_applicable(sales, sell_open) and SF.is_applicable(sales, help_open)
+    assert SF.is_applicable(sales, {"sale_purpose": "sell_entire"})            # status not given yet: still asked
+    assert not SF.is_applicable(sales, sell_closed)                            # a closed salon has no monthly sales
+    stay = SF.BY_KEY["staff_continuity"]                                       # needs a sale AND a running salon
+    assert SF.is_applicable(stay, sell_open) and not SF.is_applicable(stay, sell_closed)
+    assert not SF.is_applicable(stay, help_open)
+    for k in ("deposit_treatment", "lease_transfer_status"):
+        assert SF.is_applicable(SF.BY_KEY[k], sell_open) and not SF.is_applicable(SF.BY_KEY[k], help_open)
+    assert SF.is_applicable(SF.BY_KEY["monthly_rent"], help_open)               # rent matters for help too
+    amt = BF.BY_KEY["cash_ready_amount"]
+    assert SF.is_applicable(amt, {"cash_ready": "now"}, BF.BY_KEY)
+    assert not SF.is_applicable(amt, {"cash_ready": "planned"}, BF.BY_KEY)
+
+
+def test_buyer_profile_page_carries_the_rules(db, login):
+    admin = user(db, "admin@t.test")
+    bid = B.create_lead(db, admin, {"full_name": "Sita", "phone": "9300700021", "city": "Hyderabad",
+                                    "source": "meta_lead", "consent_contact": "1",
+                                    "owner_id": str(admin["id"])})["opportunity_id"]
+    page = login("admin@t.test").get(f"/buyers/{bid}?tab=requirements").data.decode()
+    assert 'data-show-if="need_type=new_salon"' in page and 'data-show-if="cash_ready=now|within_30d"' in page
+    sid = _owner(db, "sell_entire", phone="9300700022")
+    page = login("admin@t.test").get(f"/sellers/{sid}?tab=intake").data.decode()
+    assert 'data-show-if="operating_status=|operating"' in page                       # trading figures
+    assert 'data-also-if="operating_status=|operating"' in page                       # staff staying after sale
+
+
+def test_a_value_is_kept_while_its_deciding_question_is_blank(db):
+    admin = user(db, "admin@t.test")
+    bid = B.create_lead(db, admin, {"full_name": "Sita", "phone": "9300700031", "city": "Hyderabad",
+                                    "source": "meta_lead", "consent_contact": "1", "owner_id": str(admin["id"]),
+                                    "need_type": "acquire_operating"})["opportunity_id"]
+    opp = B.load(db, bid)
+    B.update_fields(db, admin, opp, {"cash_ready_amount": "15L"}, "funding")       # 'when available' not answered
+    assert B.load_mandate(db, opp["mandate_id"])["cash_ready_amount"] == 15_00_000
+    kept = SF.drop_not_applicable({"cash_ready_amount": (1, None)}, {"cash_ready": "planned"}, BF.BY_KEY)
+    assert kept == {}                                                                 # answered 'planned': not asked

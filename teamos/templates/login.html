@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sign in · Salon Shastra TeamOS</title>{% if brand_fonts %}<link rel="stylesheet" href="{{ brand_fonts }}">{% endif %}
-<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">{% include "_icons.html" %}
+</head>
 <body><div class="login-wrap"><form class="login" method="post">
   <div class="wordmark"><img src="{{ brand_logo }}" alt="Salon Shastra"><small>Business Exchange · TeamOS</small></div>
   {% if error %}<div class="flash error">{{ error }}</div>{% endif %}

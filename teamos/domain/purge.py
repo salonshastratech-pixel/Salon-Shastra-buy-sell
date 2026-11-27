@@ -70,6 +70,9 @@ def _delete(db, table: str, ids: list, kids: dict, cache: dict, seen: set, count
             _delete(db, child, rows, kids, cache, seen, counts)
         else:
             db.execute(f"DELETE FROM {child} WHERE {col} IN ({marks})", ids)
+    if table == "documents":   # the encrypted file itself goes too
+        db.execute(f"DELETE FROM document_blobs WHERE stored_name IN (SELECT stored_name FROM documents "
+                   f"WHERE id IN ({marks}))", ids)
     db.execute(f"DELETE FROM {table} WHERE id IN ({marks})", ids)
     counts[table] = counts.get(table, 0) + len(ids)
 

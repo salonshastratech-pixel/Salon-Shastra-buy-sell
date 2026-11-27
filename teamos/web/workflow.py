@@ -173,12 +173,14 @@ def install():
 def manifest():
     body = {
         "name": "Salon Shastra TeamOS", "short_name": "TeamOS", "start_url": "/", "scope": "/",
-        "display": "standalone", "background_color": "#faf8f6", "theme_color": "#c04000",
+        "display": "standalone", "background_color": "#fbf7f1", "theme_color": "#c04000",
         "description": "Salon Shastra team workspace: sellers, buyers, matches and deals.",
-        "icons": [{"src": url_for("static", filename="icons/icon-192.png"), "sizes": "192x192", "type": "image/png"},
-                  {"src": url_for("static", filename="icons/icon-512.png"), "sizes": "512x512", "type": "image/png"},
+        "icons": [{"src": url_for("static", filename="icons/icon-192.png"), "sizes": "192x192", "type": "image/png",
+                   "purpose": "any"},
                   {"src": url_for("static", filename="icons/icon-512.png"), "sizes": "512x512", "type": "image/png",
-                   "purpose": "maskable"}],
+                   "purpose": "any"},
+                  {"src": url_for("static", filename="icons/maskable-512.png"), "sizes": "512x512",
+                   "type": "image/png", "purpose": "maskable"}],
     }
     import json
     return Response(json.dumps(body), mimetype="application/manifest+json")
@@ -186,8 +188,8 @@ def manifest():
 
 SW = """// TeamOS phone app. Privacy: only the app's look (styles, script, icons) and an offline notice are kept on the
 // phone. Pages with customer information are never stored — they always come fresh from the server.
-const CACHE = 'teamos-shell-v2';
-const SHELL = ['/offline', '/static/app.css', '/static/app.js', '/static/icons/icon-192.png'];
+const CACHE = 'teamos-shell-v3';
+const SHELL = ['/offline', '/static/app.css', '/static/app.js', '/static/icons/icon-192.png', '/static/icons/favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
@@ -229,6 +231,15 @@ def service_worker():
     resp = Response(SW, mimetype="application/javascript")
     resp.headers["Cache-Control"] = "no-cache"
     resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+
+@pwa_bp.route("/favicon.ico")
+def favicon():
+    """Browsers ask for /favicon.ico on their own: the Salon Shastra hat."""
+    from flask import current_app, send_from_directory
+    resp = send_from_directory(current_app.static_folder, "icons/favicon.ico", mimetype="image/x-icon")
+    resp.headers["Cache-Control"] = "public, max-age=604800"
     return resp
 
 

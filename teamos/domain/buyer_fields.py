@@ -93,7 +93,7 @@ FIELDS: list[BuyerFieldDef] = [
     B("cash_ready", "When is the money available?", "funding", "enum",
       [("now", "Ready now"), ("within_30d", "Within 30 days"), ("planned", "Planned / not yet arranged")],
       matching=True, material=True),
-    B("cash_ready_amount", "Amount ready now", "funding", "inr", matching=True),
+    B("cash_ready_amount", "Amount ready now", "funding", "inr", matching=True, show_if=("cash_ready", ("now", "within_30d"))),
 
     B("preferred_city", "Preferred city", "geography", "text", quick=True, matching=True, material=True,
       help="Ranked localities and exclusions are captured below."),
