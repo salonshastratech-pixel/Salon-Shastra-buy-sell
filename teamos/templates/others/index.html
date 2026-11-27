@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ {'job': 'Job inquiries', 'academy': 'Academy inquiries'}.get(f.get('kind'), 'Job & academy inquiries') }}{% endblock %}
+{% block content %}
+{% set kind = f.get('kind') if f.get('kind') in Q.KINDS else '' %}
+<div class="ph"><div><h1>{{ {'job': 'Job inquiries', 'academy': 'Academy inquiries'}.get(kind, 'Job & academy inquiries') }}</h1>
+  <div class="sub">People who call for a job at a salon, or for training at the academy · {{ total }} shown</div></div>
+  <div class="inline"><a class="btn primary" href="{{ url_for('others.new', kind='academy') }}">+ Academy inquiry</a>
+    <a class="btn primary" href="{{ url_for('others.new', kind='job') }}">+ Job inquiry</a></div></div>
+
+<nav class="chip-tabs" aria-label="Which inquiries">
+  <a href="{{ url_for('others.index') }}" class="{{ 'on' if not kind }}">All <b>{{ counts.job + counts.academy }}</b></a>
+  <a href="{{ url_for('others.index', kind='academy') }}" class="{{ 'on' if kind == 'academy' }}">🎓 Academy <b>{{ counts.academy }}</b></a>
+  <a href="{{ url_for('others.index', kind='job') }}" class="{{ 'on' if kind == 'job' }}">💼 Jobs <b>{{ counts.job }}</b></a>
+</nav>
+
+<form class="card filters" method="get">
+  {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+  <input type="search" name="q" value="{{ f.get('q', '') }}" placeholder="Name, mobile, area, hometown, course or role…" aria-label="Search">
+  {% for arg, key, label, opts in (Q.FILTERS[kind] if kind else []) %}
+  <select name="{{ arg }}" aria-label="{{ label }}"><option value="">{{ label }}</option>{% for o in opts %}<option value="{{ o }}" {{ 'selected' if f.get(arg) == o }}>{{ o }}</option>{% endfor %}</select>
+  {% endfor %}
+  <select name="temp" aria-label="How keen"><option value="">Hot / warm / cold</option>{% for v, l in Q.TEMPS %}<option value="{{ v }}" {{ 'selected' if f.get('temp') == v }}>{{ l }}</option>{% endfor %}</select>
+  <select name="status" aria-label="Status">
+    <option value="open" {{ 'selected' if (f.get('status') or 'open') == 'open' }}>Open (to follow up)</option>
+    <option value="all" {{ 'selected' if f.get('status') == 'all' }}>All, including closed</option>
+    {% for v, l in Q.STATUSES[kind or 'job'] %}<option value="{{ v }}" {{ 'selected' if f.get('status') == v }}>{{ l }}</option>{% endfor %}
+  </select>
+  <select name="owner" aria-label="Owner"><option value="">Anyone</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if f.get('owner') == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select>
+  <button class="btn primary">Filter</button>
+  {% if f.get('q') or f.get('owner') or f.get('temp') or f.get('role') or f.get('exp') or f.get('course') or f.get('fees') or f.get('joins') or (f.get('status') and f.get('status') != 'open') %}<a class="btn link small" href="{{ url_for('others.index', kind=kind or None) }}">Clear all</a>{% endif %}
+</form>
+
+<div class="card flush"><div class="table-wrap"><table class="lead-table">
+<tr><th>Inquiry</th><th>Person</th><th>Wants</th><th>Status</th><th>Owner</th><th>Follow-up</th></tr>
+{% for r in rows %}{% set lab = Q.SUMMARY_LABEL[r.kind] %}
+<tr>
+  <td class="nowrap"><a href="{{ url_for('others.detail', iid=r.id) }}"><strong>{{ r.ref_code }}</strong></a>
+    <div><span class="badge {{ 'info' if r.kind == 'academy' else 'warn' }} small">{{ '🎓 Academy' if r.kind == 'academy' else '💼 Job' }}</span>
+      {% if r.temperature %}<span class="badge {{ 'bad' if r.temperature == 'hot' else 'warn' if r.temperature == 'warm' else 'grey' }} small">{{ dict(Q.TEMPS)[r.temperature] }}</span>{% endif %}</div>
+    <div class="small muted">{{ r.created_at|rel }}</div></td>
+  <td><a href="{{ url_for('others.detail', iid=r.id) }}"><strong>{{ r.full_name|nice }}</strong></a>
+    {% if r.phone_normalized %}<div class="small muted mono">{{ r.phone_normalized }} <span class="cbtns"><a class="cbtn call" href="{{ r.phone_normalized|tel }}" aria-label="Call">📞</a><a class="cbtn wa" href="https://wa.me/{{ (r.alt_phone or r.phone_normalized)|replace('+', '') }}" target="_blank" rel="noopener" aria-label="WhatsApp">WA</a></span></div>{% endif %}
+    <div class="small muted">{% if r.locality or r.city %}Lives in {{ (r.locality or r.city)|nice }}{% endif %}{% if r.hometown %} · from {{ r.hometown|nice }}{% endif %}</div></td>
+  <td data-label="Wants"><div class="small"><strong>{{ r.interest or '—' }}</strong></div>
+    {% if r.experience %}<div class="small muted">{{ lab[1] }}: {{ r.experience }}</div>{% endif %}
+    {% if r.budget_or_salary %}<div class="small muted">{{ lab[2] }}: {{ r.budget_or_salary }}</div>{% endif %}
+    {% if r.join_when %}<div class="small muted">{{ lab[3] }}: {{ r.join_when }}</div>{% endif %}</td>
+  <td data-label="Status"><span class="badge {{ 'ok' if r.status in ('placed', 'enrolled') else 'grey' if r.status in ('closed', 'not_interested', 'not_suitable') else 'info' }} small">{{ Q.status_label(r.kind, r.status) }}</span></td>
+  <td class="nowrap" data-label="Owner">{{ r.owner_name|first_name or '—' }}</td>
+  <td data-label="Follow-up">{% if r.next_due %}<div class="small {{ 'unknown' if r.next_due < now_iso() else 'muted' }}">{{ r.next_due|ist('%a %d %b, %I:%M %p') }}</div>{% else %}<span class="small muted">—</span>{% endif %}</td>
+</tr>
+{% else %}<tr><td colspan="6" class="empty">No inquiries here yet. Use “+ Academy inquiry” or “+ Job inquiry” while you are on the call.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

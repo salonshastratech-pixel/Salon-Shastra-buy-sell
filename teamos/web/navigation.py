@@ -19,11 +19,13 @@ MODULES = [
         ("My Day", "main.my_day", {}, None),
         ("Founder desk", "team.founder_desk", {}, "users.manage"),
         ("Tasks", "tasks.index", {}, None),
+        ("My screenshots", "work.mine", {}, "crm.log_activity"),
         ("Calendar", "channels.calendar", {}, None),
         ("My availability", "team.mine", {}, None),
     ]},
     {"key": "team", "label": "Team", "icon": "users", "pages": [
         ("Workload", "main.team_board", {}, "users.manage"),       # the Team module is for admins only
+        ("Screenshots", "work.team", {}, "users.manage"),
         ("Who's working", "team.week", {}, "users.manage"),
         ("Activity", "team.activity", {}, "users.manage"),
         ("Work log", "team.worklog", {}, "users.manage"),
@@ -41,6 +43,13 @@ MODULES = [
         ("Investor pipeline", "investor.index", {}, "crm.view"),
         ("Needs review", "buyers.index", {"queue": "criteria"}, "crm.view"),
         ("+ New buyer", "buyers.new", {}, "crm.create"),
+    ]},
+    {"key": "others", "label": "Others", "icon": "inbox", "pages": [
+        ("All inquiries", "others.index", {}, "crm.view"),
+        ("Academy inquiries", "others.index", {"kind": "academy"}, "crm.view"),
+        ("Job inquiries", "others.index", {"kind": "job"}, "crm.view"),
+        ("+ Academy inquiry", "others.new", {"kind": "academy"}, "crm.create"),
+        ("+ Job inquiry", "others.new", {"kind": "job"}, "crm.create"),
     ]},
     {"key": "deals", "label": "Matching & deals", "icon": "link", "pages": [
         ("Match Desk", "matches.desk", {}, "crm.view"),
@@ -85,7 +94,8 @@ ENDPOINT_MODULE = {
     "main.team_board": "team", "team.": "team", "improve.hand_over": "team",
     "sellers.": "owners", "pilot.": "owners", "workflow.progress_preview": "owners",
     "buyers.": "buyers", "investor.": "buyers",
-    "matches.": "deals", "deals.": "deals",
+    "matches.": "deals", "deals.": "deals", "others.": "others",
+    "work.mine": "today", "work.status": "today", "work.team": "team",
     "inbox.": "talk", "forms.": "talk",
     "reports.": "reports", "workflow.sources": "reports", "improve.learning": "reports",
     "admin.": "admin", "imports.": "admin", "channels.lead_ads": "admin", "workflow.automations": "admin",
@@ -93,6 +103,7 @@ ENDPOINT_MODULE = {
 }
 # detail pages: where "up" goes when there is no earlier page to return to
 PARENT = {
+    "others.detail": "others.index", "others.new": "others.index",
     "sellers.detail": "sellers.index", "sellers.new": "sellers.index", "buyers.detail": "buyers.index",
     "buyers.new": "buyers.index", "deals.detail": "deals.index", "matches.detail": "matches.desk",
     "tasks.detail": "tasks.index", "inbox.thread": "inbox.index", "inbox.batch": "inbox.batches",
@@ -146,7 +157,7 @@ def context(db) -> dict:
             except Exception:  # noqa: BLE001 — a page that doesn't exist in this build is simply not shown
                 continue
             on = endpoint == ep and all(request.args.get(k) == str(v) for k, v in args.items()) and (
-                args or not any(request.args.get(k) for k in ("queue",)))
+                args or not any(request.args.get(k) for k in ("queue", "kind")))
             sub.append({"label": label, "href": href, "on": on})
     home = sub[0]["href"] if sub else url_for("main.my_day")
     is_home = any(s["on"] for s in sub)

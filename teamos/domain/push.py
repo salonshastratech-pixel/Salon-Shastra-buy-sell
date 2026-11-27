@@ -21,10 +21,13 @@ from ..timeutil import now_iso
 log = logging.getLogger("teamos.push")
 CATEGORIES = [("new_lead", "New leads given to me"), ("hot", "Hot leads"),
               ("followup", "Overdue follow-ups and reminders"), ("vikas", "Calls and meetings with Vikas"),
-              ("messages", "WhatsApp replies"), ("team", "Mentions, approvals and forms")]
+              ("messages", "WhatsApp replies"), ("team", "Mentions, approvals and forms"),
+              ("reminders", "Hourly status check and the evening screenshot reminder"),
+              ("team_work", "Team screenshots uploaded (admin)")]
 KIND_CATEGORY = {"assignment": "new_lead", "task_assigned": "new_lead", "sheet_new_rows": "new_lead",
                  "hot_lead": "hot", "overdue": "followup", "stuck": "followup", "stuck_team": "followup",
-                 "escalation": "followup", "due_soon": "followup", "vikas_booking": "vikas", "message": "messages"}
+                 "escalation": "followup", "due_soon": "followup", "vikas_booking": "vikas", "message": "messages",
+                 "status_check": "reminders", "proof_reminder": "reminders", "work_proof": "team_work"}
 CALM_SECONDS = 60
 SUBJECT = "mailto:support@salonshastra.com"
 
@@ -204,6 +207,7 @@ def latest(db, user_id: int) -> dict:
     top = rows[0]
     n = len(rows)
     head = {"hot": "🔥 Hot lead", "new_lead": "New lead", "followup": "Follow-up due", "vikas": "Vikas",
-            "messages": "WhatsApp"}.get(KIND_CATEGORY.get(top["kind"], "team"), "TeamOS")
+            "messages": "WhatsApp", "reminders": "Reminder", "team_work": "Team screenshots"}.get(
+        KIND_CATEGORY.get(top["kind"], "team"), "TeamOS")
     return {"title": head if n == 1 else f"{head} · {n} updates waiting", "body": top["title"][:180],
             "url": top["link"] or "/", "count": n, "tag": "teamos"}

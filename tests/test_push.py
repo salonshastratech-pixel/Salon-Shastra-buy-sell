@@ -82,7 +82,7 @@ def test_subscribe_then_alerts_follow_each_persons_choices(app, db, login, sent)
     assert "Alerts on my phone" in page and "Android · Chrome" in page and 'value="hot"' in page
     c.post("/me/notifications", {"on": ["new_lead", "followup"]})
     assert PU.prefs(db, me["id"]) == {"new_lead": True, "hot": False, "followup": True, "vikas": False,
-                                      "messages": False, "team": False}
+                                      "messages": False, "team": False, "reminders": False, "team_work": False}
     db.execute("UPDATE push_subscriptions SET last_push_at = NULL")
     with app.app_context():
         T.notify(db, me["id"], "hot_lead", "Hot lead: Ravi", "/sellers/3")

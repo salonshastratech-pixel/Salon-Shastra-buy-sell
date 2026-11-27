@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Team's day · screenshots{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Team's day — {{ label }}</h1>
+  <div class="sub">Screenshots of calls and WhatsApp chats each person uploaded, next to the calls they logged in TeamOS.</div></div>
+  <div class="inline"><a class="btn" href="{{ url_for('work.team', day=prev) }}">← Previous day</a>{% if next %}<a class="btn" href="{{ url_for('work.team', day=next) }}">Next day →</a>{% endif %}</div></div>
+
+{% for r in rows %}
+<div class="card" id="u{{ r.user.id }}">
+  <div class="card-h"><h2>{{ r.user.full_name }}</h2>
+    <div class="inline">
+      {% if r.away %}<span class="badge grey">On leave</span>
+      {% elif not r.shots %}<span class="badge bad">No screenshots yet</span>{% endif %}
+      {% for k, l in W.KINDS %}{% if r.counts[k] %}<span class="badge ok">{{ l }}: {{ r.counts[k] }}</span>{% endif %}{% endfor %}
+      <span class="badge info">{{ r.calls_logged }} call{{ 's' if r.calls_logged != 1 }} logged in TeamOS</span>
+    </div></div>
+  {% if r.shots %}<div class="shots">{% for p in r.shots %}
+    <figure class="shot"><a href="{{ url_for('work.img', pid=p.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('work.img', pid=p.id) }}" alt="{{ W.KIND_LABELS[p.kind] }} screenshot by {{ r.user.full_name }}" loading="lazy"></a>
+      <figcaption class="small">{{ W.KIND_LABELS[p.kind] }} · {{ p.created_at|ist('%I:%M %p') }}{% if p.note %}<br><span class="muted">{{ p.note }}</span>{% endif %}</figcaption></figure>
+  {% endfor %}</div>{% endif %}
+</div>
+{% else %}<div class="card empty">No team members yet.</div>{% endfor %}
+{% endblock %}

@@ -977,3 +977,28 @@ ul.plain.checks label { display: flex; gap: 10px; align-items: center; cursor: p
 .copy-wrap { display: inline-flex; margin: 6px 0 0 6px; vertical-align: middle; }
 .link-box + .copy-wrap, textarea.msg-preview + .copy-wrap { display: flex; margin: 8px 0 0; }
 .copy-btn.done { border-color: #2f855a; color: #2f855a; }
+
+/* Others: job & academy inquiries */
+.chip-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.chip-tabs a { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); text-decoration: none; color: inherit; font-weight: 600; }
+.chip-tabs a b { margin-left: 4px; font-weight: 700; color: var(--muted); }
+.chip-tabs a.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink, #fff); }
+.chip-tabs a.on b { color: inherit; }
+.q-section { margin: 18px 0 6px; font-size: .95rem; color: var(--brand, #c04000); text-transform: none; }
+.q-section:first-of-type { margin-top: 4px; }
+.inquiry-form .chips .chip span { padding: 6px 12px; font-size: .9em; }
+details.edit-inq > summary { cursor: pointer; list-style: none; }
+details.edit-inq > summary::-webkit-details-marker { display: none; }
+details.edit-inq[open] > summary { margin-bottom: 10px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Daily work screenshots */
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.shot { margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.shot img { display: block; width: 100%; height: 220px; object-fit: cover; object-position: top; background: #f3efe9; }
+.shot figcaption { padding: 6px 8px; }
+.inline-form { display: inline; }
+.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.status-big { display: flex; gap: 10px; align-items: center; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.status-big:hover, .status-big:focus-visible { border-color: var(--brand, #c04000); }
+@media (max-width: 960px) { .inquiry-form > .stack { order: -1; } }   /* on phones: name & mobile first, then the questions */

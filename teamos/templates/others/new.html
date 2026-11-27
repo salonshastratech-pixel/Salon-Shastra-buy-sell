@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}{% from "others/_fields.html" import contact_fields, questions %}
+{% block title %}New {{ Q.KINDS[kind]|lower }}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{{ '🎓 New academy inquiry' if kind == 'academy' else '💼 New job inquiry' }}</h1>
+  <div class="sub">{{ 'Counsellor intake — ask these while they are on the call.' if kind == 'academy' else 'HR screening — ask these while they are on the call.' }} Only name and mobile are required; everything else can be added later.</div></div>
+  <a class="btn link" href="{{ url_for('others.new', kind='job' if kind == 'academy' else 'academy') }}">Switch to {{ 'job' if kind == 'academy' else 'academy' }} inquiry</a></div>
+{% if errors %}<div class="flash error">{{ errors.values()|join(' ') }}</div>{% endif %}
+<form method="post" class="split inquiry-form">{{ csrf() }}<input type="hidden" name="kind" value="{{ kind }}">
+  <div class="card">
+    <h2>{{ 'What they want to learn' if kind == 'academy' else 'Screening' }}</h2>
+    {{ questions(Q, kind, answers) }}
+    <h3 class="q-section">Remarks</h3>
+    <div class="field"><label for="n-notes" class="sr-only">Remarks</label><textarea id="n-notes" name="notes" rows="4" placeholder="{{ 'Anything else they said — e.g. asked about fees and certificate, wants to open a studio in her town' if kind == 'academy' else 'Anything else — e.g. strong at bridal makeup, prefers a unisex salon near the metro, can bring two colleagues' }}">{{ form.notes or '' }}</textarea></div>
+    <h3 class="q-section">How keen &amp; next step</h3>
+      <div class="field"><label>How keen are they?</label><div class="chips" role="radiogroup">{% for v, l in Q.TEMPS %}<label class="chip"><input type="radio" name="temperature" value="{{ v }}" {{ 'checked' if form.temperature == v }}><span>{{ l }}</span></label>{% endfor %}</div></div>
+      <div class="form-grid">
+        <div class="field"><label for="n-due">Call back on (optional)</label><input id="n-due" type="datetime-local" name="follow_up_due" value="{{ form.follow_up_due or '' }}"></div>
+        <div class="field"><label for="n-rem">Reminder text</label><input id="n-rem" name="follow_up_title" value="{{ form.follow_up_title or '' }}" placeholder="Call back (default)"></div>
+      </div>
+      {% if errors.phone and 'already has' in errors.phone %}<label class="check"><input type="checkbox" name="allow_duplicate" value="1"> Save as a new inquiry anyway</label>{% endif %}
+      <div class="inline"><button class="btn primary">Save</button><button class="btn" name="another" value="1">Save and add another</button>
+        <a class="btn link" href="{{ url_for('others.index', kind=kind) }}">Cancel</a></div>
+  </div>
+  <div class="stack">
+    <div class="card"><h2>Who called</h2>{{ contact_fields(Q, form, errors, users, current_user) }}</div>
+  </div>
+</form>
+{% endblock %}

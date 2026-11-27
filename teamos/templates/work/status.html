@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Update my status{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>What are you doing now?</h1>
+  <div class="sub">Right now: <strong>{{ state.label }}</strong>{% if state.detail %} · {{ state.detail }}{% endif %}. One tap updates it — the team and admin see it.</div></div></div>
+<form method="post" action="{{ url_for('team.status') }}" class="card status-now">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ url_for('main.my_day') }}">
+  <div class="field"><label for="s-note">Note (optional)</label><input id="s-note" name="note" maxlength="120" placeholder="e.g. calling the new Meta leads / at Kondapur salon till 4"></div>
+  <div class="status-grid">{% for v, l in AV.STATUSES %}<button class="status-big" name="status" value="{{ v }}"><i class="dot tone-{{ 'ok' if v == 'available' else 'grey' if v == 'offline' else 'warn' }}"></i>{{ l }}</button>{% endfor %}</div>
+</form>
+{% endblock %}

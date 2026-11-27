@@ -148,7 +148,11 @@ def sla_sweep(db, payload) -> str:
                  link(t))
         db.insert("task_events", {"task_id": t["id"], "event": "due_soon_alerted", "at": now})
         reminded += 1
-    return f"{alerted} overdue alerts, {escalated} escalations, {reminded} reminders"
+    from .domain import work_proof
+    nudges = work_proof.send_reminders(db)          # hourly status check + 7:30 PM screenshot reminder
+    removed = work_proof.cleanup(db)                 # screenshots older than the retention period
+    return (f"{alerted} overdue alerts, {escalated} escalations, {reminded} reminders, {nudges['status']} status "
+            f"checks, {nudges['evening']} screenshot reminders, {removed} old screenshots removed")
 
 
 @handler("form_chase")

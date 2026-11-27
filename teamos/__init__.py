@@ -173,11 +173,11 @@ def create_app(overrides: dict | None = None) -> Flask:
         return ctx
 
     from .web import (admin, auth, buyers, channels, deals, forms, improve, imports, inbox, main, matches, pilot, team, investor, ops,
-                      public, records, sellers, tasks, workflow)
+                      others, proofs, public, records, sellers, tasks, workflow)
     for bp in (auth.bp, main.bp, sellers.bp, buyers.bp, tasks.bp, admin.bp, imports.bp, forms.bp, public.bp,
                matches.bp, deals.bp, deals.teaser_public, inbox.bp, inbox.webhook, inbox.reports_bp, improve.bp,
                channels.bp, channels.feed_bp, workflow.bp, workflow.public_bp, workflow.pwa_bp,
-               pilot.bp, pilot.public_bp, team.bp, investor.bp, ops.bp, records.bp):
+               pilot.bp, pilot.public_bp, team.bp, investor.bp, ops.bp, records.bp, others.bp, proofs.bp):
         app.register_blueprint(bp)
     return app
 

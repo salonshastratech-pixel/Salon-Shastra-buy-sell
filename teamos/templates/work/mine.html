@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% block title %}My day's screenshots{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>Today's work screenshots</h1>
+  <div class="sub">Upload screenshots of your call log and your WhatsApp chats for today. The admin sees them every day. Please upload by {{ W.EVENING_REMINDER }} PM.</div></div>
+  {% if can('users.manage') %}<a class="btn" href="{{ url_for('work.team') }}">See the team's day →</a>{% endif %}</div>
+
+<div class="split">
+<div class="stack">
+  <form method="post" enctype="multipart/form-data" class="card upload-card">{{ csrf() }}
+    <h2>Upload screenshots</h2>
+    <div class="field"><label>What do they show?</label>
+      <div class="chips" role="radiogroup">{% for v, l in W.KINDS %}<label class="chip"><input type="radio" name="kind" value="{{ v }}" {{ 'checked' if loop.first }} required><span>{{ '📞 ' if v == 'calls' else '💬 ' if v == 'whatsapp' else '' }}{{ l }}</span></label>{% endfor %}</div></div>
+    <div class="field"><label for="w-files">Screenshots (you can pick several at once)</label>
+      <input id="w-files" type="file" name="files" accept="image/*" multiple required></div>
+    <div class="field"><label for="w-note">Note (optional)</label><input id="w-note" name="note" maxlength="300" placeholder="e.g. 38 calls, 9 connected; 12 WhatsApp follow-ups"></div>
+    <button class="btn primary">Upload</button>
+    <p class="small muted">Pictures are made smaller automatically (still readable), kept privately and removed after {{ W.RETENTION_DAYS }} days.</p>
+  </form>
+
+  <div class="card"><h2>Uploaded today</h2>
+    <p class="small">{% for k, l in W.KINDS %}<span class="badge {{ 'ok' if counts[k] else 'grey' }}">{{ l }}: {{ counts[k] }}</span> {% endfor %}</p>
+    <div class="shots">{% for p in items %}
+      <figure class="shot"><a href="{{ url_for('work.img', pid=p.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('work.img', pid=p.id) }}" alt="{{ W.KIND_LABELS[p.kind] }} screenshot" loading="lazy"></a>
+        <figcaption class="small">{{ W.KIND_LABELS[p.kind] }} · {{ p.created_at|ist('%I:%M %p') }}
+          <form method="post" action="{{ url_for('work.remove', pid=p.id) }}" class="inline-form">{{ csrf() }}<button class="btn link small" aria-label="Remove this screenshot">Remove</button></form></figcaption></figure>
+    {% else %}<p class="empty">Nothing uploaded yet today.</p>{% endfor %}</div>
+  </div>
+</div>
+<div class="card"><h2>Last 7 days</h2>
+  <ul class="plain small">{% for d in week %}<li>{{ d.day }} — {% if d.n %}<span class="badge ok">{{ d.n }} screenshot{{ 's' if d.n != 1 }}</span>{% else %}<span class="badge grey">none</span>{% endif %}</li>{% endfor %}</ul>
+</div>
+</div>
+{% endblock %}

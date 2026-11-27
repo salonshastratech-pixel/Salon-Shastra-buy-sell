@@ -1,0 +1,32 @@
+{# Contact block + the screening questions for this kind (job: HR screening; academy: counsellor intake). #}
+{% macro contact_fields(Q, v, errors, users, current_user) %}
+<div class="form-grid">
+  <div class="field full {{ 'has-err' if errors.full_name }}"><label for="c-name">Name *</label><input id="c-name" name="full_name" value="{{ v.full_name or '' }}" required autofocus></div>
+  <div class="field {{ 'has-err' if errors.phone }}"><label for="c-phone">Mobile *</label><input id="c-phone" name="phone" value="{{ v.phone or v.phone_normalized or '' }}" inputmode="tel" required placeholder="10-digit mobile"></div>
+  <div class="field {{ 'has-err' if errors.alt_phone }}"><label for="c-alt">WhatsApp / other number</label><input id="c-alt" name="alt_phone" value="{{ v.alt_phone or '' }}" inputmode="tel" placeholder="if different"></div>
+  <div class="field"><label for="c-area">Area where they live now</label><input id="c-area" name="locality" value="{{ v.locality or '' }}" placeholder="e.g. Kukatpally"></div>
+  <div class="field"><label for="c-city">City</label><input id="c-city" name="city" value="{{ v.city or 'Hyderabad' }}"></div>
+  <div class="field"><label for="c-home">Where they are from (hometown)</label><input id="c-home" name="hometown" value="{{ v.hometown or '' }}" placeholder="e.g. Vijayawada, Kolkata"></div>
+  <div class="field"><label for="c-email">E-mail</label><input id="c-email" name="email" type="email" value="{{ v.email or '' }}"></div>
+  <div class="field"><label for="c-src">How they reached us</label><select id="c-src" name="source">{% for k, l in Q.SOURCES %}<option value="{{ k }}" {{ 'selected' if (v.source or 'incoming_call') == k }}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="c-owner">Owner</label><select id="c-owner" name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if (v.owner_id or current_user.id)|string == u.id|string }}>{{ u.full_name }}</option>{% endfor %}</select></div>
+</div>
+{% endmacro %}
+
+{% macro questions(Q, kind, a) %}
+{% for title, qs in Q.QUESTIONS[kind] %}
+<h3 class="q-section">{{ title }}</h3>
+<div class="form-grid">
+{% for key, label, typ, opts, help in qs %}{% set cur = a.get(key) %}
+  <div class="field qf {{ 'full' if typ == 'many' or (opts and opts|length > 4) else '' }}">
+    <label {% if typ in ('text', 'number') %}for="a-{{ key }}"{% endif %}>{{ label }}</label>
+    {% if help %}<div class="help">{{ help }}</div>{% endif %}
+    {% if typ == 'one' %}<div class="chips" role="radiogroup" aria-label="{{ label }}">{% for o in opts %}<label class="chip"><input type="radio" name="{{ key }}" value="{{ o }}" {{ 'checked' if cur == o }}><span>{{ o }}</span></label>{% endfor %}</div>
+    {% elif typ == 'many' %}<div class="chips" aria-label="{{ label }}">{% for o in opts %}<label class="chip"><input type="checkbox" name="{{ key }}" value="{{ o }}" {{ 'checked' if cur and o in cur }}><span>{{ o }}</span></label>{% endfor %}</div>
+    {% elif typ == 'number' %}<input id="a-{{ key }}" name="{{ key }}" value="{{ cur if cur is not none else '' }}" inputmode="numeric" {% if 'salary' in key %}placeholder="e.g. 18000"{% endif %}>
+    {% else %}<input id="a-{{ key }}" name="{{ key }}" value="{{ cur or '' }}" {% if help %}placeholder="{{ help }}"{% endif %}>{% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endfor %}
+{% endmacro %}
