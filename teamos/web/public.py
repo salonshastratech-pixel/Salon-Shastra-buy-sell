@@ -205,8 +205,130 @@ def geo_near():
     return jsonify({"ok": bool(area), "area": area, "city": city, "label": label})
 
 
+# -- Academy and Recruitment (job) forms: the same flow as the Pilot / Investor forms, for the Others inquiries -------
+INQ_PATHS = {"academy": "academy", "job": "job", "recruitment": "job"}
+
+
+def _inq_signer():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="inquiry-draft")
+
+
+def _inq_kind():
+    k = INQ_PATHS.get(request.path.strip("/").split("/")[1])
+    if not k:
+        abort(404)
+    return k
+
+
+def _inq_draft_id(kind):
+    """The inquiry this browser has been saving while typing (a signed id - nobody can point at another record)."""
+    try:
+        d = _inq_signer().loads(request.form.get("draft", ""), max_age=7 * 86400)
+        return d["i"] if d.get("k") == kind else None
+    except (BadData, TypeError, KeyError):
+        return None
+
+
+def _inq_page(kind, answers, errors, status=200):
+    from ..domain import geo
+    from ..domain import inquiries as INQ
+    meta = INQ.PUBLIC_META[kind]
+    return _page("public/open_form.html", status, meta=meta, kind=request.path.strip("/").split("/")[1],
+                 Q={"SECTIONS": INQ.public_sections(kind)}, answers=answers, errors=errors,
+                 form_token=_signer().dumps(meta["key"]), req_keys=("full_name", "phone"),
+                 draft=request.form.get("draft", ""), area_names=geo.known_area_names())
+
+
+@bp.route("/academy", methods=["GET", "POST"])
+@bp.route("/job", methods=["GET", "POST"])
+@bp.route("/recruitment", methods=["GET", "POST"])
+def inquiry_form():
+    """Academy (course enquiry) and Recruitment (job application) forms anyone can fill: the answers become an
+    Others inquiry - the same person twice is never a second record - and the team gets it in turn, with an alert."""
+    from ..domain import inquiries as INQ
+    from ..domain.common import normalize_indian_mobile
+    kind = _inq_kind()
+    meta = INQ.PUBLIC_META[kind]
+    db = get_db()
+    if request.method == "GET":
+        return _inq_page(kind, {}, {})
+    ip = _ip_hash()
+    answers = INQ.parse_public(kind, request.form)
+    try:
+        if _signer().loads(request.form.get("form_token", ""), max_age=FORM_TOKEN_MAX_AGE) != meta["key"]:
+            raise BadData("wrong form")
+    except BadData:          # open too long: every answer comes back, nothing is lost
+        F.record_public_hit(db, ip, meta["key"], "bad_token")
+        return _inq_page(kind, answers, {"_": "The page was open for a long time. Your answers are kept — please "
+                                              "press Submit once more."})
+    if request.form.get("website"):
+        F.record_public_hit(db, ip, meta["key"], "honeypot")
+        return redirect(url_for("public.open_thanks", kind=kind))
+    if F.public_rate_limited(db, ip):
+        F.record_public_hit(db, ip, meta["key"], "rate_limited")
+        return _page("public/message.html", 429, title="Too many submissions",
+                     message="We have already received several forms from this connection. Please try again "
+                             "later or call us.")
+    errors = {}
+    if not answers.get("full_name"):
+        errors["full_name"] = "Please tell us your name."
+    if not answers.get("phone"):
+        errors["phone"] = "Please give your mobile number so we can reach you."
+    elif normalize_indian_mobile(answers["phone"])[1]:
+        errors["phone"] = normalize_indian_mobile(answers["phone"])[1]
+    if not request.form.get("consent_contact"):
+        errors["consent_contact"] = "Please tick this box so we can contact you about your answers."
+    if errors:
+        return _inq_page(kind, answers, errors)
+    try:
+        INQ.submit_public(db, kind, answers, final=True, iid=_inq_draft_id(kind))
+    except ValidationError as e:
+        return _inq_page(kind, answers, {**e.errors, "_": "Please check: " + " ".join(map(str, e.errors.values()))})
+    F.record_public_hit(db, ip, meta["key"], "submitted")
+    return redirect(url_for("public.open_thanks", kind=kind))
+
+
+@bp.route("/academy/save", methods=["POST"])
+@bp.route("/job/save", methods=["POST"])
+@bp.route("/recruitment/save", methods=["POST"])
+def inquiry_save():
+    """Saved while they type (once a name and a valid mobile are there), so nothing is lost if they stop half-way."""
+    from ..domain import inquiries as INQ
+    from ..domain.common import normalize_indian_mobile
+    kind = _inq_kind()
+    meta = INQ.PUBLIC_META[kind]
+    db = get_db()
+    try:
+        if _signer().loads(request.form.get("form_token", ""), max_age=FORM_TOKEN_MAX_AGE) != meta["key"]:
+            raise BadData("wrong form")
+    except BadData:
+        return jsonify({"ok": False}), 400
+    if request.form.get("website"):
+        return jsonify({"ok": True})
+    answers = INQ.parse_public(kind, request.form)
+    if not answers.get("full_name") or normalize_indian_mobile(answers.get("phone"))[1]:
+        return jsonify({"ok": False, "why": "name and mobile first"})
+    iid = _inq_draft_id(kind)
+    if not iid and F.public_rate_limited(db, _ip_hash()):
+        return jsonify({"ok": False}), 429
+    try:
+        iid2 = INQ.submit_public(db, kind, answers, final=False, iid=iid)
+    except ValidationError:
+        return jsonify({"ok": False})
+    if not iid:
+        F.record_public_hit(db, _ip_hash(), meta["key"], "started")
+    return jsonify({"ok": True, "draft": _inq_signer().dumps({"k": kind, "i": iid2})})
+
+
 @bp.route("/<kind>/done")
 def open_thanks(kind):
+    kind = INQ_PATHS.get(kind, kind)
+    if kind in ("academy", "job"):
+        return _page("public/message.html", title="Thank you",
+                     message=("Thank you! We have received your answers. A course counsellor from Salon Shastra will "
+                              "call you soon with the right course options." if kind == "academy" else
+                              "Thank you! We have received your details. The Salon Shastra HR team will call you about "
+                              "suitable salon jobs."))
     if kind not in OPEN_FORMS:
         abort(404)
     msg = ("Thank you! We have received your answers. Our team is preparing your free SWOT report and will send it "

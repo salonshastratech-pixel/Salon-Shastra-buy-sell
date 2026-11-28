@@ -27,7 +27,8 @@ def index():
         rows = db.all(TASK_SELECT + "WHERE t.status <> 'open' AND (t.assignee_id = ? OR t.completed_by = ?) "
                       "ORDER BY t.updated_at DESC LIMIT 100", (g.user["id"], g.user["id"]))
     elif view == "created":
-        rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.creator_id = ? AND t.assignee_id <> ?",
+        rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.creator_id = ? AND t.assignee_id <> ?"
+                      + (" AND t.task_type = 'other'" if request.args.get("given") else ""),   # given with the box
                       (g.user["id"], g.user["id"]))
     else:
         rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.assignee_id = ?", (g.user["id"],))
@@ -49,16 +50,29 @@ def index():
 def create():
     db = get_db()
     f = request.form
+    from ..security import safe_next
+    back = safe_next(f.get("next"), "")
     try:
+        ref = "".join((f.get("ref") or "").split()).upper()
+        entity = None
+        if ref:
+            if ref[:2] in ("SL", "BY") and ref[2:3] != "-" and ref[2:].isdigit():
+                ref = f"{ref[:2]}-{int(ref[2:]):05d}"                  # "sl123" -> SL-00123
+            entity = db.one("SELECT id FROM opportunities WHERE ref_code = ?", (ref,))
+            if not entity:
+                raise ValidationError({"ref": f"No lead {ref} — check the number (e.g. SL-00123 or BY-00045)."})
         with db:
             tid = T.create_task(db, g.user, title=f.get("title"), assignee_id=int(f.get("assignee_id") or 0),
                                 due_at=parse_local_input(f.get("due_at")), task_type=f.get("task_type") or "other",
-                                priority=f.get("priority") or "normal")
-        flash("Task created.", "ok")
-        return redirect(url_for("tasks.detail", task_id=tid))
+                                priority=f.get("priority") or "normal",
+                                entity_type="opportunity" if entity else None, entity_id=entity["id"] if entity else None)
+        who = db.scalar("SELECT full_name FROM users WHERE id = ?", (int(f.get("assignee_id") or 0),))
+        flash("Task created." if int(f.get("assignee_id") or 0) == g.user["id"] else
+              f"Task given to {who}. They have been told.", "ok")
+        return redirect(back or url_for("tasks.detail", task_id=tid))
     except (ValidationError, ValueError) as e:
         flash(" ".join(e.errors.values()) if isinstance(e, ValidationError) else str(e), "error")
-        return redirect(url_for("tasks.index"))
+        return redirect(back or url_for("tasks.index"))
 
 
 @bp.route("/<int:task_id>")

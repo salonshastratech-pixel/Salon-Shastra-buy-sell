@@ -9,6 +9,13 @@ from ..security import require
 bp = Blueprint("others", __name__, url_prefix="/others")
 
 
+def _links():
+    """The two forms anyone can fill: shared in ads, WhatsApp groups, the website, or sent to one person."""
+    from .. import messaging
+    base = messaging.public_base(request)
+    return {"academy": f"{base}/f/academy", "job": f"{base}/f/job"}
+
+
 def _team(db):
     return db.all("SELECT id, full_name FROM users WHERE is_active = 1 AND role <> 'finance' ORDER BY full_name")
 
@@ -19,7 +26,7 @@ def index():
     db = get_db()
     rows, total = Q.search(db, request.args)
     return render_template("others/index.html", rows=rows, total=total, f=request.args, Q=Q, counts=Q.counts(db),
-                           users=_team(db))
+                           users=_team(db), links=_links())
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -68,4 +75,24 @@ def detail(iid):
         except PermissionDenied:
             abort(403)
     return render_template("others/detail.html", inq=inq, Q=Q, errors=errors, history=Q.history(db, iid),
-                           tasks=Q.open_tasks(db, iid), users=_team(db), edit=request.args.get("edit"))
+                           tasks=Q.open_tasks(db, iid), users=_team(db), edit=request.args.get("edit"), links=_links())
+
+
+@bp.route("/<int:iid>/send-form", methods=["POST"])
+@require("crm.log_activity")
+def send_form(iid):
+    """'Send the form' on an inquiry: WhatsApp opens to this person with the form link, ready to send. What they fill
+    comes straight into this inquiry (same mobile number)."""
+    from urllib.parse import quote
+
+    from ..domain import tasks as T
+    db = get_db()
+    inq = Q.load(db, iid)
+    if not inq:
+        abort(404)
+    url = _links()[inq["kind"]]
+    text = Q.form_message(inq, url, g.user["full_name"].split()[0])
+    T.add_activity(db, g.user["id"], "inquiry", iid, "note",
+                   f"Sent the {Q.PUBLIC_META[inq['kind']]['label']} form on WhatsApp")
+    digits = "".join(ch for ch in (inq.get("alt_phone") or inq.get("phone_normalized") or "") if ch.isdigit())
+    return redirect(f"https://wa.me/{digits}?text={quote(text)}" if digits else f"https://wa.me/?text={quote(text)}")

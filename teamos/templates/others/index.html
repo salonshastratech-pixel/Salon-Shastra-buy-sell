@@ -7,6 +7,18 @@
   <div class="inline"><a class="btn primary" href="{{ url_for('others.new', kind='academy') }}">+ Academy inquiry</a>
     <a class="btn primary" href="{{ url_for('others.new', kind='job') }}">+ Job inquiry</a></div></div>
 
+<details class="card disclose share-forms" {{ 'open' if not total }}><summary><strong>Forms to share</strong> <span class="small muted">— Academy and Recruitment links for ads, WhatsApp groups and the website</span></summary>
+  <div class="share-row"><div><strong>🎓 Academy — course enquiry form</strong>
+    <div class="small muted">Courses, level, timing, fees and support → an Academy inquiry, given to the team in turn, with an alert and a first call.</div>
+    <code class="copy">{{ links.academy }}</code></div>
+    <a class="btn sm" href="{{ links.academy }}" target="_blank" rel="noopener">Open</a></div>
+  <div class="share-row"><div><strong>💼 Recruitment — job application form</strong>
+    <div class="small muted">Role, experience, skills, current and expected salary, areas, joining → a Job inquiry, same flow.</div>
+    <code class="copy">{{ links.job }}</code></div>
+    <a class="btn sm" href="{{ links.job }}" target="_blank" rel="noopener">Open</a></div>
+  <p class="small muted">For one person, open their inquiry and press <strong>📝 Send form</strong> — WhatsApp opens with the link and a message ready. Answers save while they type; the same mobile number never makes a second inquiry.</p>
+</details>
+
 <nav class="chip-tabs" aria-label="Which inquiries">
   <a href="{{ url_for('others.index') }}" class="{{ 'on' if not kind }}">All <b>{{ counts.job + counts.academy }}</b></a>
   <a href="{{ url_for('others.index', kind='academy') }}" class="{{ 'on' if kind == 'academy' }}">🎓 Academy <b>{{ counts.academy }}</b></a>

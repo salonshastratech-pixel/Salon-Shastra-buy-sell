@@ -6,7 +6,8 @@
     <span class="badge {{ 'ok' if inq.status in ('placed', 'enrolled') else 'grey' if inq.status in ('closed', 'not_interested', 'not_suitable') else 'info' }}">{{ Q.status_label(inq.kind, inq.status) }}</span>
     {% if inq.temperature %}<span class="badge {{ 'bad' if inq.temperature == 'hot' else 'warn' if inq.temperature == 'warm' else 'grey' }}">{{ dict(Q.TEMPS)[inq.temperature] }}</span>{% endif %}
     <span>{{ inq.ref_code }}</span> · <span>Owner: <strong>{{ inq.owner_name or '—' }}</strong></span> · <span>{{ Q.SOURCE_LABELS.get(inq.source, inq.source) }}, {{ inq.created_at|rel }}</span></div></div>
-  {% if inq.phone_normalized %}<div class="inline"><a class="btn primary" href="{{ inq.phone_normalized|tel }}">Call</a><a class="btn wa-btn" href="https://wa.me/{{ (inq.alt_phone or inq.phone_normalized)|replace('+', '') }}" target="_blank" rel="noopener">WhatsApp</a></div>{% endif %}</div>
+  {% if inq.phone_normalized %}<div class="inline"><a class="btn primary" href="{{ inq.phone_normalized|tel }}">Call</a><a class="btn wa-btn" href="https://wa.me/{{ (inq.alt_phone or inq.phone_normalized)|replace('+', '') }}" target="_blank" rel="noopener">WhatsApp</a>
+    <form method="post" action="{{ url_for('others.send_form', iid=inq.id) }}" target="_blank" class="inline">{{ csrf() }}<button class="btn">📝 Send form</button></form></div>{% endif %}</div>
 
 <div class="split">
 <div class="stack">
@@ -37,6 +38,11 @@
 </div>
 
 <div class="stack">
+  <div class="card" id="online-form"><h2>{{ Q.PUBLIC_META[inq.kind].label }} form</h2>
+    <p class="small">Send it on WhatsApp, or copy the link. What they fill comes straight into this inquiry (same mobile number) — nothing is overwritten, you get an alert.</p>
+    <form method="post" action="{{ url_for('others.send_form', iid=inq.id) }}" target="_blank">{{ csrf() }}<button class="btn primary sm">📝 Send the form on WhatsApp</button></form>
+    <code class="copy">{{ links[inq.kind] }}</code>
+  </div>
   <div class="card"><h2>Contact</h2>
     <div class="facts">
       <div><div class="small muted">Mobile</div><div class="mono">{{ inq.phone_normalized or '—' }}</div></div>

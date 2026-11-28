@@ -76,7 +76,8 @@ def inbox():
                            STATUS=F.STATUS_LABELS, public_links={"seller": f"{base}/f/seller",
                                                                  "buyer": f"{base}/f/buyer",
                                                                  "pilot": f"{base}/f/pilot",
-                                                                 "investor": f"{base}/f/investor"},
+                                                                 "investor": f"{base}/f/investor",
+                                                                 "academy": f"{base}/f/academy", "job": f"{base}/f/job"},
                            MOCK_LABEL=messaging.PROVIDER_LABEL)
 
 

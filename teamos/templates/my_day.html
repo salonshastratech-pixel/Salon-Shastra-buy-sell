@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ph">
   <div><h1>Good to see you, {{ current_user.full_name.split()[0] }}</h1>
-  <div class="sub">{{ now_iso()|ist('%A, %d %B %Y') }} · most urgent first</div></div>
+  <div class="sub">{{ now_iso()|ist('%A, %d %B %Y') }} · most urgent first{% if side %} · your priority: <strong>{{ {'seller': 'Salon owners', 'buyer': 'Buyers & investors'}[side] }}</strong>, the other side follows below{% endif %}</div></div>
   {% if can('crm.create') %}<div class="actions">
     <a class="btn primary" href="{{ url_for('sellers.new') }}">+ Seller lead</a>
     <a class="btn primary" href="{{ url_for('buyers.new') }}">+ Buyer lead</a></div>{% endif %}
@@ -20,13 +20,17 @@
 
 <div class="split">
   <div>
-    {% if overdue %}
-    <div class="card" id="overdue"><div class="card-h"><h2>Overdue</h2><span class="badge bad">{{ overdue|length }}</span></div>
-      <ul class="tasks">{% for t in overdue %}{{ task_item(t) }}{% endfor %}</ul></div>
+    {% macro other_side(rows, back) %}{% if rows %}<details class="other-side"><summary>{{ {'seller': 'Salon owners', 'buyer': 'Buyers & investors'}['buyer' if side == 'seller' else 'seller'] }} — also yours ({{ rows|length }})</summary>
+      <ul class="tasks">{% for t in rows %}{{ task_item(t, return_to=back, pass_to=colleagues) }}{% endfor %}</ul></details>{% endif %}{% endmacro %}
+    {% if overdue or overdue_other %}
+    <div class="card" id="overdue"><div class="card-h"><h2>Overdue</h2><span class="badge bad">{{ overdue|length + overdue_other|length }}</span></div>
+      <ul class="tasks">{% for t in overdue %}{{ task_item(t, return_to='/#overdue', pass_to=colleagues) }}{% endfor %}</ul>
+      {{ other_side(overdue_other, '/#overdue') }}</div>
     {% endif %}
-    <div class="card" id="today"><div class="card-h"><h2>Today</h2><span class="badge">{{ today|length }}</span></div>
-      <ul class="tasks">{% for t in today %}{{ task_item(t) }}{% else %}<li class="empty">{{ 'Nothing else due today.' if overdue else 'All clear for today. Pick something from “Coming up” or the Match Desk.' }}</li>{% endfor %}</ul></div>
-    {{ new_leads_card(new_leads, show_owner=leads_all) }}
+    <div class="card" id="today"><div class="card-h"><h2>Today</h2><span class="badge">{{ today|length + today_other|length }}</span></div>
+      <ul class="tasks">{% for t in today %}{{ task_item(t, return_to='/#today', pass_to=colleagues) }}{% else %}<li class="empty">{{ 'Nothing else due today.' if overdue else 'All clear for today. Pick something from “Coming up” or the Match Desk.' }}</li>{% endfor %}</ul>
+      {{ other_side(today_other, '/#today') }}</div>
+    {{ new_leads_card(new_leads, show_owner=leads_all, pass_to=colleagues) }}
     {% if no_next %}
     <div class="card"><div class="card-h"><h2>No next step yet</h2><span class="badge bad">{{ no_next|length }}</span></div>
       <p class="small muted">Every live record needs a next step so nothing slips.</p>
@@ -38,9 +42,15 @@
       <ul class="tasks">{% for x in stuck %}<li class="task"><div><div class="t small"><a href="{{ url_for('deals.detail', deal_id=x.id) if x.kind == 'deal' else opp_url(x.kind, x.id) }}">{{ x.ref_code }} · {{ x.name }}</a> <span class="badge grey">{{ x.stage_label }} · {{ x.days }} days</span></div><div class="meta">{{ x.push }}</div></div></li>{% endfor %}</ul></div>
     {% endif %}
     <details class="card disclose" {{ 'open' if not overdue and not today }}><summary>Coming up ({{ upcoming|length }})</summary>
-      <ul class="tasks">{% for t in upcoming %}{{ task_item(t) }}{% else %}<li class="empty">No upcoming tasks.</li>{% endfor %}</ul></details>
+      <ul class="tasks">{% for t in upcoming %}{{ task_item(t, return_to='/', pass_to=colleagues) }}{% else %}<li class="empty">No upcoming tasks.</li>{% endfor %}</ul></details>
   </div>
   <div>
+    {% if passed_to_me %}<div class="card" id="passed"><div class="card-h"><h2>Passed to you</h2><span class="badge info">{{ passed_to_me|length }}</span></div>
+      <ul class="tasks">{% for p in passed_to_me %}<li class="task"><div>
+        <div class="t"><a href="{{ opp_url(p.kind, p.id) }}">{{ p.salon_name or p.contact_name }}</a> <span class="small muted">{{ p.ref_code }} · {{ 'Buyer / investor' if p.kind == 'buyer' else 'Salon owner' }}</span></div>
+        <div class="meta">from <strong>{{ p.actor_name }}</strong> · {{ p.at|rel }}{% if 'Passed by' in (p.body or '') and ':' in p.body.split('Passed by', 1)[1] %} · “{{ p.body.split('Passed by', 1)[1].split(':', 1)[1].split(' (')[0].strip() }}”{% endif %}</div>
+      </div></li>{% endfor %}</ul></div>{% endif %}
+    {% with back="/#give-task" %}{% include "_give_task.html" %}{% endwith %}
     {% set live_tiles = match_tiles|selectattr('count')|list %}
     {% if unread_convs or forms_waiting or live_tiles %}
     <div class="card"><div class="card-h"><h2>Waiting for you</h2></div>

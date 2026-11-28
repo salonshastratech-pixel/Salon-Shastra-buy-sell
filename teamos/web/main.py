@@ -39,9 +39,31 @@ def my_day():
     mine = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.assignee_id = ?", (g.user["id"],))
     for t in mine:
         t["why"] = T.priority_reason(t, now, day_end)
-    overdue = _sort([t for t in mine if t["due_at"] and t["due_at"] < now])
-    today = _sort([t for t in mine if t["due_at"] and now <= t["due_at"] < day_end])
-    upcoming = _sort([t for t in mine if not t["due_at"] or t["due_at"] >= day_end])[:15]
+    side = g.user.get("team") if g.user.get("team") in ("seller", "buyer") else None   # their priority side
+
+    def first_mine(rows):
+        """Their own side (and tasks not about a lead) first; the other side after, still theirs to do."""
+        return ([t for t in rows if not side or t.get("opp_kind") in (None, side)],
+                [t for t in rows if side and t.get("opp_kind") not in (None, side)])
+    overdue, overdue_other = first_mine(_sort([t for t in mine if t["due_at"] and t["due_at"] < now]))
+    today, today_other = first_mine(_sort([t for t in mine if t["due_at"] and now <= t["due_at"] < day_end]))
+    upcoming = _sort([t for t in mine if not t["due_at"] or t["due_at"] >= day_end])
+    upcoming = (first_mine(upcoming)[0] + first_mine(upcoming)[1])[:15]
+    # team members first (the suggested person for a lead is the one on its side, else the first team member)
+    colleagues = db.all("SELECT id, full_name, team FROM users WHERE is_active = 1 AND id <> ? AND role IN "
+                        "('team_member', 'team_lead', 'super_admin') ORDER BY CASE WHEN role = 'super_admin' THEN 1 "
+                        "ELSE 0 END, full_name", (g.user["id"],))
+    people = db.all("SELECT id, full_name FROM users WHERE is_active = 1 AND role IN "
+                    "('team_member', 'team_lead', 'super_admin') ORDER BY full_name")
+    passed_to_me = db.all(
+        "SELECT a.body, a.at, u.full_name AS actor_name, o.id, o.kind, o.ref_code, c.full_name AS contact_name, "
+        "b.name AS salon_name FROM activities a JOIN opportunities o ON o.id = a.entity_id "
+        "JOIN contacts c ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id "
+        "LEFT JOIN users u ON u.id = a.actor_id WHERE a.entity_type = 'opportunity' AND a.kind = 'assignment' "
+        "AND a.at >= ? AND a.actor_id <> ? AND o.primary_owner_id = ? AND o.status <> 'closed' "
+        "ORDER BY a.at DESC LIMIT 10", (to_iso(now_utc() - timedelta(days=3)), g.user["id"], g.user["id"]))
+    gave_open = db.scalar("SELECT COUNT(*) FROM tasks WHERE creator_id = ? AND assignee_id <> ? AND status = 'open' "
+                          "AND task_type = 'other'", (g.user["id"], g.user["id"]))
     done_today = db.all(TASK_SELECT + "WHERE t.status = 'done' AND t.completed_by = ? AND t.completed_at >= ? "
                         "ORDER BY t.completed_at DESC", (g.user["id"], day_start))
     calls_today = db.scalar("SELECT COUNT(*) FROM activities WHERE actor_id = ? AND kind = 'call' AND at >= ?",
@@ -65,8 +87,13 @@ def my_day():
     from ..domain import dashboard as DB
     me = [g.user["id"]]
     is_lead = g.user["role"] in ("super_admin", "team_lead")
+    leads = DB.new_leads(db, DB.team_ids(db) if is_lead else me, 8)
+    if side:
+        leads.sort(key=lambda r: r["kind"] != side)       # stable: own side first, newest first within each
     return render_template("my_day.html", targets=targets, nums=DB.numbers(db, me),
-                           new_leads=DB.new_leads(db, DB.team_ids(db) if is_lead else me, 8), leads_all=is_lead,
+                           new_leads=leads, leads_all=is_lead, side=side, overdue_other=overdue_other,
+                           today_other=today_other, colleagues=colleagues, people=people, passed_to_me=passed_to_me,
+                           gave_open=gave_open,
                            feed=DB.feed(db, me, 10),
                            team_rows=DB.team_rows(db) if is_lead else [],
                            team_nums=DB.numbers(db, DB.team_ids(db)) if is_lead else None, saved_new=saved_new, overdue=overdue, today=today, upcoming=upcoming, done_today=done_today,
@@ -121,7 +148,12 @@ def team_board():
                            exceptions=exceptions, unowned=unowned, review_queue=review_queue, buyer_queue=buyer_queue, dup_open=dup_open,
                            match_counts=match_counts, top_matches=top_matches, MQ=MM.QUEUES,
                            workload=P.workload(db), stuck=P.stuck(db, limit=40),
-                           who=who, STAGE_LABELS=STAGE_LABELS)
+                           who=who, STAGE_LABELS=STAGE_LABELS,
+                           people=db.all("SELECT id, full_name FROM users WHERE is_active = 1 AND role IN "
+                                         "('team_member', 'team_lead', 'super_admin') ORDER BY full_name"),
+                           gave_open=db.scalar("SELECT COUNT(*) FROM tasks WHERE creator_id = ? AND assignee_id <> ? "
+                                               "AND status = 'open' AND task_type = 'other'",
+                                               (g.user["id"], g.user["id"])))
 
 
 @bp.route("/search")

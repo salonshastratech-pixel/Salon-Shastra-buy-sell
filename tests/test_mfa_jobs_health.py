@@ -120,7 +120,7 @@ def test_sla_sweep_alerts_once_and_escalates_after_24h(login, db):
     assert db.scalar("SELECT COUNT(*) FROM notifications WHERE kind = 'escalation'") == 2   # lead + admin
     jobs.enqueue(db, "sla_sweep")
     jobs.run_once(db)                      # second sweep: no repeat alerts
-    assert db.scalar("SELECT COUNT(*) FROM notifications") == 3
+    assert db.scalar("SELECT COUNT(*) FROM notifications WHERE kind IN ('overdue', 'escalation')") == 3   # hourly status checks aside
 
 
 def test_healthz_reports_without_login(app):

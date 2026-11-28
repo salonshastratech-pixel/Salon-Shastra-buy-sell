@@ -103,7 +103,9 @@ def delete_records(db, actor: dict, opp_ids: list[int], reason: str, remember: b
             if o["business_id"] and not db.scalar("SELECT COUNT(*) FROM opportunities WHERE business_id = ?",
                                                   (o["business_id"],)):
                 _delete(db, "salon_businesses", [o["business_id"]], kids, cache, seen, counts)
-        for o in opps:
+        for o in opps:   # alerts that would open a page that no longer exists
+            for path in (f"/sellers/{o['id']}", f"/buyers/{o['id']}"):
+                db.execute("DELETE FROM notifications WHERE link = ? OR link LIKE ?", (path, path + "#%"))
             audit.record(db, actor["id"], "record.deleted", "opportunity", o["id"],
                          {"ref": o["ref_code"], "name": o["full_name"], "reason": reason[:200]})
     return {"records": len(opps), "rows": sum(counts.values()), "refs": [o["ref_code"] for o in opps]}

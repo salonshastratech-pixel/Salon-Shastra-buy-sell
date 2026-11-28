@@ -8,10 +8,11 @@ Each inquiry has an owner, a status, call history and follow-up reminders that a
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from .. import audit
 from ..permissions import user_can
-from ..timeutil import now_iso, parse_local_input
+from ..timeutil import now_iso, now_utc, parse_local_input, to_iso
 from . import tasks as T
 from .common import normalize_indian_mobile
 from .errors import PermissionDenied, ValidationError
@@ -128,7 +129,8 @@ STATUSES = {
 OPEN_STATUSES = ("new", "contacted", "screened", "interview", "counselled", "demo", "on_hold")
 TEMPS = [("hot", "Hot"), ("warm", "Warm"), ("cold", "Cold")]
 SOURCES = [("incoming_call", "Incoming call"), ("walk_in", "Walk-in"), ("whatsapp", "WhatsApp"),
-           ("meta_ad", "Meta / Instagram ad"), ("referral", "Referral"), ("website", "Website"), ("other", "Other")]
+           ("meta_ad", "Meta / Instagram ad"), ("referral", "Referral"), ("website", "Website"),
+           ("online_form", "Online form"), ("other", "Other")]
 SOURCE_LABELS = dict(SOURCES)
 
 
@@ -379,3 +381,183 @@ def history(db, iid: int) -> list[dict]:
 def open_tasks(db, iid: int) -> list[dict]:
     return db.all("SELECT * FROM tasks WHERE entity_type = 'inquiry' AND entity_id = ? AND status = 'open' "
                   "ORDER BY due_at", (iid,))
+
+
+# -- The online forms (Academy / Recruitment) ------------------------------------------------------------------------
+# The same questions the team asks on a call, worded for the person filling it in. Shown with the same look as the
+# Pilot / Investor forms (one section per step on phones, saved while typing).
+PUBLIC_META = {
+    "academy": {"key": "academy_open", "title": "Salon Shastra Academy — course enquiry",
+                "intro": "Tell us what you would like to learn and what suits you — timing, fees and support. A course "
+                         "counsellor from Salon Shastra will call you with the right options.",
+                "time": "about 3 minutes", "label": "Academy"},
+    "job": {"key": "job_open", "title": "Salon jobs — apply with Salon Shastra",
+            "intro": "Tell us about your work, your skills and the job you want. The Salon Shastra HR team will call "
+                     "you about suitable openings in salons near you.",
+            "time": "about 4 minutes", "label": "Recruitment"},
+}
+_YOU = {
+    "About them": "About you", "About the student": "About you", "Work they want": "Work you want",
+    "Current job & pay": "Your current job & pay", "Course": "The course",
+    "Languages they speak": "Languages you speak", "What they are good at": "What you are good at",
+    "Salon type they prefer": "Salon type you prefer", "Areas they can work in": "Areas you can work in",
+    "Needs accommodation?": "Do you need accommodation?", "Working now?": "Are you working now?",
+    "Can share work photos / resume on WhatsApp?": "Can you share work photos / your resume on WhatsApp?",
+    "Role(s) wanted": "Role(s) you want", "Can join": "When can you join?",
+    "Course / certificate done": "Any course / certificate done?", "What they do now": "What do you do now?",
+    "Who decides / pays": "Who will decide / pay for the course?",
+    "Courses interested in": "Courses you are interested in", "Their current level": "Your current level",
+    "Why they want to learn": "Why do you want to learn?", "Willing to join": "When would you like to join?",
+    "Batch that suits them": "Batch that suits you", "How long can they study": "How long can you study?",
+    "Support they need": "Support you need",
+    "Other academies they are considering": "Other academies you are considering",
+    "Will they visit for a demo / counselling?": "Would you like to visit for a demo / counselling?",
+    "What matters more": "What matters more to you?",
+}
+_KIND_OF = {"one": "choice", "many": "multi", "text": "text", "number": "number"}
+_MONEY = {"current_salary", "expected_salary"}
+
+
+def public_sections(kind: str) -> list:
+    """[(key, title, sub, questions)] in the shape the shared form renderer uses."""
+    def q(key, label, k, options=None, hint=""):
+        return {"key": key, "label": label, "kind": k, "options": options or [], "hint": hint, "other": False,
+                "extra": False, "required": key in ("full_name", "phone")}
+    first = [q("full_name", "Your name", "text"), q("phone", "Mobile number (WhatsApp)", "phone"),
+             q("email", "E-mail (optional)", "email"),
+             q("city", "Where do you live now? (area, city)", "text"),
+             q("hometown", "Where are you from? (home town)", "text", hint="e.g. Vijayawada, Kolkata")]
+    out = [("you", "About you", "", first)]
+    for title, qs in QUESTIONS[kind]:
+        rows = []
+        for key, label, typ, opts, hint in qs:
+            k = "money" if key in _MONEY else _KIND_OF[typ]
+            rows.append(q(key, _YOU.get(label, label), k, opts, "" if hint.startswith("Ask:") else hint))
+        t = _YOU.get(title, title)
+        if t == "About you":
+            out[0] = ("you", "About you", "", first + rows)
+        else:
+            out.append((title.lower().replace(" ", "_"), t, "", rows))
+    return out
+
+
+def parse_public(kind: str, form) -> dict:
+    """The answers as typed (lenient: nothing here is refused except a missing name / mobile at the end)."""
+    ans = _answers_from(kind, form)
+    for k in ("full_name", "phone", "email", "city", "hometown"):
+        v = (form.get(k) or "").strip()
+        if v:
+            ans[k] = v[:200]
+    return ans
+
+
+def _owner_for_inquiry(db) -> int | None:
+    """New online inquiries: the team in turn (everyone, both sides); nobody available → the admin."""
+    from .progress import is_away
+    people = [p["id"] for p in db.all("SELECT id, away_until FROM users WHERE is_active = 1 AND role IN "
+                                      "('team_member', 'team_lead') ORDER BY id") if not is_away(p)]
+    if not people:
+        row = db.one("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin' ORDER BY id LIMIT 1")
+        return row["id"] if row else None
+    key = "round_robin:inquiry"
+    last = db.scalar("SELECT note FROM automation_settings WHERE key = ?", (key,))
+    last = int(last) if last and str(last).isdigit() else None
+    nxt = next((p for p in people if last is None or p > last), people[0])
+    if db.scalar("SELECT 1 FROM automation_settings WHERE key = ?", (key,)):
+        db.execute("UPDATE automation_settings SET note = ?, updated_at = ? WHERE key = ?", (str(nxt), now_iso(), key))
+    else:
+        db.insert("automation_settings", {"key": key, "enabled": 1, "note": str(nxt), "updated_at": now_iso()})
+    return nxt
+
+
+def submit_public(db, kind: str, ans: dict, final: bool, iid: int | None = None) -> int:
+    """Saves the online form. `iid` is this person's own draft (saved while typing): it is updated. Otherwise the same
+    mobile number already with us gets the answers added (blank ones only - nothing the team wrote is overwritten);
+    only a new number makes a new inquiry. Returns the inquiry id."""
+    phone, err = normalize_indian_mobile(ans.get("phone"))
+    if err or not ans.get("full_name"):
+        raise ValidationError({"phone": err} if err else {"full_name": "Please tell us your name."})
+    label = PUBLIC_META[kind]["label"]
+    answers = {k: v for k, v in ans.items() if k in ALL_Q[kind]}
+    s = SUMMARY[kind]
+    now = now_iso()
+    with db:
+        inq = load(db, iid) if iid else None
+        if inq and inq["kind"] != kind:
+            inq = None
+        own_draft = inq is not None
+        if not inq:
+            dup = duplicate_of(db, kind, phone)
+            inq = load(db, dup["id"]) if dup else None
+            # started online in the last 12 h and nobody from the team has touched it: still their own draft (the
+            # page may not have heard back from its first save before they switched apps)
+            if inq and inq["created_by"] is None and inq["status"] == "new" and not inq["last_contact_at"] and                     inq["created_at"] >= to_iso(now_utc() - timedelta(hours=12)):
+                own_draft = True
+        if inq:
+            old = answers_of(inq)
+            merged = {**old, **answers} if own_draft else {**answers, **old}   # their draft: newest wins; else blanks
+            sets = {"answers": json.dumps(merged, ensure_ascii=False), "updated_at": now,
+                    "interest": inq["interest"] or show(merged.get(s[0])) or None,
+                    "experience": inq["experience"] or show(merged.get(s[1])) or None,
+                    "budget_or_salary": inq["budget_or_salary"] or show(merged.get(s[2])) or (
+                        show(merged.get("budget")) if kind == "academy" else None),
+                    "join_when": inq["join_when"] or show(merged.get(s[3])) or None}
+            for k, n in (("email", 200), ("city", 80), ("hometown", 120)):
+                if ans.get(k) and (own_draft or not inq.get(k)):
+                    sets[k] = ans[k][:n]
+            if own_draft and ans.get("full_name"):
+                sets["full_name"] = ans["full_name"][:120]
+            reopened = inq["status"] not in OPEN_STATUSES
+            if reopened and final:
+                sets["status"] = "new"
+            db.execute("UPDATE inquiries SET " + ", ".join(f"{k} = ?" for k in sets) + " WHERE id = ?",
+                       (*sets.values(), inq["id"]))
+            if final:
+                T.add_activity(db, None, "inquiry", inq["id"], "note",
+                               f"Filled the {label} form online"
+                               + (" — added to this inquiry (same mobile number), nothing overwritten"
+                                  if not own_draft else "")
+                               + (" · they came back, inquiry reopened" if reopened else ""))
+                if not own_draft and inq["owner_id"]:
+                    T.notify(db, inq["owner_id"], "assignment", f"{inq['full_name']} filled the {label} form again "
+                             f"({inq['ref_code']}) — answers added", f"/others/{inq['id']}")
+                _first_call(db, inq["id"], inq["full_name"], kind, inq["owner_id"])
+            return inq["id"]
+        owner = _owner_for_inquiry(db)
+        vals = {"full_name": ans["full_name"][:120], "phone_normalized": phone, "alt_phone": None,
+                "email": (ans.get("email") or "")[:200] or None, "city": (ans.get("city") or "")[:80] or None,
+                "locality": None, "hometown": (ans.get("hometown") or "")[:120] or None, "notes": None,
+                "source": "online_form", "temperature": None, "owner_id": owner,
+                "answers": json.dumps(answers, ensure_ascii=False), "interest": show(answers.get(s[0])) or None,
+                "experience": show(answers.get(s[1])) or None,
+                "budget_or_salary": show(answers.get(s[2])) or (
+                    show(answers.get("budget")) if kind == "academy" else None),
+                "join_when": show(answers.get(s[3])) or None}
+        new_id = db.insert("inquiries", {**vals, "kind": kind, "status": "new", "created_by": None, "created_at": now,
+                                         "updated_at": now, "last_contact_at": None})
+        ref = f"{PREFIX[kind]}-{new_id:05d}"
+        db.execute("UPDATE inquiries SET ref_code = ? WHERE id = ?", (ref, new_id))
+        T.add_activity(db, None, "inquiry", new_id, "note",
+                       f"{label} form " + ("filled online" if final else "started online (saved while typing)"))
+        if owner:
+            T.notify(db, owner, "assignment", f"New {label.lower()} enquiry from the online form: "
+                     f"{vals['full_name']} ({ref}) — call soon", f"/others/{new_id}")
+        if final:
+            _first_call(db, new_id, vals["full_name"], kind, owner)
+        return new_id
+
+
+def _first_call(db, iid, name, kind, owner_id):
+    """One first call for the owner when the form is submitted (not if a call is already planned)."""
+    if not owner_id or db.scalar("SELECT COUNT(*) FROM tasks WHERE entity_type = 'inquiry' AND entity_id = ? AND "
+                                 "status = 'open'", (iid,)):
+        return
+    T.create_task(db, None, title=f"First call: {name} ({PUBLIC_META[kind]['label'].lower()} form)",
+                  assignee_id=owner_id, due_at=T.first_contact_due(15), task_type="call", priority="high",
+                  entity_type="inquiry", entity_id=iid)
+
+
+def form_message(inq: dict, url: str, sender: str) -> str:
+    what = "the course you are looking for" if inq["kind"] == "academy" else "your work and the job you want"
+    return (f"Hello {inq['full_name'].split()[0]}, this is {sender} from Salon Shastra. Please tell us about {what} "
+            f"here — it takes a few minutes and your answers are saved as you go: {url}")

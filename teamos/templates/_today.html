@@ -1,5 +1,5 @@
 {# Today's CRM numbers, new leads with their timing, the activity feed and the per-person table. #}
-{% from "macros.html" import contact_buttons %}
+{% from "macros.html" import contact_buttons, pass_control %}
 {% macro today_kpis(n, who='') %}
 <div class="kpis day-kpis" role="list" aria-label="Today's numbers{{ ' — ' ~ who if who }}">
   <a role="listitem" class="kpi info" href="#newleads"><b>{{ n.new_leads }}</b><span>New leads today</span></a>
@@ -12,7 +12,7 @@
 </div>
 {% endmacro %}
 
-{% macro new_leads_card(leads, show_owner=false) %}
+{% macro new_leads_card(leads, show_owner=false, pass_to=None) %}
 <div class="card" id="newleads"><div class="card-h"><h2>New leads</h2><span class="small muted">newest first · when they came in and how fast we called</span></div>
   <ul class="tasks lead-list">{% for r in leads %}<li class="task">
     <div>
@@ -20,7 +20,7 @@
       <div class="meta"><span title="{{ r.lead_at|ist }}">Came in {{ r.lead_at|rel }}</span> · {{ r.source_name or 'Unknown source' }}{% if show_owner %} · <strong>{{ r.owner_name or 'Unassigned' }}</strong>{% endif %}</div>
       <div><span class="badge {{ r.speed.tone }} small">{{ r.speed.label }}</span></div>
     </div>
-    <div class="inline">{{ contact_buttons(r.id, r.phone_normalized) }}</div>
+    <div class="inline">{{ contact_buttons(r.id, r.phone_normalized) }}{% if pass_to %}{{ pass_control(r.id, r.kind, pass_to, '/#newleads') }}{% endif %}</div>
   </li>{% else %}<li class="empty">No leads yet.</li>{% endfor %}</ul></div>
 {% endmacro %}
 

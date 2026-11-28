@@ -10,7 +10,18 @@
 {%- set v = m.get(state, ('grey', state)) -%}<span class="badge {{ v[0] }}">{{ v[1] }}</span>
 {%- endmacro %}
 
-{% macro task_item(t, show_assignee=false, return_to=None) %}
+{% macro pass_control(opp_id, opp_kind, colleagues, back='/') -%}
+{%- set best = (colleagues|selectattr('team', 'equalto', opp_kind)|list or colleagues)[0] if colleagues else none -%}
+{% if best %}<details class="pass"><summary title="Give this lead to a colleague">Pass</summary>
+  <form method="post" action="{{ url_for('records.pass_lead', opp_id=opp_id) }}" class="pass-f">{{ csrf() }}
+    <input type="hidden" name="next" value="{{ back }}">
+    <label class="small">To <select name="to_id">{% for c in colleagues %}<option value="{{ c.id }}" {{ 'selected' if c.id == best.id }}>{{ c.full_name }}{% if c.team in ('seller', 'buyer') %} · {{ {'seller': 'salon owners', 'buyer': 'buyers'}[c.team] }}{% endif %}</option>{% endfor %}</select></label>
+    <input name="note" maxlength="200" placeholder="Why / what was said (optional)" aria-label="Note for them">
+    <button class="btn sm primary">Pass with its tasks</button>
+  </form></details>{% endif %}
+{%- endmacro %}
+
+{% macro task_item(t, show_assignee=false, return_to=None, pass_to=None) %}
 <li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}">
   <div>
     <div class="why">{{ t.why }}</div>
@@ -26,6 +37,7 @@
   <div class="inline">
     {% if t.opp_id %}<a class="btn sm" href="{{ opp_url(t.opp_kind, t.opp_id) }}">Open</a>{% elif t.entity_type == 'match' %}<a class="btn sm" href="{{ url_for('matches.detail', cid=t.entity_id) }}">Open match</a>{% elif t.entity_type == 'deal' %}<a class="btn sm" href="{{ url_for('deals.detail', deal_id=t.entity_id) }}">Open deal</a>{% elif t.entity_type == 'inquiry' %}<a class="btn sm" href="{{ url_for('others.detail', iid=t.entity_id) }}">Open inquiry</a>{% endif %}
     <a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a>
+    {% if pass_to and t.opp_id and t.opp_kind in ('seller', 'buyer') and t.opp_status != 'closed' %}{{ pass_control(t.opp_id, t.opp_kind, pass_to, return_to or '/') }}{% endif %}
   </div>
 </li>
 {% endmacro %}

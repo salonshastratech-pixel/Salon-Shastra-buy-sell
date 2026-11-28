@@ -27,6 +27,7 @@
       </div></details>{% endif %}</td></tr>{% endfor %}
 </table></div></div>
 
+{% with back="/team#give-task" %}{% include "_give_task.html" %}{% endwith %}
 <div class="card" id="stuck"><div class="card-h"><h2>Not moving</h2><span class="badge {{ 'warn' if stuck else 'ok' }}">{{ stuck|length }}</span></div>
   <p class="small muted">Records that have sat in one stage longer than usual with nobody speaking to the customer. Each has one suggested push.</p>
   <ul class="tasks">{% for x in stuck[:15] %}<li class="task"><div><div class="t small">

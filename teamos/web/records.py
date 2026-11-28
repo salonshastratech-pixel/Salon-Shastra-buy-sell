@@ -242,6 +242,33 @@ def rebuild_from_sheets():
     return redirect(url_for("records.manage") + "#rebuild")
 
 
+@bp.route("/<int:opp_id>/pass", methods=["POST"])
+@require("crm.assign")
+def pass_lead(opp_id):
+    """'Pass' on My Day: give a lead to a colleague - its open tasks and history go with it, they are told."""
+    db = get_db()
+    kind = db.scalar("SELECT kind FROM opportunities WHERE id = ?", (opp_id,))
+    if kind not in ("seller", "buyer"):
+        abort(404)
+    mod = S if kind == "seller" else B
+    opp = mod.load(db, opp_id)
+    to = int(request.form.get("to_id") or 0)
+    note = " ".join((request.form.get("note") or "").split())[:200]
+    back = safe_next(request.form.get("next"), url_for("main.my_day"))
+    if to == opp["primary_owner_id"]:
+        flash("They already own it.", "error")
+        return redirect(back)
+    try:
+        mod.assign_owner(db, g.user, opp, to, f"Passed by {g.user['full_name']}" + (f": {note}" if note else ""))
+        name = db.scalar("SELECT full_name FROM users WHERE id = ?", (to,))
+        flash(f"{opp['ref_code']} passed to {name} with its open tasks. They have been told.", "ok")
+    except ValidationError as e:
+        flash("Not passed: " + _msg(e), "error")
+    except PermissionDenied:
+        abort(403)
+    return redirect(back)
+
+
 @bp.route("/<int:opp_id>/basics", methods=["POST"])
 @require("crm.edit")
 def edit_basics(opp_id):
