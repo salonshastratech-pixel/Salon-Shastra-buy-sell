@@ -644,3 +644,113 @@ document.addEventListener("click", function (e) {
   document.addEventListener("change", all);
   all();
 })();
+
+// ---- Voice typing (speech to text) --------------------------------------------------------------------------------
+// A 🎤 button on the boxes where the team writes sentences (call notes, notes, remarks, tasks, WhatsApp replies).
+// Uses the browser's own speech recognition (Chrome / Edge: free, no key). Language: English (India), Hindi or
+// Telugu - tap the small EN / हि / తె label to switch; remembered on this device. Words are added where the
+// cursor is; the box still saves as usual (and the draft keeper sees every change).
+(function () {
+  if (document.body.classList.contains("public")) return;           // staff pages only
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var LANGS = [["en-IN", "EN", "English"], ["hi-IN", "हि", "Hindi"], ["te-IN", "తె", "Telugu"]];
+  var SKIP = /^(path_text|links|split|localities_preferred|localities_excluded|t|csv|raw)$/;
+  var lang = (function () { try { return localStorage.getItem("teamos-voice-lang") || "en-IN"; } catch (e) { return "en-IN"; } })();
+  var active = null;   // {rec, box, btn}
+
+  function langInfo(code) { for (var i = 0; i < LANGS.length; i++) if (LANGS[i][0] === code) return LANGS[i]; return LANGS[0]; }
+  function say(wrap, msg, bad) {
+    var n = wrap.querySelector(".voice-msg");
+    if (!n) { n = document.createElement("div"); n.className = "voice-msg"; n.setAttribute("aria-live", "polite"); wrap.appendChild(n); }
+    n.textContent = msg; n.classList.toggle("bad", !!bad); n.hidden = !msg;
+  }
+  function insert(box, text) {
+    text = text.trim();
+    if (!text) return;
+    var v = box.value, s = box.selectionStart == null ? v.length : box.selectionStart, e = box.selectionEnd == null ? v.length : box.selectionEnd;
+    var before = v.slice(0, s), after = v.slice(e);
+    if (before && !/\s$/.test(before)) text = " " + text;
+    if (before.trim() === "" || /[.!?]\s*$/.test(before)) text = text.replace(/^(\s*)(\S)/, function (m, sp, c) { return sp + c.toUpperCase(); });
+    var max = box.maxLength > 0 ? box.maxLength : 100000;
+    var next = (before + text + after).slice(0, max);
+    box.value = next;
+    var pos = Math.min((before + text).length, next.length);
+    try { box.setSelectionRange(pos, pos); } catch (x) {}
+    box.dispatchEvent(new Event("input", {bubbles: true}));
+  }
+  function stop() {
+    if (!active) return;
+    try { active.rec.stop(); } catch (e) {}
+  }
+  function start(box, btn, wrap) {
+    if (!SR) {
+      say(wrap, "Voice typing needs Chrome or Edge. On a phone you can also tap the 🎤 on the keyboard.", true);
+      return;
+    }
+    if (active) { var same = active.box === box; stop(); if (same) return; }
+    var rec = new SR();
+    rec.lang = lang; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+    active = {rec: rec, box: box, btn: btn};
+    btn.classList.add("on"); btn.setAttribute("aria-pressed", "true"); btn.title = "Listening… tap to stop";
+    say(wrap, "Listening (" + langInfo(lang)[2] + ")… speak, then tap 🎤 to stop.");
+    box.focus();
+    rec.onresult = function (ev) {
+      var interim = "";
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var r = ev.results[i];
+        if (r.isFinal) insert(box, r[0].transcript); else interim += r[0].transcript;
+      }
+      say(wrap, interim ? "… " + interim : "Listening (" + langInfo(lang)[2] + ")…");
+    };
+    rec.onerror = function (ev) {
+      var m = {"not-allowed": "Allow the microphone for this site (tap the lock icon next to the address → Microphone → Allow), then try again.",
+               "service-not-allowed": "Allow the microphone for this site, then try again.",
+               "no-speech": "Didn't hear anything — tap 🎤 and speak again.",
+               "audio-capture": "No microphone found on this device.",
+               "network": "Voice typing needs internet — check the connection and try again."}[ev.error];
+      say(wrap, m || "Voice typing stopped — tap 🎤 to try again.", true);
+    };
+    rec.onend = function () {
+      btn.classList.remove("on"); btn.setAttribute("aria-pressed", "false"); btn.title = "Type by voice";
+      var msg = wrap.querySelector(".voice-msg");
+      if (msg && !msg.classList.contains("bad")) say(wrap, "");
+      if (active && active.rec === rec) active = null;
+    };
+    try { rec.start(); } catch (e) { say(wrap, "Voice typing could not start — tap 🎤 again.", true); active = null; btn.classList.remove("on"); }
+  }
+  function attach(box) {
+    if (box.dataset.voice === "off" || box.dataset.voiceReady || SKIP.test(box.name || "") || box.readOnly || box.disabled) return;
+    if (box.type === "hidden") return;
+    box.dataset.voiceReady = "1";
+    var wrap = document.createElement("span");
+    wrap.className = "voice-wrap" + (box.tagName === "TEXTAREA" ? " is-area" : " is-line");
+    box.parentNode.insertBefore(wrap, box);
+    wrap.appendChild(box);
+    var bar = document.createElement("span");
+    bar.className = "voice-bar";
+    var lb = document.createElement("button");
+    lb.type = "button"; lb.className = "voice-lang"; lb.textContent = langInfo(lang)[1];
+    lb.title = "Voice language: " + langInfo(lang)[2] + " — tap to change";
+    var mic = document.createElement("button");
+    mic.type = "button"; mic.className = "voice-mic"; mic.title = "Type by voice"; mic.setAttribute("aria-label", "Type by voice");
+    mic.setAttribute("aria-pressed", "false"); mic.textContent = "🎤";
+    bar.appendChild(lb); bar.appendChild(mic); wrap.appendChild(bar);
+    mic.addEventListener("click", function (e) { e.preventDefault(); start(box, mic, wrap); });
+    lb.addEventListener("click", function (e) {
+      e.preventDefault();
+      var i = 0; for (; i < LANGS.length; i++) if (LANGS[i][0] === lang) break;
+      lang = LANGS[(i + 1) % LANGS.length][0];
+      try { localStorage.setItem("teamos-voice-lang", lang); } catch (x) {}
+      document.querySelectorAll(".voice-lang").forEach(function (b) { b.textContent = langInfo(lang)[1]; b.title = "Voice language: " + langInfo(lang)[2] + " — tap to change"; });
+      say(wrap, "Voice language: " + langInfo(lang)[2]);
+      if (active) stop();
+    });
+  }
+  function scan(root) {
+    (root || document).querySelectorAll(".main textarea, .main input[data-voice], .pass-f input[name=note]").forEach(attach);
+  }
+  scan();
+  document.addEventListener("toggle", function (e) { if (e.target && e.target.open) scan(e.target); }, true);
+  document.addEventListener("submit", stop, true);
+  window.addEventListener("pagehide", stop);
+})();
