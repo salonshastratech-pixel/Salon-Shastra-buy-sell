@@ -111,3 +111,14 @@ def test_session_errors_explain_and_number_fields_are_marked(app, login):
     assert 'name="asking_price"' in page and re.search(r'name="asking_price"[^>]*data-num="int"', page)
     js = c.get("/static/app.js").data.decode()
     assert "teamos-draft:" in js and "Numbers only" in js
+
+
+def test_placeholder_salon_names_are_not_duplicates(db):
+    admin = user(db, "admin@t.test")
+    for i, ph in enumerate(("9300990041", "9300990042")):
+        S.create_lead(db, admin, {"full_name": f"Owner {i}", "phone": ph, "salon_name": "Salon name not given",
+                                  "city": "Hyderabad", "locality": "Area not given", "source": "import",
+                                  "consent_contact": "1", "owner_id": str(admin["id"])})
+    assert S.find_duplicates(db, None, "Salon name not given", "Area not given") == []
+    assert S.find_duplicates(db, None, "Hyderabad", "Hyderabad") == []
+    assert db.scalar("SELECT COUNT(*) FROM duplicate_reviews WHERE status = 'open'") == 0

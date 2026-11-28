@@ -12,7 +12,7 @@ from .. import audit
 from ..permissions import can_view_restricted_seller, user_can
 from ..timeutil import now_iso, now_utc
 from . import tasks as T
-from .common import normalize_indian_mobile, parse_float, parse_inr, parse_int
+from .common import known_place, normalize_indian_mobile, parse_float, parse_inr, parse_int
 from .errors import PermissionDenied, ValidationError
 from .seller_fields import (ANSWER_STATE_LABELS, BY_KEY, CHECKLIST_STATUSES, FIELDS, LISTING_CHECKLIST,
                             MATERIAL_KEYS, RESTRICTED_KEYS, SECTIONS, is_applicable)
@@ -91,7 +91,11 @@ def find_duplicates(db, phone: str | None, salon_name: str, locality: str) -> li
         for c in db.all("SELECT * FROM contacts WHERE phone_normalized = ? OR alt_phone_normalized = ?",
                         (phone, phone)):
             found[c["id"]] = {**c, "reason": "Same mobile number"}
-    if salon_name and locality:
+    # Placeholders from imports ("Salon name not given" / "Area not given") or a city typed as the salon name
+    # say nothing about who someone is - matching on them flagged every unnamed import as a duplicate.
+    real = (known_place(salon_name) and known_place(locality)
+            and str(salon_name).strip().lower() != str(locality).strip().lower())
+    if real:
         for c in db.all(
             "SELECT c.* FROM salon_businesses b JOIN contacts c ON c.id = b.owner_contact_id "
             "WHERE lower(trim(b.name)) = lower(trim(?)) AND lower(trim(b.locality)) = lower(trim(?))",
