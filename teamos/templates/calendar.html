@@ -15,7 +15,7 @@
 <p class="small muted appt-key">Standard lengths: phone or video call with Vikas <b>10 min</b> · meeting at our office <b>3 hours</b> · salon or place visit <b>5 hours</b>.</p>
 <div class="week">{% for d in days %}
   <div class="day {{ 'today' if d.today }}"><div class="day-h">{{ d.date.strftime('%a') }} <b>{{ d.date.strftime('%d %b') }}</b></div>
-    {% for e in d.events %}<a class="ev ev-{{ e.type }} {{ 'hi' if e.priority in ('urgent','high') }}" href="{{ e.link }}"><span class="ev-time">{{ e.time }}–{{ e.end_time }} <span class="ev-len">· {{ e.length }}</span></span><span class="ev-t">{{ e.title }}</span>{% if e.ref %}<span class="ev-ref">{{ e.ref }}{% if e.area %} · {{ e.area }}{% endif %}</span>{% endif %}</a>{% if e.kind in ('vikas_call', 'consultation', 'visit') %}<a class="ev-gcal" href="{{ e.gcal }}" target="_blank" rel="noopener">📅 Add to Google Calendar</a>{% endif %}
+    {% for e in d.events %}<a class="ev ev-{{ e.type }} {{ 'hi' if e.priority in ('urgent','high') }}" href="{{ e.link }}"><span class="ev-time">{{ e.time }}–{{ e.end_time }} <span class="ev-len">· {{ e.length }}</span></span><span class="ev-t">{{ e.title }}</span>{% if e.ref %}<span class="ev-ref">{{ e.ref }}{% if e.area %} · {{ e.area }}{% endif %}</span>{% endif %}</a>{% if e.kind in ('vikas_call', 'consultation', 'visit') or (e.kind == 'task' and e.type == 'visit') %}<a class="ev-gcal" href="{{ e.gcal }}" target="_blank" rel="noopener">📅 Add to Google Calendar</a>{% endif %}
     {% else %}<div class="ev-empty">—</div>{% endfor %}
   </div>{% endfor %}
 </div>

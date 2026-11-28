@@ -63,7 +63,7 @@ def my_day():
         "AND a.at >= ? AND a.actor_id <> ? AND o.primary_owner_id = ? AND o.status <> 'closed' "
         "ORDER BY a.at DESC LIMIT 10", (to_iso(now_utc() - timedelta(days=3)), g.user["id"], g.user["id"]))
     gave_open = db.scalar("SELECT COUNT(*) FROM tasks WHERE creator_id = ? AND assignee_id <> ? AND status = 'open' "
-                          "AND task_type = 'other'", (g.user["id"], g.user["id"]))
+                          "AND task_type IN ('other', 'visit')", (g.user["id"], g.user["id"]))
     done_today = db.all(TASK_SELECT + "WHERE t.status = 'done' AND t.completed_by = ? AND t.completed_at >= ? "
                         "ORDER BY t.completed_at DESC", (g.user["id"], day_start))
     calls_today = db.scalar("SELECT COUNT(*) FROM activities WHERE actor_id = ? AND kind = 'call' AND at >= ?",
@@ -152,7 +152,7 @@ def team_board():
                            people=db.all("SELECT id, full_name FROM users WHERE is_active = 1 AND role IN "
                                          "('team_member', 'team_lead', 'super_admin') ORDER BY full_name"),
                            gave_open=db.scalar("SELECT COUNT(*) FROM tasks WHERE creator_id = ? AND assignee_id <> ? "
-                                               "AND status = 'open' AND task_type = 'other'",
+                                               "AND status = 'open' AND task_type IN ('other', 'visit')",
                                                (g.user["id"], g.user["id"])))
 
 

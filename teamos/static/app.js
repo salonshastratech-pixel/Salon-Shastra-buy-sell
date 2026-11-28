@@ -627,3 +627,20 @@ document.addEventListener("click", function (e) {
   var m = document.querySelector('meta[name="theme-color"]');
   if (m) m.setAttribute("content", next === "dark" ? "#3b1a0e" : "#c04000");
 });
+
+// "Date & time" becomes required as soon as the next step it belongs to is written
+(function () {
+  function sync(el) {
+    var f = el.form, other = f && f.elements[el.getAttribute("data-required-with")];
+    var on = !!(other && other.value && other.value.trim());
+    el.required = on;
+    var lab = el.closest(".field") && el.closest(".field").querySelector("label");
+    if (lab) lab.classList.toggle("is-req", on);
+  }
+  function all() { document.querySelectorAll("[data-required-with]").forEach(sync); }
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.form) e.target.form.querySelectorAll("[data-required-with]").forEach(sync);
+  });
+  document.addEventListener("change", all);
+  all();
+})();

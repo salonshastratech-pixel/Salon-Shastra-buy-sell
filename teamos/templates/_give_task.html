@@ -1,11 +1,15 @@
 {# "Give a task" - for yourself or anyone in the team, optionally about one lead (needs: people, gave_open, back). #}
 {% from "macros.html" import csrf %}
 <div class="card" id="give-task"><div class="card-h"><h2>Give a task</h2>{% if gave_open %}<a class="small" href="{{ url_for('tasks.index', view='created', given=1) }}">{{ gave_open }} you gave, still open →</a>{% endif %}</div>
-  <form method="post" action="{{ url_for('tasks.create') }}" class="form-grid give-task">{{ csrf() }}<input type="hidden" name="next" value="{{ back }}"><input type="hidden" name="task_type" value="other">
-    <div class="field full"><label for="gt-title">What needs doing</label><input id="gt-title" name="title" required maxlength="200" placeholder="e.g. Call back about the lease, send the investor form"></div>
-    <div class="field"><label for="gt-who">For</label><select id="gt-who" name="assignee_id">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if p.id == current_user.id }}>{{ p.full_name }}{{ ' (me)' if p.id == current_user.id }}</option>{% endfor %}</select></div>
-    <div class="field"><label for="gt-due">By</label><input id="gt-due" type="datetime-local" name="due_at"></div>
-    <div class="field"><label for="gt-ref">Lead number (optional)</label><input id="gt-ref" name="ref" placeholder="SL-00123 or BY-00045" maxlength="12"></div>
-    <div class="field"><label for="gt-pri">Priority</label><select id="gt-pri" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option><option value="low">Low</option></select></div>
-    <div class="full"><button class="btn primary">Give task</button> <span class="small muted">They get an alert; it shows on their My Day.</span></div>
+  <form method="post" action="{{ url_for('tasks.create') }}" class="give-task">{{ csrf() }}<input type="hidden" name="next" value="{{ back }}">
+    <div class="field"><label for="gt-title">What needs doing</label><textarea id="gt-title" name="title" required maxlength="200" rows="2" placeholder="e.g. Call back about the lease, send the investor form"></textarea></div>
+    <div class="field"><label for="gt-who">Give it to</label><select id="gt-who" name="assignee_id">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if p.id == current_user.id }}>{{ p.full_name }}{{ ' (me)' if p.id == current_user.id }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="gt-due">Date &amp; time <span class="req">*</span></label><input id="gt-due" type="datetime-local" name="due_at" required></div>
+    <div class="field"><label for="gt-kind">What kind</label><select id="gt-kind" name="task_type"><option value="other">Task (call, follow-up, anything)</option><option value="visit">Visit / meeting / appointment 📅</option></select></div>
+    <div class="gt-pair">
+      <div class="field"><label for="gt-ref">Lead no.</label><input id="gt-ref" name="ref" placeholder="SL-00123" maxlength="12" title="Optional: the salon owner (SL-…) or buyer (BY-…) number"></div>
+      <div class="field"><label for="gt-pri">Priority</label><select id="gt-pri" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option><option value="low">Low</option></select></div>
+    </div>
+    <button class="btn primary gt-go">Give task</button>
+    <p class="small muted gt-hint">They get an alert and it shows on their My Day. Appointments also go on the Calendar.</p>
   </form></div>

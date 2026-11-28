@@ -114,7 +114,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-soft)
 .field .help { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
 .field .err { font-size: 12px; color: var(--bad); margin-top: 3px; }
 .field.has-err input, .field.has-err select { border-color: var(--bad); }
-.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(50% - 16px)), 1fr));
+  gap: 0 16px; align-items: start; }
 .form-grid .full { grid-column: 1 / -1; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; }
 .check input { margin-top: 3px; }
@@ -1011,17 +1012,24 @@ details.edit-inq[open] > summary { margin-bottom: 10px; }
 
 /* My Day: pass a lead to a colleague; the other side folded under each list; give a task */
 details.pass { display: inline-block; position: relative; }
-details.pass > summary { list-style: none; cursor: pointer; font-size: .82rem; padding: .25rem .6rem; border: 1px solid var(--line, #ddd);
-  border-radius: 999px; background: var(--card, #fff); }
+details.pass > summary { list-style: none; cursor: pointer; }
 details.pass > summary::-webkit-details-marker { display: none; }
-details.pass[open] > summary { background: var(--accent-soft, #fdeee6); }
-.pass-f { position: absolute; right: 0; z-index: 30; margin-top: .35rem; width: min(300px, 86vw); display: grid; gap: .45rem;
-  padding: .75rem; background: var(--card, #fff); border: 1px solid var(--line, #ddd); border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.14); }
+details.pass[open] > summary { border-color: var(--brand); }
+.pass-f { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(300px, 86vw); display: grid; gap: 8px;
+  padding: 12px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow-lift, 0 10px 30px rgba(0,0,0,.14)); }
+.pass-f label { display: grid; gap: 4px; margin: 0; }
 .pass-f select, .pass-f input { width: 100%; }
-details.other-side { margin-top: .6rem; border-top: 1px dashed var(--line, #ddd); padding-top: .5rem; }
-details.other-side > summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--muted, #666); }
-.give-task .field { margin: 0; }
+.pass-f .btn { justify-content: center; }
+details.other-side { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; }
+details.other-side > summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--muted); padding: 4px 0; }
+li.task > .inline { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.give-task { display: grid; gap: 10px; }
+.give-task .field { margin: 0; min-width: 0; }
+.give-task textarea { min-height: 0; resize: vertical; }
+.gt-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: end; }
+.gt-go { width: 100%; justify-content: center; }
+.gt-hint { margin: -2px 0 0; text-align: center; }
+.give-task input, .give-task select { width: 100%; min-width: 0; }
 
 /* ==================================================================================================================
    Dark theme — "Mahogany night" (28 Nov 2026). The default for the team. Built from the brand, not from black:
@@ -1096,7 +1104,7 @@ html[data-theme="dark"] .board-col { background: rgba(70, 33, 19, .55); }
 html[data-theme="dark"] .board-card, html[data-theme="dark"] details.pop .pop-body, html[data-theme="dark"] .person-card,
 html[data-theme="dark"] .rel-chip, html[data-theme="dark"] .back, html[data-theme="dark"] .bubble.in,
 html[data-theme="dark"] .link-box, html[data-theme="dark"] .badge.syn, html[data-theme="dark"] .pass-f,
-html[data-theme="dark"] details.pass > summary, html[data-theme="dark"] .cbtn, html[data-theme="dark"] .area-count,
+html[data-theme="dark"] .cbtn, html[data-theme="dark"] .area-count,
 html[data-theme="dark"] .chip span, html[data-theme="dark"] .stat-chip { background: var(--surface-2); color: var(--text); }
 html[data-theme="dark"] details.pop .pop-body, html[data-theme="dark"] .pass-f { background: #4a2414; box-shadow: 0 18px 44px rgba(18, 5, 1, .55); }
 html[data-theme="dark"] .tile, html[data-theme="dark"] table.cmp tr.fam td, html[data-theme="dark"] .teaser-mini,
@@ -1214,3 +1222,15 @@ html[data-theme="dark"] ::-webkit-scrollbar-track { background: transparent; }
 .theme-switch { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: none;
   font: inherit; color: inherit; cursor: pointer; border-radius: 8px; text-align: left; }
 .theme-switch:hover { background: var(--brand-tint); }
+
+/* page headers never push the page wide on a phone (long names, sources) */
+.ph .sub, .ph h1 { overflow-wrap: anywhere; }
+/* short button labels stay on one line; a crowded row of buttons wraps as whole buttons instead */
+.btn.sm, .ph .actions .btn, .ph > .inline .btn, .chip-tabs a { white-space: nowrap; }
+.ph .actions, .ph > .inline { flex-wrap: wrap; justify-content: flex-end; row-gap: 8px; }
+label.is-req::after { content: " *"; color: var(--bad); }
+.btn.gcal { white-space: nowrap; }
+
+/* header rows: buttons keep their own height; long words in the header line break instead of widening the page */
+.ph .actions, .ph > .inline, .ph .inline { align-items: center; }
+.ph .sub > *, .ph .inline.sub > * { min-width: 0; flex-shrink: 1; overflow-wrap: anywhere; }

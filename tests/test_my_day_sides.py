@@ -81,8 +81,8 @@ def test_admin_and_team_give_each_other_tasks(db, login):
     assert db.scalar("SELECT COUNT(*) FROM tasks") == n                       # wrong lead number: nothing made
     c = login("seller@t.test")
     assert "Give a task" in c.get("/").data.decode()
-    c.post("/tasks/new", {"title": "Approve the Glow teaser", "assignee_id": str(admin["id"]), "next": "/"})
-    c.post("/tasks/new", {"title": "Call Ravi back", "assignee_id": str(user(db, "buyer@t.test")["id"]), "next": "/"})
+    c.post("/tasks/new", {"title": "Approve the Glow teaser", "assignee_id": str(admin["id"]), "due_at": "2030-01-05T11:00", "next": "/"})
+    c.post("/tasks/new", {"title": "Call Ravi back", "assignee_id": str(user(db, "buyer@t.test")["id"]), "due_at": "2030-01-05T12:00", "next": "/"})
     assert db.scalar("SELECT assignee_id FROM tasks WHERE title = 'Approve the Glow teaser'") == admin["id"]
     assert db.scalar("SELECT assignee_id FROM tasks WHERE title = 'Call Ravi back'") == user(db, "buyer@t.test")["id"]
     assert "2 you gave, still open" in c.get("/").data.decode()

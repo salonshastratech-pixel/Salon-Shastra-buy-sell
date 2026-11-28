@@ -5,6 +5,7 @@ from .. import messaging
 from ..db import get_db
 from ..domain import forms as F
 from ..domain import matching as M
+from ..domain import tasks as T
 from ..domain.errors import ValidationError
 from ..permissions import user_can
 from ..security import login_required, require, safe_next
@@ -139,6 +140,8 @@ def tasks(cid):
     db = get_db()
     f = request.form
     try:
+        if (f.get("buyer_task") or "").strip() or (f.get("seller_task") or "").strip():
+            T.need_when(parse_local_input(f.get("due_at")))
         M.create_subtasks(db, g.user, cid, f.get("buyer_task"), f.get("seller_task"), parse_local_input(f.get("due_at")))
         flash("Tasks created — each side's owner sees theirs on My Day; the shared match task closes when both are done.",
               "ok")

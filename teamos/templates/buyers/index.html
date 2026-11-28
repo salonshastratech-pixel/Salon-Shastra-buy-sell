@@ -33,7 +33,7 @@
     {% if can('users.manage') %}<option value="delete">Delete for good (admin)</option>{% endif %}
   </select>
   <span class="bulk-opt" data-for="assign" hidden><select name="owner_id" aria-label="New owner">{% for u in users %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endfor %}</select></span>
-  <span class="bulk-opt" data-for="task" hidden><input name="title" placeholder="e.g. Call back about the pilot" maxlength="120" aria-label="Task"><input type="datetime-local" name="due_at" aria-label="Due"></span>
+  <span class="bulk-opt" data-for="task" hidden><input name="title" placeholder="e.g. Call back about the pilot" maxlength="120" aria-label="Task"><input type="datetime-local" name="due_at" aria-label="Date and time" data-required-with="title"></span>
   <span class="bulk-opt" data-for="delete" hidden><input name="reason" placeholder="Why? e.g. test data" aria-label="Reason"><input name="confirm" placeholder="Type DELETE" aria-label="Type DELETE to confirm" autocomplete="off"></span>
   <button class="btn sm primary">Apply</button>
   {% if can('users.manage') %}<a class="btn sm" href="?{{ request.query_string.decode() }}{{ '&' if request.query_string else '' }}export=csv">Export this list (CSV)</a>{% endif %}

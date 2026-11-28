@@ -68,7 +68,7 @@
       <form method="post" action="{{ url_for('matches.tasks', cid=c.id) }}">{{ csrf() }}
         <div class="field"><label>Buyer side → {{ c.buyer_owner or 'buyer owner' }}</label><input name="buyer_task" value="{{ buyer_q[0].text if buyer_q else '' }}"></div>
         <div class="field"><label>Salon side → {{ c.seller_owner or 'seller owner' }}</label><input name="seller_task" value="{{ seller_q[0].text if seller_q else '' }}"></div>
-        <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at"></div>
+        <div class="field"><label>Date &amp; time <span class="req">*</span></label><input type="datetime-local" name="due_at" required></div>
         <button class="btn">Create linked tasks</button>
         <p class="small muted">Each owner sees their task on My Day; the shared match task closes itself when both are done. Existing identical tasks are reused, so nobody calls twice.</p>
       </form></details>

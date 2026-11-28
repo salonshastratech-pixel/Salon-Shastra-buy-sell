@@ -62,6 +62,7 @@ def bulk():
         elif action == "task":
             title = (f.get("title") or "").strip()
             due = parse_local_input(f.get("due_at"))
+            T.need_when(due)
             for r in rows:
                 try:
                     with db:

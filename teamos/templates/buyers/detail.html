@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_lead_marks.html" import marks %}{% from "macros.html" import csrf, stage_badge %}{% from "_send_form.html" import send_form, moved_banner, move_card %}
+{% extends "base.html" %}{% from "_lead_marks.html" import marks %}{% from "macros.html" import cal_btn, csrf, stage_badge %}{% from "_send_form.html" import send_form, moved_banner, move_card %}
 {% macro bfact(label, key, kind='text') -%}
 {%- set value = mandate[key] -%}{%- set st = prov.get(key, {}).get('answer_state') -%}
 <div class="fact"><div class="k">{{ label }}</div><div class="v">
@@ -21,7 +21,7 @@
     <div class="inline sub">{{ stage_badge(opp.stage, STAGE_LABELS) }}
       {% if mandate.need_type %}<span class="badge {{ 'warn' if mandate.need_type == 'new_salon' else 'info' }}">{{ BF.option_label('need_type', mandate.need_type) }}</span>{% endif %}
       <span>{{ mandate.preferred_city or opp.contact_city }}</span> · <span>Owner: <strong>{{ opp.owner_name or 'Unassigned' }}</strong></span>
-      · <span>Source: {{ SOURCE_LABELS.get(opp.source, opp.source) }}{% if opp.source_detail %} ({{ opp.source_detail }}){% endif %}</span>
+      · <span>Source: {{ SOURCE_LABELS.get(opp.source, opp.source) }}{% if opp.source_detail %} ({{ opp.source_detail|source_detail }}){% endif %}</span>
       {% if opp.is_synthetic %}<span class="badge syn">synthetic demo record</span>{% endif %}
       {% if opp.do_not_contact %}<span class="badge bad">Do not contact</span>{% endif %} {{ marks(opp) }}</div>
   </div>
@@ -48,15 +48,15 @@
       {% if tasks %}
       <ul class="tasks">{% for t in tasks %}<li class="task {{ 'overdue' if t.due_at and t.due_at < now_iso() }}"><div><div class="t"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div>
         <div class="meta">{{ t.assignee_name }} · due {{ t.due_at|ist }} ({{ t.due_at|rel }})</div></div>
-        <div><a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a></div></li>{% endfor %}</ul>
+        <div class="inline">{{ cal_btn(t) }}<a class="btn sm" href="{{ url_for('tasks.detail', task_id=t.id) }}">Complete</a></div></li>{% endfor %}</ul>
       {% elif opp.status != 'closed' %}<div class="flash error">No next action. Add one below so this buyer isn't lost.</div>{% endif %}
       {% if opp.status != 'closed' %}
       <details class="disclose"><summary>+ Add a task</summary>
         <form method="post" action="{{ url_for('buyers.add_task', opp_id=opp.id) }}" class="form-grid">{{ csrf() }}
           <div class="field full"><label>What needs to happen?</label><input name="title" required placeholder="e.g. Collect bank statement showing available funds"></div>
           <div class="field"><label>Who</label><select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == current_user.id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
-          <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at" required></div>
-          <div class="field"><label>Type</label><select name="task_type">{% for v, l in [('follow_up','Follow-up'),('call','Call'),('collect_info','Collect information'),('review','Review'),('visit','Visit')] %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Date &amp; time <span class="req">*</span></label><input type="datetime-local" name="due_at" required></div>
+          <div class="field"><label>Type</label><select name="task_type">{% for v, l in [('follow_up','Follow-up'),('call','Call'),('collect_info','Collect information'),('review','Review'),('visit','Visit / meeting / appointment 📅')] %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
           <div class="field"><label>Priority</label><select name="priority">{% for p in ['normal','high','urgent','low'] %}<option value="{{ p }}">{{ p|title }}</option>{% endfor %}</select></div>
           <div class="full"><button class="btn primary">Add task</button></div>
         </form></details>{% endif %}
@@ -70,7 +70,7 @@
         <div class="field"><label>Also complete task</label><select name="complete_task_id"><option value="">— none —</option>{% for t in tasks %}<option value="{{ t.id }}" {{ 'selected' if loop.first and t.task_type in ('first_contact','call','review') }}>{{ t.title }}</option>{% endfor %}</select></div>
         <div class="field full"><label>What was said</label><textarea name="note" placeholder="Budget, must-haves, objections, commitments"></textarea></div>
         <div class="field"><label>Next action</label><input name="next_title" placeholder="e.g. Send detailed buyer form"></div>
-        <div class="field"><label>Next action due (IST)</label><input type="datetime-local" name="next_due"></div>
+        <div class="field"><label>Next action date &amp; time</label><input type="datetime-local" name="next_due" data-required-with="next_title"></div>
         <div class="full"><button class="btn primary">Save call</button> <span class="small muted">A next action is required unless another task stays open. "Not interested" or "Disqualified" with no next action closes the record, with your note as the reason.</span></div>
       </form>{% endif %}
     </div>

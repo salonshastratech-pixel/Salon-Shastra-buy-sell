@@ -139,6 +139,24 @@ def create_app(overrides: dict | None = None) -> Flask:
     app.jinja_env.filters["rel"] = timeutil.relative
     app.jinja_env.filters["tel"] = _tel_link
     app.jinja_env.filters["nice"] = _nice
+
+    def _source_detail(v):
+        """Where a lead came from, readable: 'google-sheet-1BiG… · File · Tab' → 'Google Sheet: File › Tab'."""
+        s = str(v or "").strip()
+        if s.startswith("google-sheet-"):
+            parts = [p.strip() for p in s.split("·")[1:] if p.strip()]
+            return "Google Sheet" + (": " + " › ".join(parts) if parts else "")
+        return s[:80]
+    app.jinja_env.filters["source_detail"] = _source_detail
+
+    def _gcal_task(t):
+        if not t or t.get("task_type") != "visit" or not t.get("due_at"):
+            return None
+        from .domain import appointments as AP
+        ref = t.get("ref_code") or ""
+        return AP.gcal_url(t["title"] + (f" · {ref}" if ref else ""), t["due_at"], AP.TASK_MINUTES.get("visit", 60),
+                           "Salon Shastra TeamOS" + (f" — {ref}" if ref else ""), t.get("area") or "")
+    app.jinja_env.globals["gcal_task"] = _gcal_task
     app.jinja_env.filters["first_name"] = lambda n: (str(n).split()[0] if n else "")
     app.jinja_env.filters["short_action"] = _short_action
     app.jinja_env.globals.update(

@@ -750,6 +750,8 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
             change_stage(db, actor, opp, CLOSE_ON_CALL[outcome],
                          (note or "").strip() or T.CALL_OUTCOME_LABELS[outcome] + " (on the call)")
             return
+        if (next_title or "").strip() and not next_due:
+            T.need_when(None, "next_due")                      # a next step the caller typed needs its time
         if outcome in S.NO_ANSWER and not (next_title or "").strip():
             next_title, next_due = S.retry_slot(outcome)
         if next_title and next_title.strip():

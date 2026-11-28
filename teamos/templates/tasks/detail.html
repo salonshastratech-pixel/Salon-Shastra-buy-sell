@@ -1,10 +1,11 @@
-{% extends "base.html" %}{% from "macros.html" import csrf %}
+{% extends "base.html" %}{% from "macros.html" import csrf, cal_btn %}
 {% block title %}Task{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>{{ task.title }}</h1>
 <div class="sub"><span class="badge {{ 'ok' if task.status == 'done' else 'grey' if task.status == 'cancelled' else 'info' }}">{{ task.status }}</span>
- {{ task.task_type|replace('_',' ') }} · {{ task.priority }} priority · assigned to <strong>{{ task.assignee_name }}</strong> · due {{ task.due_at|ist }} ({{ task.due_at|rel }})
+ {{ dict(TASK_TYPES).get(task.task_type, task.task_type|replace('_',' ')) }} · {{ task.priority }} priority · assigned to <strong>{{ task.assignee_name }}</strong> · due {{ task.due_at|ist }} ({{ task.due_at|rel }})
  {% if task.ref_code %} · <a href="{{ opp_url(task.opp_kind, task.opp_id) }}">{{ task.ref_code }} {{ task.salon_name or task.contact_name }}</a>{% elif task.entity_type == 'match' %} · <a href="{{ url_for('matches.detail', cid=task.entity_id) }}">Open match</a>{% elif task.entity_type == 'deal' %} · <a href="{{ url_for('deals.detail', deal_id=task.entity_id) }}">Open deal</a>{% endif %}</div></div></div>
+{% if task.status == 'open' %}<div class="inline" style="margin:-6px 0 14px">{{ cal_btn(task) }}</div>{% endif %}
 <div class="split"><div>
   {% if task.status == 'open' and can_act %}
   <div class="card"><h2>Complete</h2>
@@ -12,7 +13,7 @@
       <input type="hidden" name="return_to" value="{{ opp_url(task.opp_kind, task.opp_id) if task.opp_id else '' }}">
       <div class="field full"><label>Outcome — what happened?</label><textarea name="outcome" required></textarea></div>
       <div class="field"><label>Next action {% if task.opp_id %}<span class="muted">(required if nothing else is open)</span>{% endif %}</label><input name="next_title"></div>
-      <div class="field"><label>Next due (IST)</label><input type="datetime-local" name="next_due"></div>
+      <div class="field"><label>Next action date &amp; time</label><input type="datetime-local" name="next_due" data-required-with="next_title"></div>
       <div class="field"><label>Next action owner</label><select name="next_assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == task.assignee_id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
       <div class="full"><button class="btn primary">Mark done</button></div></form></div>
   {% elif task.status == 'open' %}<div class="card muted">Only the assignee, the requester or a team lead can complete this task.</div>

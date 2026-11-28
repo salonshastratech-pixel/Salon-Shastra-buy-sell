@@ -15,7 +15,7 @@ from .errors import PermissionDenied, ValidationError
 TASK_TYPES = [
     ("first_contact", "First contact"), ("call", "Call"), ("follow_up", "Follow-up"),
     ("collect_info", "Collect information"), ("review", "Review"), ("approval", "Approval"),
-    ("visit", "Visit"), ("match_review", "Match review"), ("other", "Other"),
+    ("visit", "Visit / meeting / appointment"), ("match_review", "Match review"), ("other", "Other"),
 ]
 PRIORITIES = [("urgent", "Urgent"), ("high", "High"), ("normal", "Normal"), ("low", "Low")]
 PRIORITY_RANK = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
@@ -134,6 +134,8 @@ def complete_task(db, actor: dict, task_id: int, outcome: str, next_title: str |
     outcome = (outcome or "").strip()
     if not outcome:
         raise ValidationError({"outcome": "Record what happened."})
+    if next_title and next_title.strip():
+        need_when(next_due, "next_due")
     with db:
         if next_title and next_title.strip():
             create_task(db, actor, title=next_title, assignee_id=next_assignee_id or task["assignee_id"],
@@ -213,6 +215,15 @@ def ensure_next_action(db, actor, opp: dict, status: str) -> None:
     create_task(db, actor, title="Follow up — record reopened, plan the next step",
                 assignee_id=opp.get("primary_owner_id") or actor["id"], due_at=to_iso(t), task_type="follow_up",
                 priority="normal", entity_type="opportunity", entity_id=opp["id"])
+
+
+WHEN_MSG = "Choose the date and the time — every task, call-back and appointment needs both."
+
+
+def need_when(due_at, field: str = "due_at") -> None:
+    """Anything a person schedules needs a date AND a time (a box left empty, or only half filled, is refused)."""
+    if not due_at:
+        raise ValidationError({field: WHEN_MSG})
 
 
 def cancel_open_tasks(db, actor_id, entity_type, entity_id, reason: str) -> None:

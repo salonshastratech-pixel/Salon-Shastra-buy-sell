@@ -15,7 +15,7 @@ from ..timeutil import parse_iso
 MINUTES = {"phone": 10, "video": 10, "office": 180, "salon_visit": 300, "visit": 300}
 LABELS = {"phone": "Phone call with Vikas", "video": "Video call with Vikas", "office": "Meeting at our office",
           "salon_visit": "Salon visit", "visit": "Salon / place visit"}
-TASK_MINUTES = {"first_contact": 10, "call": 10, "follow_up": 10, "visit": 300}
+TASK_MINUTES = {"first_contact": 10, "call": 10, "follow_up": 10, "visit": 60}   # visit / meeting / appointment
 
 
 def minutes_for(kind: str | None) -> int:

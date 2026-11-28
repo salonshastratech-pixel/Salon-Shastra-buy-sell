@@ -242,6 +242,7 @@ def add_task(opp_id):
     f = request.form
 
     def go():
+        T.need_when(parse_local_input(f.get("due_at")))
         with db:
             T.create_task(db, g.user, title=f.get("title"), assignee_id=int(f.get("assignee_id") or 0),
                           due_at=parse_local_input(f.get("due_at")), task_type=f.get("task_type") or "follow_up",

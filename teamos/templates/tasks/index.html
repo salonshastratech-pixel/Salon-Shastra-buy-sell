@@ -13,7 +13,7 @@
     <form method="post" action="{{ url_for('tasks.create') }}">{{ csrf() }}
       <div class="field"><label>Title</label><input name="title" required></div>
       <div class="field"><label>Assign to</label><select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == current_user.id }}>{{ u.full_name }}</option>{% endfor %}</select></div>
-      <div class="field"><label>Due (IST)</label><input type="datetime-local" name="due_at"></div>
+      <div class="field"><label>Date &amp; time <span class="req">*</span></label><input type="datetime-local" name="due_at" required></div>
       <div class="field"><label>Type</label><select name="task_type">{% for v, l in TASK_TYPES %}<option value="{{ v }}" {{ 'selected' if v == 'other' }}>{{ l }}</option>{% endfor %}</select></div>
       <div class="field"><label>Priority</label><select name="priority">{% for v, l in PRIORITIES %}<option value="{{ v }}" {{ 'selected' if v == 'normal' }}>{{ l }}</option>{% endfor %}</select></div>
       <button class="btn primary">Create</button></form>

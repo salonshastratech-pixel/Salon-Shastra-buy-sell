@@ -28,7 +28,7 @@ def index():
                       "ORDER BY t.updated_at DESC LIMIT 100", (g.user["id"], g.user["id"]))
     elif view == "created":
         rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.creator_id = ? AND t.assignee_id <> ?"
-                      + (" AND t.task_type = 'other'" if request.args.get("given") else ""),   # given with the box
+                      + (" AND t.task_type IN ('other', 'visit')" if request.args.get("given") else ""),   # given with the box
                       (g.user["id"], g.user["id"]))
     else:
         rows = db.all(TASK_SELECT + "WHERE t.status = 'open' AND t.assignee_id = ?", (g.user["id"],))
@@ -61,9 +61,12 @@ def create():
             entity = db.one("SELECT id FROM opportunities WHERE ref_code = ?", (ref,))
             if not entity:
                 raise ValidationError({"ref": f"No lead {ref} — check the number (e.g. SL-00123 or BY-00045)."})
+        due = parse_local_input(f.get("due_at"))
+        if (f.get("title") or "").strip():
+            T.need_when(due)
         with db:
             tid = T.create_task(db, g.user, title=f.get("title"), assignee_id=int(f.get("assignee_id") or 0),
-                                due_at=parse_local_input(f.get("due_at")), task_type=f.get("task_type") or "other",
+                                due_at=due, task_type=f.get("task_type") if f.get("task_type") in dict(T.TASK_TYPES) else "other",
                                 priority=f.get("priority") or "normal",
                                 entity_type="opportunity" if entity else None, entity_id=entity["id"] if entity else None)
         who = db.scalar("SELECT full_name FROM users WHERE id = ?", (int(f.get("assignee_id") or 0),))
@@ -89,7 +92,7 @@ def detail(task_id):
     events = db.all("SELECT e.*, u.full_name AS actor_name FROM task_events e LEFT JOIN users u ON u.id = e.actor_id "
                     "WHERE task_id = ? ORDER BY e.at, e.id", (task_id,))
     users = db.all("SELECT id, full_name FROM users WHERE is_active = 1 AND role <> 'finance' ORDER BY full_name")
-    return render_template("tasks/detail.html", task=task, events=events, users=users,
+    return render_template("tasks/detail.html", task=task, events=events, users=users, TASK_TYPES=T.TASK_TYPES,
                            can_act=T.can_act_on_task(db, g.user, task))
 
 
