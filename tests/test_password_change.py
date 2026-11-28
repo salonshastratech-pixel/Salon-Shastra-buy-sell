@@ -7,8 +7,8 @@ def test_temporary_password_leads_to_change_page_and_banner(app, db, login):
     c = app.test_client()
     r = c.post("/login", data={"email": "seller@t.test", "password": PW})
     assert r.status_code == 302 and "/me/password" in r.headers["Location"]
-    page = c.get("/").data.decode()
-    assert "You are using a temporary password" in page
+    r = c.get("/")                                   # nothing else opens until it is replaced
+    assert r.status_code == 302 and "/me/password" in r.headers["Location"]
 
 
 def test_change_password_rules_and_other_devices_signed_out(app, db, login):

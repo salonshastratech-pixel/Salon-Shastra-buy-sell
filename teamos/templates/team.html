@@ -39,7 +39,7 @@
 <div class="split">
   <div>
     <div class="card"><div class="card-h"><h2>Overdue</h2><span class="badge {{ 'bad' if overdue else 'grey' }}">{{ overdue|length }}</span></div>
-      <ul class="tasks">{% for t in overdue %}{{ task_item(t, show_assignee=true) }}{% else %}<li class="empty">Nothing overdue.</li>{% endfor %}</ul></div>
+      <ul class="tasks">{% for t in overdue[:60] %}{{ task_item(t, show_assignee=true) }}{% else %}<li class="empty">Nothing overdue.</li>{% endfor %}</ul>{% if overdue|length > 60 %}<p class="small muted">Showing the 60 most urgent of {{ overdue|length }}. <a href="{{ url_for('tasks.index', view='all') }}">See all open tasks →</a> or pick a person above.</p>{% endif %}</div>
     <div class="card"><div class="card-h"><h2>Due today</h2><span class="badge">{{ due_today|length }}</span></div>
       <ul class="tasks">{% for t in due_today %}{{ task_item(t, show_assignee=true) }}{% else %}<li class="empty">Nothing else due today.</li>{% endfor %}</ul></div>
     <details class="card disclose"><summary>Later ({{ later|length }})</summary>

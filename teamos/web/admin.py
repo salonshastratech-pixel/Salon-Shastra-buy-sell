@@ -43,8 +43,10 @@ def create_user():
         err = "Name and a valid email are required."
     elif role not in ROLE_LABELS:
         err = "Choose a role."
-    if role in ("finance", "super_admin") and team in ("seller", "buyer", "general"):
+    if role in ("finance", "super_admin"):          # an Admin / Finance person is not in the lead rotation
         team = "finance" if role == "finance" else "admin"
+    if err:
+        pass
     elif db.one("SELECT id FROM users WHERE email = ?", (email,)):
         err = f"{email} already belongs to " + (db.scalar("SELECT full_name FROM users WHERE email = ?", (email,)) or "a user") + \
             ". If you did not type it, your browser filled in a saved login — clear the field and type their email."
@@ -86,7 +88,34 @@ def toggle_active(user_id):
         if not new:
             revoke_user_sessions(db, user_id)
         audit.record(db, g.user["id"], "user.enable" if new else "user.disable", "user", user_id)
-    flash(f"{u['full_name']} {'enabled' if new else 'disabled — all sessions ended immediately'}.", "ok")
+    msg = f"{u['full_name']} {'enabled' if new else 'disabled — all sessions ended immediately'}."
+    if not new:
+        leads = db.scalar("SELECT COUNT(*) FROM opportunities WHERE primary_owner_id = ? AND status <> 'closed'",
+                          (user_id,)) or 0
+        tasks = db.scalar("SELECT COUNT(*) FROM tasks WHERE assignee_id = ? AND status = 'open'", (user_id,)) or 0
+        if leads or tasks:
+            msg += (f" They still hold {leads} open lead(s) and {tasks} open task(s) — give them to someone in "
+                    "Team → Workload → Hand over, so nobody is left waiting for a call.")
+    flash(msg, "ok")
+    return redirect(url_for("admin.users"))
+
+
+@bp.route("/users/<int:user_id>/name", methods=["POST"])
+@require("users.manage")
+def rename_user(user_id):
+    """The name the team sees (Today page, owner on records, messages). Sign-in email and password do not change."""
+    db = get_db()
+    u = db.one("SELECT * FROM users WHERE id = ?", (user_id,))
+    if not u:
+        abort(404)
+    name = " ".join((request.form.get("full_name") or "").split())[:80]
+    if len(name) < 2:
+        flash("Write the person's name.", "error")
+    elif name != u["full_name"]:
+        with db:
+            db.update("users", user_id, {"full_name": name})
+            audit.record(db, g.user["id"], "user.rename", "user", user_id, {"from": u["full_name"], "to": name})
+        flash(f"Renamed {u['full_name']} to {name}.", "ok")
     return redirect(url_for("admin.users"))
 
 

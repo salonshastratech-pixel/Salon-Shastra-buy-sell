@@ -17,7 +17,7 @@ from .domain import seller_fields as SF
 from .domain.common import format_inr
 from .domain.errors import PermissionDenied
 from .permissions import CAPABILITIES, ROLE_LABELS
-from .security import can, check_csrf, enforce_mfa, load_current_user, log_denied
+from .security import can, check_csrf, enforce_mfa, enforce_password_change, load_current_user, log_denied
 
 __version__ = "0.13.0-m13"
 
@@ -85,7 +85,7 @@ def create_app(overrides: dict | None = None) -> Flask:
         g.request_started = time.monotonic()
         load_current_user()
         check_csrf()
-        return enforce_mfa()
+        return enforce_mfa() or enforce_password_change()
 
     @app.after_request
     def _headers(resp):

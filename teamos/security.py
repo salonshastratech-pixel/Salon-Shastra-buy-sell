@@ -132,6 +132,23 @@ def enforce_mfa():
     return None
 
 
+PASSWORD_EXEMPT = MFA_EXEMPT | {"auth.change_password", "auth.login"}
+
+
+def enforce_password_change():
+    """A temporary password (new person, or reset by an admin) must be replaced before anything else: the admin
+    typed it, so it must not stay in use."""
+    u = g.get("user")
+    if (u and u.get("must_change_password") and not g.get("mfa_pending")
+            and request.endpoint not in PASSWORD_EXEMPT and not (request.endpoint or "").startswith(
+                ("public.", "public_teaser.", "public_webhook.", "public_calendar.", "public_status.", "public_pilot.",
+                 "pwa.", "ops."))):
+        if request.method == "GET":
+            return redirect(url_for("auth.change_password", first=1))
+        abort(403)
+    return None
+
+
 def can(capability: str, scope_type: str | None = None, scope_id: int | None = None) -> bool:
     if g.get("mfa_pending"):
         return False
