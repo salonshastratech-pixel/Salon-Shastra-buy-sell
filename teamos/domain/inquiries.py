@@ -268,6 +268,8 @@ def update(db, actor, inq: dict, data) -> None:
         db.execute("UPDATE inquiries SET " + ", ".join(f"{k} = ?" for k in vals) + ", updated_at = ? WHERE id = ?",
                    (*vals.values(), now_iso(), inq["id"]))
         T.add_activity(db, actor["id"], "inquiry", inq["id"], "data_update", "Details updated")
+        if vals.get("notes") and vals["notes"] != (inq.get("notes") or ""):
+            T.tag_people(db, actor, vals["notes"], f"/others/{inq['id']}", f"{inq['ref_code']} ({inq['full_name']})")
         audit.record(db, actor["id"], "inquiry.update", "inquiry", inq["id"], {})
 
 
@@ -290,6 +292,7 @@ def log(db, actor, inq: dict, data) -> None:
         if parts:
             T.add_activity(db, actor["id"], "inquiry", inq["id"], "call" if data.get("was_call") else "note",
                            " · ".join(parts))
+        T.tag_people(db, actor, note, f"/others/{inq['id']}", f"{inq['ref_code']} ({inq['full_name']})")
         db.execute("UPDATE inquiries SET status = ?, temperature = ?, updated_at = ?, last_contact_at = ? WHERE id = ?",
                    (status, temp, now, now if data.get("was_call") else inq["last_contact_at"], inq["id"]))
         if status not in OPEN_STATUSES:     # finished: their open reminders are no longer needed

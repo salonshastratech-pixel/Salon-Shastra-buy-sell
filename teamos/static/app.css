@@ -1253,3 +1253,16 @@ label.is-req::after { content: " *"; color: var(--bad); }
 html[data-theme="dark"] .voice-mic, html[data-theme="dark"] .voice-lang { background: rgba(255, 232, 216, .1); border-color: rgba(255, 196, 160, .3); color: #fff3ea; }
 html[data-theme="dark"] .voice-mic.on { background: #d9534a; border-color: #ff8a7d; }
 @media (prefers-reduced-motion: reduce) { .voice-mic.on { animation: none; } }
+
+/* ---- @tags: the name picker and highlighted tags ---- */
+.tag-menu { position: absolute; left: 8px; right: 8px; top: calc(100% + 4px); z-index: 40; display: grid; gap: 2px; padding: 6px;
+  background: var(--surface, #fff); border: 1px solid var(--line-strong, #ddd); border-radius: 12px;
+  box-shadow: var(--shadow-lift, 0 10px 30px rgba(0,0,0,.18)); max-height: 260px; overflow: auto; }
+.tag-opt { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; padding: 8px 10px; border: 0;
+  border-radius: 8px; background: none; color: inherit; font: inherit; cursor: pointer; }
+.tag-opt span { font-size: 12px; color: var(--muted); }
+.tag-opt.on, .tag-opt:hover { background: var(--brand-soft, #ffe3d5); }
+.tag { color: var(--brand); font-weight: 600; background: var(--brand-tint, #fff6f1); border-radius: 6px; padding: 0 3px; }
+html[data-theme="dark"] .tag-menu { background: #4a2414; border-color: rgba(255, 196, 160, .3); box-shadow: 0 18px 44px rgba(18, 5, 1, .55); }
+html[data-theme="dark"] .tag-opt.on, html[data-theme="dark"] .tag-opt:hover { background: rgba(255, 138, 76, .22); }
+html[data-theme="dark"] .tag { color: #ffb48a; background: rgba(255, 138, 76, .14); }

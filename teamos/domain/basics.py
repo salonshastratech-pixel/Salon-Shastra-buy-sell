@@ -93,6 +93,9 @@ def update(db, actor: dict, opp: dict, data) -> list[str]:
                 T.notify(db, owner, "hot_lead", f"{actor['full_name']} marked {before_o.get('ref_code')} as hot "
                          f"({contact.get('full_name') or business.get('name') or 'lead'}) — call soon",
                          f"/{'sellers' if kind == 'seller' else 'buyers'}/{opp['id']}")
+        if "team_remark" in o_set and o_set["team_remark"]:
+            T.tag_people(db, actor, o_set["team_remark"], T.record_link({**before_o, "id": opp["id"]}),
+                         T.record_label({**opp, "ref_code": before_o.get("ref_code")}))
         if changed:
             T.add_activity(db, actor["id"], "opportunity", opp["id"], "data_update", "Details edited: " + ", ".join(changed))
             audit.record(db, actor["id"], "record.basics_edited", "opportunity", opp["id"],

@@ -754,3 +754,71 @@ document.addEventListener("click", function (e) {
   document.addEventListener("submit", stop, true);
   window.addEventListener("pagehide", stop);
 })();
+
+// ---- @tags: typing @ in a note box offers the team; pick one and they are told when the note is saved ----
+(function () {
+  var team = [];
+  try { team = JSON.parse(document.body.getAttribute("data-team") || "[]"); } catch (e) { team = []; }
+  if (!team.length) return;
+  var menu = null, box = null, start = -1, items = [], pick = 0;
+  function close() { if (menu) { menu.remove(); menu = null; } box = null; start = -1; }
+  function where(el) {
+    var v = el.value, caret = el.selectionStart == null ? v.length : el.selectionStart;
+    var m = /(^|[\s(])@([^\s@]{0,30})$/.exec(v.slice(0, caret));
+    return m ? {from: caret - m[2].length - 1, q: m[2].toLowerCase(), caret: caret} : null;
+  }
+  function choose(i) {
+    if (!box || !items[i]) return;
+    var v = box.value, w = where(box);
+    if (!w) { close(); return; }
+    var ins = "@" + items[i].h + " ";
+    box.value = v.slice(0, w.from) + ins + v.slice(w.caret);
+    var pos = w.from + ins.length;
+    try { box.setSelectionRange(pos, pos); } catch (x) {}
+    box.dispatchEvent(new Event("input", {bubbles: true}));
+    close();
+  }
+  function paint() {
+    menu.innerHTML = "";
+    items.forEach(function (t, i) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "tag-opt" + (i === pick ? " on" : "");
+      b.innerHTML = "<strong></strong><span></span>";
+      b.firstChild.textContent = "@" + t.h; b.lastChild.textContent = t.n + (t.s ? " · " + t.s : "") + (t.me ? " (you)" : "");
+      b.addEventListener("mousedown", function (e) { e.preventDefault(); choose(i); });
+      menu.appendChild(b);
+    });
+  }
+  function open(el, w) {
+    items = team.filter(function (t) {
+      return !w.q || t.h.toLowerCase().indexOf(w.q) === 0 || t.n.toLowerCase().indexOf(w.q) === 0 ||
+             t.n.toLowerCase().indexOf(" " + w.q) > -1;
+    }).slice(0, 8);
+    if (!items.length) { close(); return; }
+    if (!menu || box !== el) {
+      close();
+      menu = document.createElement("div"); menu.className = "tag-menu"; menu.setAttribute("role", "listbox");
+      var host = el.closest(".voice-wrap") || el.parentNode;
+      if (getComputedStyle(host).position === "static") host.style.position = "relative";
+      host.appendChild(menu);
+    }
+    box = el; pick = Math.min(pick, items.length - 1); paint();
+  }
+  function ok(el) {
+    return el && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && (el.hasAttribute("data-voice") ||
+      (el.name === "note" && el.closest(".pass-f"))))) && el.closest(".main");
+  }
+  document.addEventListener("input", function (e) {
+    if (!ok(e.target)) return;
+    var w = where(e.target);
+    if (w) { if (box !== e.target) pick = 0; open(e.target, w); } else if (box === e.target) close();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!menu || e.target !== box) return;
+    if (e.key === "ArrowDown") { pick = (pick + 1) % items.length; paint(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { pick = (pick - 1 + items.length) % items.length; paint(); e.preventDefault(); }
+    else if (e.key === "Enter" || e.key === "Tab") { choose(pick); e.preventDefault(); }
+    else if (e.key === "Escape") { close(); e.preventDefault(); }
+  });
+  document.addEventListener("focusout", function (e) { if (e.target === box) setTimeout(close, 150); });
+})();

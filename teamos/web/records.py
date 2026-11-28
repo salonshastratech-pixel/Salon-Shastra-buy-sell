@@ -263,6 +263,7 @@ def pass_lead(opp_id):
         mod.assign_owner(db, g.user, opp, to, f"Passed by {g.user['full_name']}" + (f": {note}" if note else ""))
         name = db.scalar("SELECT full_name FROM users WHERE id = ?", (to,))
         flash(f"{opp['ref_code']} passed to {name} with its open tasks. They have been told.", "ok")
+        T.tag_people(db, g.user, note, T.record_link(opp), T.record_label(opp))
     except ValidationError as e:
         flash("Not passed: " + _msg(e), "error")
     except PermissionDenied:

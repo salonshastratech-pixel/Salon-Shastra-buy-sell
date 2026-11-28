@@ -30,7 +30,7 @@
     <span class="feed-dot" aria-hidden="true">{{ {'call': '📞', 'note': '📝', 'stage_change': '➜', 'assignment': '👤'}.get(a.kind, '•') }}</span>
     <div><div class="small"><a href="{{ opp_url(a.opp_kind, a.entity_id) }}">{{ a.salon_name or a.contact_name }}</a>
       {% if a.kind == 'call' %} · call: <strong>{{ CALL_OUTCOME_LABELS.get(a.call_outcome, a.call_outcome or 'logged') }}</strong>{% endif %}</div>
-      {% if a.body %}<div class="small muted clip">{{ a.body|truncate(110) }}</div>{% endif %}
+      {% if a.body %}<div class="small muted clip">{{ a.body|truncate(110)|tags }}</div>{% endif %}
       <div class="small muted">{{ a.actor_name or 'System' }} · <span title="{{ a.at|ist }}">{{ a.at|rel }}</span></div></div>
   </li>{% else %}<li class="empty">Nothing yet today.</li>{% endfor %}</ol></div>
 {% endmacro %}

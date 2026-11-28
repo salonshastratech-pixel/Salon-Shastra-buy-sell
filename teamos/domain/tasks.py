@@ -136,6 +136,8 @@ def complete_task(db, actor: dict, task_id: int, outcome: str, next_title: str |
         raise ValidationError({"outcome": "Record what happened."})
     if next_title and next_title.strip():
         need_when(next_due, "next_due")
+    if "@" in outcome:
+        tag_people(db, actor, outcome, f"/tasks/{task_id}", f"the task “{task['title'][:60]}”")
     with db:
         if next_title and next_title.strip():
             create_task(db, actor, title=next_title, assignee_id=next_assignee_id or task["assignee_id"],
@@ -224,6 +226,55 @@ def need_when(due_at, field: str = "due_at") -> None:
     """Anything a person schedules needs a date AND a time (a box left empty, or only half filled, is refused)."""
     if not due_at:
         raise ValidationError({field: WHEN_MSG})
+
+
+def _tag_key(s: str) -> str:
+    return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+
+
+def tag_people(db, actor: dict | None, text: str | None, link: str | None, where: str) -> list[str]:
+    """@tags in anything the team writes: each colleague tagged gets an alert (and a phone push when their phone
+    alerts are on) saying who tagged them, where, and what was written. @Firstname, @FullName (with or without the
+    space) and @email-name all work; case does not matter. Returns the names tagged (the writer is told)."""
+    import re
+    text = text or ""
+    if "@" not in text:
+        return []
+    tokens = {_tag_key(t) for t in re.findall(r"@([^\s@,.;:!?()\[\]{}\"']+(?:[ ][A-Z][^\s@,.;:!?()]*)?)", text)}
+    tokens |= {_tag_key(t) for t in re.findall(r"@([^\s@,.;:!?()\[\]{}\"']+)", text)}
+    tokens.discard("")
+    if not tokens:
+        return []
+    tagged = []
+    for u in db.all("SELECT id, full_name, email FROM users WHERE is_active = 1 AND role <> 'finance' ORDER BY id"):
+        names = {_tag_key(u["full_name"].split()[0]) if u["full_name"].split() else "", _tag_key(u["full_name"]),
+                 _tag_key((u["email"] or "").split("@")[0].split(".")[0]), _tag_key((u["email"] or "").split("@")[0])}
+        names.discard("")
+        if not (tokens & names) or (actor and u["id"] == actor["id"]):
+            continue
+        snippet = " ".join(text.split())
+        snippet = snippet if len(snippet) <= 140 else snippet[:137] + "…"
+        notify(db, u["id"], "mention", f"{(actor or {}).get('full_name') or 'Someone'} tagged you on {where}: “{snippet}”",
+               link)
+        tagged.append(u["full_name"])
+    if tagged:
+        try:
+            from flask import flash, has_request_context
+            if has_request_context():
+                flash("Tagged " + ", ".join(tagged) + " — they get an alert.", "ok")
+        except Exception:  # noqa: BLE001 — telling the writer is a courtesy, never a failure
+            pass
+    return tagged
+
+
+def record_label(opp: dict) -> str:
+    """'SL-00123 (Glow Salon)' — how a record is named in an alert."""
+    name = opp.get("salon_name") or opp.get("contact_name") or ""
+    return f"{opp.get('ref_code') or 'a record'}" + (f" ({name})" if name else "")
+
+
+def record_link(opp: dict) -> str:
+    return f"/{'buyers' if opp.get('kind') == 'buyer' else 'sellers'}/{opp['id']}"
 
 
 def cancel_open_tasks(db, actor_id, entity_type, entity_id, reason: str) -> None:

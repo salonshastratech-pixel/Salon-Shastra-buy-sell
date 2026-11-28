@@ -650,6 +650,7 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
     now = now_iso()
     with db:
         T.add_activity(db, actor["id"], "opportunity", opp["id"], "call", (note or "").strip() or None, outcome)
+        T.tag_people(db, actor, note, f"/sellers/{opp['id']}", T.record_label(opp))
         from .timeline import mark_contacted
         mark_contacted(db, opp["id"], now)
         if outcome == "do_not_contact":
@@ -702,12 +703,7 @@ def add_note(db, actor, opp, body: str) -> None:
         raise ValidationError({"body": "Write a note."})
     with db:
         T.add_activity(db, actor["id"], "opportunity", opp["id"], "note", body.strip()[:4000])
-        # @mentions: notify users whose first name is mentioned with @
-        for u in db.all("SELECT id, full_name FROM users WHERE is_active = 1"):
-            first = u["full_name"].split()[0].lower()
-            if f"@{first}" in body.lower() and u["id"] != actor["id"]:
-                T.notify(db, u["id"], "mention", f"{actor['full_name']} mentioned you on {opp['ref_code']}",
-                         f"/sellers/{opp['id']}")
+        T.tag_people(db, actor, body, f"/sellers/{opp['id']}", T.record_label(opp))
 
 
 def assign_owner(db, actor, opp, new_owner_id: int, reason: str) -> None:

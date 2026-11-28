@@ -33,7 +33,7 @@
   </div>
 
   <div class="card"><h2>History</h2>
-    <ul class="tasks">{% for a in history %}<li class="task"><div><div class="t small">{{ a.body }}</div><div class="meta">{{ a.actor_name or 'System' }} · {{ a.at|rel }}</div></div></li>{% else %}<li class="empty">Nothing logged yet.</li>{% endfor %}</ul>
+    <ul class="tasks">{% for a in history %}<li class="task"><div><div class="t small">{{ a.body|tags }}</div><div class="meta">{{ a.actor_name or 'System' }} · {{ a.at|rel }}</div></div></li>{% else %}<li class="empty">Nothing logged yet.</li>{% endfor %}</ul>
   </div>
 </div>
 

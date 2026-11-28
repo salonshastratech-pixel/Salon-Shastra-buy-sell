@@ -197,7 +197,7 @@ def main():
             first = db.scalar("SELECT full_name FROM users WHERE id = ?", (other,)).split()[0]
             post(c, f"/{base}/{o['id']}/note", {"body": f"@{first} she may also want to buy a second salon"},
                  f"/{base}/{o['id']}")
-            check(notified(other, f"%mentioned you on {o['ref_code']}%") == 1, f"Meera: @{first} gets a notification")
+            check(notified(other, f"%tagged you on {o['ref_code']}%") == 1, f"Meera: @{first} gets a notification")
             check(notes_shown(c, base, o["id"], "may also want to buy a second salon"), "Meera: note shows on the profile")
             empty = post(c, f"/{base}/{o['id']}/note", {"body": "   "}, f"/{base}/{o['id']}")
             check("Write a note" in empty, "Meera: an empty note is refused, with a message")

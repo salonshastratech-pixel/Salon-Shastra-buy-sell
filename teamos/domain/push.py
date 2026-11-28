@@ -27,7 +27,8 @@ CATEGORIES = [("new_lead", "New leads given to me"), ("hot", "Hot leads"),
 KIND_CATEGORY = {"assignment": "new_lead", "task_assigned": "new_lead", "sheet_new_rows": "new_lead",
                  "hot_lead": "hot", "overdue": "followup", "stuck": "followup", "stuck_team": "followup",
                  "escalation": "followup", "due_soon": "followup", "vikas_booking": "vikas", "message": "messages",
-                 "status_check": "reminders", "proof_reminder": "reminders", "work_proof": "team_work"}
+                 "status_check": "reminders", "proof_reminder": "reminders", "work_proof": "team_work",
+                 "mention": "team"}
 CALM_SECONDS = 60
 SUBJECT = "mailto:support@salonshastra.com"
 

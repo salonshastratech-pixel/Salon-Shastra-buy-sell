@@ -93,7 +93,7 @@
       <form method="post" action="{{ url_for('sellers.note', opp_id=opp.id) }}">{{ csrf() }}
         <div class="field"><textarea name="body" placeholder="Internal note. Use @firstname to notify a colleague." required></textarea></div>
         <button class="btn">Add note</button></form>
-      <ul class="timeline">{% for a in timeline[:15] %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body or '' }}</div>
+      <ul class="timeline">{% for a in timeline[:15] %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body|tags }}</div>
         <div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul>
       {% if timeline|length > 15 %}<a href="{{ url_for('sellers.detail', opp_id=opp.id, tab='history') }}">Full history →</a>{% endif %}
     </div>
@@ -280,7 +280,7 @@
 
 {% elif tab == 'history' %}
 <div class="grid g2">
-  <div class="card"><h2>Activity</h2><ul class="timeline">{% for a in timeline %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong> {% endif %}{{ a.body or '' }}</div><div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul></div>
+  <div class="card"><h2>Activity</h2><ul class="timeline">{% for a in timeline %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong> {% endif %}{{ a.body|tags }}</div><div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul></div>
   <div>
     <div class="card"><h2>Stage history</h2>{% for h in history %}<div class="small">{{ STAGE_LABELS.get(h.from_stage, '—') }} → <strong>{{ STAGE_LABELS.get(h.to_stage) }}</strong> · {{ h.actor_name }} · {{ h.at|ist }}{% if h.reason %}<div class="muted">{{ h.reason }}</div>{% endif %}</div>{% endfor %}</div>
     <div class="card"><h2>Field changes</h2>{% for c in changes %}{% if c.field_key not in hidden %}<div class="small">v{{ c.data_version }} · <strong>{{ SF.BY_KEY[c.field_key].label if c.field_key in SF.BY_KEY else c.field_key }}</strong>: {{ c.old_value if c.old_value is not none else (c.old_state or 'not provided') }} → {{ c.new_value if c.new_value is not none else (c.new_state or 'not provided') }} <span class="muted">· {{ c.actor_name }} · {{ c.at|ist }}</span></div>{% endif %}{% else %}<p class="muted small">No changes recorded.</p>{% endfor %}</div>

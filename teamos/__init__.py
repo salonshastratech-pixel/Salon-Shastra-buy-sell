@@ -149,6 +149,46 @@ def create_app(overrides: dict | None = None) -> Flask:
         return s[:80]
     app.jinja_env.filters["source_detail"] = _source_detail
 
+    def _tags(text):
+        """A note as text, with @tags of team members highlighted (everything else escaped as usual)."""
+        import re
+
+        from markupsafe import Markup, escape
+        s = str(escape(text or ""))
+        if "@" not in s:
+            return Markup(s)
+        try:
+            from .db import get_db
+            keys = set()
+            for u in get_db().all("SELECT full_name FROM users WHERE is_active = 1 AND role <> 'finance'"):
+                parts = u["full_name"].split()
+                if parts:
+                    keys |= {parts[0].lower(), "".join(parts).lower()}
+        except Exception:  # noqa: BLE001
+            return Markup(s)
+        return Markup(re.sub(r"@([A-Za-zऀ-౿][\w]*)",
+                             lambda m: f'<span class="tag">@{m.group(1)}</span>' if m.group(1).lower() in keys
+                             else m.group(0), s))
+    app.jinja_env.filters["tags"] = _tags
+
+    def _team_tags():
+        if not g.get("user"):
+            return []
+        from .db import get_db
+        rows = get_db().all("SELECT id, full_name, team, role FROM users WHERE is_active = 1 AND role <> 'finance' "
+                            "ORDER BY full_name")
+        firsts = [r["full_name"].split()[0].lower() for r in rows if r["full_name"].split()]
+        out = []
+        for r in rows:
+            parts = r["full_name"].split()
+            if not parts:
+                continue
+            handle = parts[0] if firsts.count(parts[0].lower()) == 1 else "".join(parts)
+            side = {"seller": "Salon owners", "buyer": "Buyers & investors", "admin": "Admin"}.get(r["team"], "")
+            out.append({"h": handle, "n": r["full_name"], "s": side, "me": r["id"] == g.user["id"]})
+        return out
+    app.jinja_env.globals["team_tags"] = _team_tags
+
     def _gcal_task(t):
         if not t or t.get("task_type") != "visit" or not t.get("due_at"):
             return None

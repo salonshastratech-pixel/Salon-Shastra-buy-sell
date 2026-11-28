@@ -69,6 +69,7 @@ def create():
                                 due_at=due, task_type=f.get("task_type") if f.get("task_type") in dict(T.TASK_TYPES) else "other",
                                 priority=f.get("priority") or "normal",
                                 entity_type="opportunity" if entity else None, entity_id=entity["id"] if entity else None)
+        T.tag_people(db, g.user, f.get("title"), f"/tasks/{tid}", "a task")
         who = db.scalar("SELECT full_name FROM users WHERE id = ?", (int(f.get("assignee_id") or 0),))
         flash("Task created." if int(f.get("assignee_id") or 0) == g.user["id"] else
               f"Task given to {who}. They have been told.", "ok")

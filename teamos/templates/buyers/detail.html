@@ -109,7 +109,7 @@
       <form method="post" action="{{ url_for('buyers.note', opp_id=opp.id) }}">{{ csrf() }}
         <div class="field"><textarea name="body" placeholder="Internal note. Use @firstname to notify a colleague." required></textarea></div>
         <button class="btn">Add note</button></form>
-      <ul class="timeline">{% for a in timeline[:15] %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body or '' }}</div>
+      <ul class="timeline">{% for a in timeline[:15] %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body|tags }}</div>
         <div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul>
       {% if timeline|length > 15 %}<a href="{{ url_for('buyers.detail', opp_id=opp.id, tab='history') }}">Full history →</a>{% endif %}
     </div>
@@ -269,7 +269,7 @@
   <div class="card"><h2>Stage history</h2>
     <ul class="timeline">{% for h in history %}<li><div>{{ STAGE_LABELS.get(h.from_stage, h.from_stage or '—') }} → <strong>{{ STAGE_LABELS.get(h.to_stage, h.to_stage) }}</strong>{% if h.reason %}: {{ h.reason }}{% endif %}</div><div class="who">{{ h.actor_name or 'System' }} · {{ h.at|ist }}</div></li>{% endfor %}</ul></div>
   <div class="card"><h2>All activity</h2>
-    <ul class="timeline">{% for a in timeline %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body or '' }}</div><div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul></div>
+    <ul class="timeline">{% for a in timeline %}<li class="{{ a.kind }}"><div>{% if a.kind == 'call' %}<strong>Call — {{ CALL_OUTCOME_LABELS.get(a.call_outcome) }}</strong>{% if a.body %}: {% endif %}{% endif %}{{ a.body|tags }}</div><div class="who">{{ a.actor_name or 'System' }} · {{ a.at|ist }}</div></li>{% endfor %}</ul></div>
 </div><div>
   <div class="card flush"><div class="card-h"><h2>&nbsp;&nbsp;Requirement changes</h2></div><div class="table-wrap"><table class="small">
     <tr><th>v</th><th>Field</th><th>From</th><th>To</th><th>By</th></tr>
