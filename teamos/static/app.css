@@ -1002,3 +1002,9 @@ details.edit-inq[open] > summary { margin-bottom: 10px; }
 .status-big { display: flex; gap: 10px; align-items: center; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
 .status-big:hover, .status-big:focus-visible { border-color: var(--brand, #c04000); }
 @media (max-width: 960px) { .inquiry-form > .stack { order: -1; } }   /* on phones: name & mobile first, then the questions */
+
+/* Numbers only + kept drafts */
+.num-hint { color: #b45309; }
+.num-hint:empty { display: none; }
+.draft-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; margin: 0 0 10px; border: 1px dashed var(--brand, #c04000); border-radius: 10px; background: #fff7ed; font-size: .92em; }
+.draft-note { margin: 0 0 10px; }

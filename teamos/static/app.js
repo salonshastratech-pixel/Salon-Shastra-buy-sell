@@ -94,7 +94,7 @@
   function inrWords(raw) {
     var v = (raw || '').toLowerCase().replace(/[,₹\s]|rs\.?/g, '');
     var m = v.match(/^(\d+(?:\.\d+)?)(l|lac|lakh|lakhs|cr|crore|crores|k|thousand|thousands)?$/);
-    if (!m) return v ? 'Write a number like 45000, 45k or 25L' : '';
+    if (!m) return v ? 'Type the amount in rupees, numbers only (e.g. 45000)' : '';
     var mult = {l: 1e5, lac: 1e5, lakh: 1e5, lakhs: 1e5, cr: 1e7, crore: 1e7, crores: 1e7, k: 1e3, thousand: 1e3, thousands: 1e3}[m[2]] || 1;
     var n = Math.round(parseFloat(m[1]) * mult);
     var T = formText();
@@ -102,7 +102,12 @@
     return '= ₹' + n.toLocaleString('en-IN') + (words ? ' (' + words + ')' : '');
   }
   document.querySelectorAll('input[data-inr]').forEach(function (i) {
-    var out = i.closest('.qf').querySelector('.inr-words');
+    var box = i.closest('.qf, .field, .intake-row') || i.parentNode;
+    var out = box.querySelector('.inr-words');
+    if (!out) {                                   // staff forms: add the "= Rs 25 lakh" line under the amount
+      out = document.createElement('div'); out.className = 'inr-words help'; out.setAttribute('aria-live', 'polite');
+      (i.closest('.inr') || i).insertAdjacentElement('afterend', out);
+    }
     var upd = function () { if (out) out.textContent = inrWords(i.value); };
     i.addEventListener('input', upd); upd();
   });
@@ -451,5 +456,153 @@
     });
     var wrap = document.createElement('span'); wrap.className = 'copy-wrap';
     el.parentNode.insertBefore(wrap, el.nextSibling); wrap.appendChild(b);
+  });
+})();
+
+
+// -- Number fields take numbers only (typed, pasted or autofilled). data-num: int | dec | tel; phone-like fields too --
+(function () {
+  var PHONE = /^(phone|alt_phone|wa_number|contact_number|whatsapp|mobile)$/;
+  function kindOf(el) {
+    if (el.dataset.num) return el.dataset.num;
+    if (el.type === 'tel' || el.getAttribute('inputmode') === 'tel' || PHONE.test(el.name || '')) return 'tel';
+    if (el.getAttribute('inputmode') === 'numeric') return 'int';
+    if (el.getAttribute('inputmode') === 'decimal') return 'dec';
+    return null;
+  }
+  function clean(v, k) {
+    if (k === 'int') return v.replace(/[^0-9]/g, '');
+    if (k === 'dec') {
+      v = v.replace(/[^0-9.]/g, '');
+      var i = v.indexOf('.');
+      return i < 0 ? v : v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '');
+    }
+    if (k === 'tel') return v.replace(/(?!^\+)[^0-9]/g, '');
+    return v;
+  }
+  function fix(el) {
+    var k = kindOf(el); if (!k) return;
+    var v = clean(el.value, k);
+    if (v === el.value) return;
+    el.value = v;
+    el.dispatchEvent(new Event('input', {bubbles: true}));   // helpers (e.g. the rupee line) see the cleaned value
+    var after = el.closest('.inr') || el;
+    var hint = after.nextElementSibling && after.nextElementSibling.classList.contains('num-hint') ? after.nextElementSibling : null;
+    if (!hint) { hint = document.createElement('div'); hint.className = 'num-hint small'; after.insertAdjacentElement('afterend', hint); }
+    hint.textContent = k === 'tel' ? 'Numbers only (10-digit mobile).' : 'Numbers only, no letters.';
+    clearTimeout(el._numT); el._numT = setTimeout(function () { hint.textContent = ''; }, 2500);
+  }
+  document.addEventListener('input', function (e) { if (e.target.tagName === 'INPUT') fix(e.target); });
+  document.addEventListener('change', function (e) { if (e.target.tagName === 'INPUT') fix(e.target); });
+  document.querySelectorAll('input').forEach(function (el) {
+    var k = kindOf(el);
+    if (k && !el.getAttribute('inputmode')) el.setAttribute('inputmode', k === 'tel' ? 'tel' : k === 'dec' ? 'decimal' : 'numeric');
+  });
+})();
+
+// -- Nothing typed is ever lost: every form keeps a draft on this device until it is saved -------------------------
+// If saving fails (a mistake to fix, the session ended...) the page comes back with everything put back in. If someone
+// leaves without saving, the page offers to restore it next time. Passwords, files and hidden values are never kept.
+(function () {
+  var PREFIX = 'teamos-draft:', DAY = 864e5, KEEP_DAYS = 7, store;
+  try { store = window.localStorage; store.setItem(PREFIX + 't', '1'); store.removeItem(PREFIX + 't'); } catch (e) { return; }
+  function allKeys() { var out = []; for (var i = 0; i < store.length; i++) out.push(store.key(i)); return out; }
+  document.querySelectorAll('form[action="/logout"]').forEach(function (f) {
+    f.addEventListener('submit', function () {        // signing out: drafts leave the device too
+      allKeys().forEach(function (k) { if (k && k.indexOf(PREFIX) === 0) store.removeItem(k); });
+    });
+  });
+  allKeys().forEach(function (k) {                    // old drafts expire
+    if (!k || k.indexOf(PREFIX) !== 0) return;
+    try { if (Date.now() - JSON.parse(store.getItem(k)).at > KEEP_DAYS * DAY) store.removeItem(k); } catch (e) { store.removeItem(k); }
+  });
+  var forms = Array.prototype.filter.call(document.querySelectorAll('form'), function (f) {
+    var m = (f.getAttribute('method') || 'get').toLowerCase();
+    var act = f.getAttribute('action') || '';
+    return m === 'post' && !f.hasAttribute('data-no-draft') && !/\/(login|logout|mfa|me\/password)/.test(act + ' ' + location.pathname)
+      && f.querySelector('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=file]), textarea, select');
+  });
+  var seen = {};
+  function keyOf(f) {
+    var base = location.pathname + '|' + (f.getAttribute('action') || location.pathname);
+    seen[base] = (seen[base] || 0) + 1;
+    return PREFIX + base + '|' + seen[base];
+  }
+  function fields(f) {
+    return Array.prototype.filter.call(f.elements, function (el) {
+      return el.name && !/^(csrf_token|form_token|draft|website|next)$/.test(el.name) &&
+        !/^(hidden|password|file|submit|button|reset)$/.test(el.type);
+    });
+  }
+  function read(f) {
+    var out = {}, any = false;
+    fields(f).forEach(function (el) {
+      if (el.type === 'radio') { if (el.checked) { out[el.name] = el.value; if (!el.defaultChecked) any = true; } return; }
+      if (el.type === 'checkbox') {
+        out[el.name] = out[el.name] || [];
+        if (el.checked) out[el.name].push(el.value);
+        if (el.checked !== el.defaultChecked) any = true;
+        return;
+      }
+      if (el.tagName === 'SELECT') {
+        out[el.name] = el.multiple ? Array.prototype.filter.call(el.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : el.value;
+        if (Array.prototype.some.call(el.options, function (o) { return o.selected !== o.defaultSelected; })) any = true;
+        return;
+      }
+      if (out[el.name] === undefined) out[el.name] = el.value;
+      if (el.value !== el.defaultValue) any = true;
+    });
+    return any ? out : null;
+  }
+  function write(f, vals) {
+    fields(f).forEach(function (el) {
+      if (!(el.name in vals)) return;
+      var v = vals[el.name];
+      if (el.type === 'radio') el.checked = (el.value === v);
+      else if (el.type === 'checkbox') el.checked = Array.isArray(v) && v.indexOf(el.value) >= 0;
+      else if (el.tagName === 'SELECT' && el.multiple) Array.prototype.forEach.call(el.options, function (o) { o.selected = Array.isArray(v) && v.indexOf(o.value) >= 0; });
+      else { el.value = v; el.dispatchEvent(new Event('input', {bubbles: true})); }
+    });
+    f.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  var failed = !!document.querySelector('.flash.error, .has-err, .page-error');
+  var okFlash = !!document.querySelector('.flash.ok');
+  // the form sent last: saved for sure when the app says so or moved on to another page; otherwise kept
+  var pending = null;
+  try { pending = JSON.parse(window.sessionStorage.getItem('teamos-pending') || 'null'); window.sessionStorage.removeItem('teamos-pending'); } catch (e) { pending = null; }
+  if (pending && !failed && (okFlash || pending.path !== location.pathname)) store.removeItem(pending.key);
+  forms.forEach(function (f) {
+    var key = keyOf(f), saved = null;
+    try { saved = JSON.parse(store.getItem(key) || 'null'); } catch (e) { saved = null; }
+    if (saved && saved.vals) {
+      if (saved.submitted && failed) {
+        write(f, saved.vals);                       // saving failed: everything typed is put back
+        var n = document.createElement('div'); n.className = 'draft-note flash warn';
+        n.textContent = 'Your entries were kept. Fix the item mentioned above and save again.';
+        f.insertBefore(n, f.firstChild);
+      } else if (!(saved.submitted && pending && pending.key === key && !failed)) {
+        var bar = document.createElement('div'); bar.className = 'draft-bar';
+        var when = new Date(saved.at).toLocaleString([], {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'});
+        var txt = document.createElement('span'); txt.textContent = 'You have unsaved entries here from ' + when + '.';
+        var r = document.createElement('button'); r.type = 'button'; r.className = 'btn sm primary'; r.textContent = 'Restore';
+        var d = document.createElement('button'); d.type = 'button'; d.className = 'btn sm link'; d.textContent = 'Discard';
+        r.addEventListener('click', function () { write(f, saved.vals); bar.remove(); });
+        d.addEventListener('click', function () { store.removeItem(key); bar.remove(); });
+        bar.appendChild(txt); bar.appendChild(r); bar.appendChild(d);
+        f.insertBefore(bar, f.firstChild);
+      }
+    }
+    var t;
+    var keep = function (submitted) {
+      var vals = read(f);
+      if (vals) store.setItem(key, JSON.stringify({at: Date.now(), vals: vals, submitted: !!submitted}));
+      else if (!submitted) store.removeItem(key);
+    };
+    f.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { keep(false); }, 400); });
+    f.addEventListener('change', function (e) { if (e.isTrusted) keep(false); });
+    f.addEventListener('submit', function () {
+      clearTimeout(t); keep(true);
+      try { window.sessionStorage.setItem('teamos-pending', JSON.stringify({key: key, path: location.pathname})); } catch (e) {}
+    });
   });
 })();

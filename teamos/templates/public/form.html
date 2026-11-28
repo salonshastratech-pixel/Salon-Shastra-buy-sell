@@ -11,8 +11,8 @@
   {% elif f.ftype == 'enum' %}<select id="q-{{ key }}" name="{{ key }}"><option value="">{{ _('Choose...') }}</option>{% for ov, ol in f.options %}<option value="{{ ov }}" {{ 'selected' if v == ov }}>{{ _(ol) }}</option>{% endfor %}</select>
   {% elif f.ftype == 'textarea' %}<textarea id="q-{{ key }}" name="{{ key }}" maxlength="2000" rows="3">{{ v or '' }}</textarea>
   {% elif f.ftype == 'date' %}<input id="q-{{ key }}" type="date" name="{{ key }}" value="{{ v or '' }}">
-  {% elif f.ftype == 'inr' %}<div class="inr"><span class="inr-sym">₹</span><input id="q-{{ key }}" name="{{ key }}" value="{{ v or '' }}" maxlength="40" inputmode="decimal" placeholder="{{ _('e.g. 45000 or 45k or 25L') }}" data-inr></div><div class="inr-words help" aria-live="polite"></div>
-  {% else %}<input id="q-{{ key }}" name="{{ key }}" value="{{ v or '' }}" maxlength="200" {% if f.ftype in ('int','pct') %}inputmode="numeric"{% endif %}>{% endif %}
+  {% elif f.ftype == 'inr' %}<div class="inr"><span class="inr-sym">₹</span><input id="q-{{ key }}" name="{{ key }}" value="{{ v or '' }}" maxlength="12" inputmode="numeric" data-num="int" placeholder="{{ _('in rupees, e.g. 45000') }}" data-inr></div><div class="inr-words help" aria-live="polite"></div>
+  {% else %}<input id="q-{{ key }}" name="{{ key }}" value="{{ v or '' }}" maxlength="200" {% if f.ftype == 'int' %}inputmode="numeric" data-num="int"{% elif f.ftype == 'pct' %}inputmode="decimal" data-num="dec"{% endif %}>{% endif %}
   <div class="chips small-chips" role="radiogroup" aria-label="Or">{% for sv, sl in FT.RESPONDENT_STATES %}<label class="chip ghost"><input type="radio" name="{{ key }}__state" value="{{ sv }}" {{ 'checked' if a.state == sv }}><span>{{ _(sl) }}</span></label>{% endfor %}</div>
   {% if f.importance %}{% set imp = (answers.get('importance:' ~ key) or {}).value %}
   <div class="imp"><span class="small muted">{{ _('How important is this?') }}</span>{{ chips(key ~ '__importance', FT.IMPORTANCE_SHORT, imp) }}</div>{% endif %}

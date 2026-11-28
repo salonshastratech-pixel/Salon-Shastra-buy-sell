@@ -175,7 +175,7 @@
       {% if f.ftype == 'enum' %}<select name="{{ f.key }}" data-value-for="{{ f.key }}"><option value="">—</option>{% for v, l in f.options %}<option value="{{ v }}" {{ 'selected' if listing[f.key] == v }}>{{ l }}</option>{% endfor %}</select>
       {% elif f.ftype == 'textarea' %}<textarea name="{{ f.key }}" data-value-for="{{ f.key }}">{{ listing[f.key] or '' }}</textarea>
       {% elif f.ftype == 'date' %}<input type="date" name="{{ f.key }}" value="{{ listing[f.key] or '' }}" data-value-for="{{ f.key }}">
-      {% else %}<input name="{{ f.key }}" value="{{ '' if listing[f.key] is none else listing[f.key] }}" data-value-for="{{ f.key }}"{% if f.ftype == 'int' %} inputmode="numeric"{% elif f.ftype == 'pct' %} inputmode="decimal"{% endif %} {% if f.ftype == 'inr' %}placeholder="₹ e.g. 5L"{% endif %}>
+      {% else %}<input name="{{ f.key }}" value="{{ '' if listing[f.key] is none else listing[f.key] }}" data-value-for="{{ f.key }}"{% if f.ftype in ('int', 'inr') %} inputmode="numeric" data-num="int"{% elif f.ftype == 'pct' %} inputmode="decimal" data-num="dec"{% endif %} {% if f.ftype == 'inr' %}placeholder="₹ in rupees, e.g. 500000" data-inr{% endif %}>
         {% if f.ftype == 'inr' and listing[f.key] is not none %}<div class="help">{{ listing[f.key]|inr(false) }}</div>{% endif %}{% endif %}
     </div>
     <div><select name="{{ f.key }}__state" title="Answer state"><option value="">Not provided</option>{% for v, l in SF.ANSWER_STATES %}<option value="{{ v }}" {{ 'selected' if p and p.answer_state == v }}>{{ l }}</option>{% endfor %}</select></div>

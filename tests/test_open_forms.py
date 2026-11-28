@@ -55,11 +55,13 @@ def test_open_forms_block_bots_and_stale_pages(app, db):
     page = pub.get("/f/pilot").data.decode()
     r = pub.post("/f/pilot", data={**FULL, "form_token": _token(page), "consent_contact": "1", "website": "spam"})
     assert r.status_code == 302 and not db.scalar("SELECT COUNT(*) FROM opportunities")   # honeypot: nothing saved
+    # an expired / forged / wrong-form token saves nothing — but the form comes back with every answer kept
     r = pub.post("/f/pilot", data={**FULL, "form_token": "forged", "consent_contact": "1"})
-    assert r.status_code == 400 and not db.scalar("SELECT COUNT(*) FROM opportunities")
+    assert r.status_code == 200 and "Your answers are kept" in r.data.decode()
+    assert not db.scalar("SELECT COUNT(*) FROM opportunities")
     inv = pub.get("/f/investor").data.decode()
     r = pub.post("/f/pilot", data={**FULL, "form_token": _token(inv), "consent_contact": "1"})  # wrong form's token
-    assert r.status_code == 400
+    assert "Your answers are kept" in r.data.decode() and not db.scalar("SELECT COUNT(*) FROM opportunities")
 
 
 def test_screen_from_form_reads_weak_answers():

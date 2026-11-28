@@ -262,3 +262,115 @@ def fix_side_duplicates(db, actor: dict, phones: list[str], keep: str = "seller"
                 merge_into(db, actor, x["id"], main["id"], why)
             out["merged"].append(f"{x['ref_code']} → {main['ref_code']}")
     return out
+
+
+# -- Same person, same side, two records (older imports / repeated form sends) -------------------------------------
+MOVE_TABLES = ("form_invitations", "form_submissions", "documents", "communications", "messages", "pilot_links",
+               "pilot_responses", "swot_reports", "vikas_bookings", "consultations", "investor_responses",
+               "investor_reports", "status_links", "fee_agreements", "import_rows", "sheet_import_rows",
+               "lead_ad_events", "batch_recipients")
+SKIP_COLS = {"id", "opportunity_id", "business_id", "created_at", "updated_at", "data_version", "approval_state",
+             "criteria_reviewed_version", "funding_status"}
+
+
+def _fill_details(db, table: str, src_id: int, dst_id: int, prov_entity: str | None) -> list[str]:
+    """Copy into the kept record's details (listing / requirements / profile) whatever it is missing; report clashes."""
+    s = db.one(f"SELECT * FROM {table} WHERE opportunity_id = ?", (src_id,))
+    if not s:
+        return []
+    d = db.one(f"SELECT * FROM {table} WHERE opportunity_id = ?", (dst_id,))
+    if not d:
+        db.execute(f"UPDATE {table} SET opportunity_id = ? WHERE opportunity_id = ?", (dst_id, src_id))
+        return []
+    fill, clash = {}, []
+    for k, v in s.items():
+        if k in SKIP_COLS or v in (None, ""):
+            continue
+        if d.get(k) in (None, ""):
+            fill[k] = v
+        elif str(d.get(k)) != str(v):
+            clash.append(f"{k.replace('_', ' ')}: {str(v)[:60]}")
+    if fill:
+        db.execute(f"UPDATE {table} SET " + ", ".join(f"{k} = ?" for k in fill) + " WHERE id = ?",
+                   (*fill.values(), d["id"]))
+        if prov_entity:   # keep the source of each copied answer
+            for k in fill:
+                row = db.one("SELECT * FROM field_provenance WHERE entity_type = ? AND entity_id = ? AND field_key = ?",
+                             (prov_entity, s["id"], k))
+                if row and not db.scalar("SELECT 1 FROM field_provenance WHERE entity_type = ? AND entity_id = ? AND "
+                                         "field_key = ?", (prov_entity, d["id"], k)):
+                    db.execute("UPDATE field_provenance SET entity_id = ? WHERE entity_type = ? AND entity_id = ? AND "
+                               "field_key = ?", (d["id"], prov_entity, s["id"], k))
+    return clash
+
+
+def merge_same_side(db, actor: dict, from_id: int, into_id: int, why: str) -> None:
+    """Two records of the same person on the same side: everything of `from_id` moves to `into_id` (calls, notes,
+    tasks, forms, answers, reports, documents, messages, bookings), missing details are filled in, differing values
+    are written into a note, and `from_id` is closed as Moved (kept, never deleted)."""
+    src, dst = load_any(db, from_id), load_any(db, into_id)
+    if not src or not dst or src["kind"] != dst["kind"]:
+        raise ValidationError({"record": "Both records must exist and be on the same side."})
+    with db:
+        clashes = []
+        if src["kind"] == "seller":
+            clashes += _fill_details(db, "seller_listings", from_id, into_id, "seller_listing")
+            clashes += _fill_details(db, "pilot_profiles", from_id, into_id, None)
+        else:
+            clashes += _fill_details(db, "buyer_mandates", from_id, into_id, "buyer_mandate")
+            clashes += _fill_details(db, "investor_profiles", from_id, into_id, None)
+        for t in MOVE_TABLES:
+            db.execute(f"UPDATE {t} SET opportunity_id = ? WHERE opportunity_id = ?", (into_id, from_id))
+        for u in db.all("SELECT user_id, added_by, added_at FROM opportunity_collaborators WHERE opportunity_id = ?",
+                        (from_id,)):
+            if not db.scalar("SELECT 1 FROM opportunity_collaborators WHERE opportunity_id = ? AND user_id = ?",
+                             (into_id, u["user_id"])):
+                db.insert("opportunity_collaborators", {"opportunity_id": into_id, **u})
+        db.execute("DELETE FROM opportunity_collaborators WHERE opportunity_id = ?", (from_id,))
+        db.execute("DELETE FROM sheet_field_state WHERE opportunity_id = ?", (from_id,))
+        if clashes:
+            T.add_activity(db, actor["id"], "opportunity", into_id, "note",
+                           f"From the duplicate record {src['ref_code']} (different from what is here): "
+                           + "; ".join(clashes)[:1800])
+    merge_into(db, actor, from_id, into_id, why)          # calls, notes, tasks, chats, marks; closes it as Moved
+
+
+def _weight(db, o: dict) -> tuple:
+    work = db.scalar("SELECT COUNT(*) FROM activities WHERE entity_type = 'opportunity' AND entity_id = ? AND "
+                     "kind IN ('call', 'note')", (o["id"],)) or 0
+    forms = db.scalar("SELECT COUNT(*) FROM pilot_responses WHERE opportunity_id = ?", (o["id"],)) or 0
+    forms += db.scalar("SELECT COUNT(*) FROM investor_responses WHERE opportunity_id = ?", (o["id"],)) or 0
+    return (o["status"] != "closed", forms, work, -o["id"])      # open, with forms, most worked on, then oldest
+
+
+def merge_duplicates(db, actor: dict, dry: bool = True) -> dict:
+    """Everyone with two or more records on the same side (same mobile number): keep the best one, fold the rest in.
+    Records linked to a deal or teaser are left for a person to decide."""
+    out = {"people": 0, "merged": [], "left_for_review": []}
+    groups = db.all("SELECT c.phone_normalized AS ph, o.kind FROM opportunities o JOIN contacts c ON c.id = o.contact_id "
+                    "WHERE o.stage <> ? AND c.phone_normalized IS NOT NULL GROUP BY c.phone_normalized, o.kind "
+                    "HAVING COUNT(*) > 1", (MOVED_STAGE,))
+    for g in groups:
+        recs = db.all("SELECT o.* FROM opportunities o JOIN contacts c ON c.id = o.contact_id WHERE o.kind = ? AND "
+                      "o.stage <> ? AND (c.phone_normalized = ? OR c.alt_phone_normalized = ?)",
+                      (g["kind"], MOVED_STAGE, g["ph"], g["ph"]))
+        if len(recs) < 2:
+            continue
+        out["people"] += 1
+        keep = max(recs, key=lambda o: _weight(db, o))
+        for o in recs:
+            if o["id"] == keep["id"]:
+                continue
+            if db.scalar("SELECT 1 FROM deals WHERE buyer_opp_id = ? OR seller_opp_id = ?", (o["id"], o["id"])) or \
+                    db.scalar("SELECT 1 FROM teasers WHERE seller_opp_id = ?", (o["id"],)):
+                out["left_for_review"].append(f"{o['ref_code']} (in a deal) - same person as {keep['ref_code']}")
+                continue
+            if not dry:
+                merge_same_side(db, actor, o["id"], keep["id"], "same person, same mobile number")
+                db.execute("UPDATE duplicate_reviews SET status = 'same_person_linked', resolved_by = ?, resolved_at = ?, "
+                           "rationale = ? WHERE status = 'open' AND ((contact_id = ? AND candidate_contact_id = ?) OR "
+                           "(contact_id = ? AND candidate_contact_id = ?))",
+                           (actor["id"], now_iso(), f"Merged {o['ref_code']} into {keep['ref_code']}",
+                            o["contact_id"], keep["contact_id"], keep["contact_id"], o["contact_id"]))
+            out["merged"].append(f"{o['ref_code']} -> {keep['ref_code']}")
+    return out

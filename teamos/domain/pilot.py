@@ -1238,6 +1238,19 @@ def answers_from_sheet(raw: dict) -> dict:
 
 
 # -- Public (open) Pilot Program form: anyone can fill it, e.g. from an ad --------------------------------------------
+def existing_record(db, kind: str, raw_phone) -> dict | None:
+    """The person's record of this side, found by mobile number — so filling the open form again (or the page saving
+    while they fill it, or a retry after an error) adds to the same record instead of making a duplicate."""
+    from .common import normalize_indian_mobile
+    phone, err = normalize_indian_mobile(raw_phone)
+    if err or not phone:
+        return None
+    return db.one("SELECT o.*, c.full_name AS contact_name, b.name AS salon_name FROM opportunities o JOIN contacts c "
+                  "ON c.id = o.contact_id LEFT JOIN salon_businesses b ON b.id = o.business_id WHERE o.kind = ? AND "
+                  "o.stage <> 'moved' AND (c.phone_normalized = ? OR c.alt_phone_normalized = ?) "
+                  "ORDER BY CASE WHEN o.status = 'closed' THEN 1 ELSE 0 END, o.id DESC LIMIT 1", (kind, phone, phone))
+
+
 def submit_public(db, answers: dict, consent: bool, final: bool = True) -> int:
     """Create the salon-owner record from the open Pilot Program form, save the answers and draft the SWOT report.
     Same safeguards as the other public forms: never merged into an existing contact (possible duplicates go to the
@@ -1250,6 +1263,17 @@ def submit_public(db, answers: dict, consent: bool, final: bool = True) -> int:
         city = geo.city_of(city) or city  # "Hyd" → "Hyderabad", so it matches buyers' city
     else:  # "Kondapur" → area Kondapur, city Hyderabad (built-in area list); unknown names are kept as typed
         locality, city = loc, (geo.city_of(loc) or loc)
+    known = existing_record(db, "seller", answers.get("contact_number"))
+    if known:   # already with us: their answers go to the same record (empty fields only — nothing overwritten)
+        with db:
+            T.add_activity(db, None, "opportunity", known["id"], "system",
+                           "Filled the Pilot Program form " + ("" if final else "(in progress) ") +
+                           "— added to this record (same mobile number), no new record made")
+            if final:
+                save_response(db, known, answers, "link")
+            else:
+                save_partial(db, known, answers)
+        return known["id"]
     payload = {"full_name": answers.get("owner_name"), "phone": answers.get("contact_number"),
                "salon_name": answers.get("salon_name") or "Salon name not given",
                "city": city or "City not given", "locality": locality or city or "Area not given",

@@ -714,6 +714,18 @@ def submit_public(db, answers: dict, consent: bool, final: bool = True) -> int:
     """Create the buyer/investor record from the open Investor form, pre-screen it (Pursue / Nurture / Not now from
     their own answers), save the answers and draft the readiness report."""
     from . import buyers as B
+    known = P.existing_record(db, "buyer", answers.get("phone"))
+    if known:   # already with us: their answers go to the same record (empty fields only — nothing overwritten)
+        with db:
+            T.add_activity(db, None, "opportunity", known["id"], "system",
+                           "Filled the Investor form " + ("" if final else "(in progress) ") +
+                           "— added to this record (same mobile number), no new record made")
+            opp = B.load(db, known["id"])
+            if final:
+                save_response(db, opp, answers, "link")
+            else:
+                save_partial(db, opp, answers)
+        return known["id"]
     total = P.parse_amount(answers.get("total_budget"))
     from . import geo
     city = (answers.get("city") or "").strip()

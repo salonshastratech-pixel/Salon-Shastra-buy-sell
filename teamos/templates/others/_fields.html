@@ -23,7 +23,7 @@
     {% if help %}<div class="help">{{ help }}</div>{% endif %}
     {% if typ == 'one' %}<div class="chips" role="radiogroup" aria-label="{{ label }}">{% for o in opts %}<label class="chip"><input type="radio" name="{{ key }}" value="{{ o }}" {{ 'checked' if cur == o }}><span>{{ o }}</span></label>{% endfor %}</div>
     {% elif typ == 'many' %}<div class="chips" aria-label="{{ label }}">{% for o in opts %}<label class="chip"><input type="checkbox" name="{{ key }}" value="{{ o }}" {{ 'checked' if cur and o in cur }}><span>{{ o }}</span></label>{% endfor %}</div>
-    {% elif typ == 'number' %}<input id="a-{{ key }}" name="{{ key }}" value="{{ cur if cur is not none else '' }}" inputmode="numeric" {% if 'salary' in key %}placeholder="e.g. 18000"{% endif %}>
+    {% elif typ == 'number' %}<input id="a-{{ key }}" name="{{ key }}" value="{{ cur if cur is not none else '' }}" inputmode="numeric" data-num="int" maxlength="9" {% if 'salary' in key %}placeholder="in rupees, e.g. 18000" data-inr{% endif %}>
     {% else %}<input id="a-{{ key }}" name="{{ key }}" value="{{ cur or '' }}" {% if help %}placeholder="{{ help }}"{% endif %}>{% endif %}
   </div>
 {% endfor %}

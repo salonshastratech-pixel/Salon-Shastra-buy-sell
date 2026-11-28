@@ -19,7 +19,7 @@ from ..domain.errors import ValidationError
 
 bp = Blueprint("public", __name__, url_prefix="/f")
 
-FORM_TOKEN_MAX_AGE = 2 * 60 * 60
+FORM_TOKEN_MAX_AGE = 12 * 60 * 60   # people fill these on the phone between other things
 
 
 def _signer():
@@ -88,10 +88,15 @@ def open_form():
         try:
             if _signer().loads(request.form.get("form_token", ""), max_age=FORM_TOKEN_MAX_AGE) != meta["key"]:
                 raise BadData("wrong form")
-        except BadData:
+        except BadData:   # open too long: show the form again with every answer kept — never a dead end
             F.record_public_hit(db, ip, meta["key"], "bad_token")
-            return _page("public/message.html", 400, title="Please try again",
-                         message="This form expired or was not loaded correctly. Please reload the page and resubmit.")
+            answers, _e = mod.parse_answers(request.form, lenient=True)
+            from ..domain import geo
+            return _page("public/open_form.html", meta=meta, kind=kind, Q=mod, answers=answers,
+                         errors={"_": "The page was open for a long time. Your answers are kept — please press Submit "
+                                      "once more."}, form_token=_signer().dumps(meta["key"]),
+                         req_keys=REQUIRED_KEYS[kind], draft=request.form.get("draft", ""),
+                         area_names=geo.known_area_names())
         if request.form.get("website"):
             F.record_public_hit(db, ip, meta["key"], "honeypot")
             return redirect(url_for("public.open_thanks", kind=kind))

@@ -276,6 +276,24 @@ def fix_side_duplicates(db, payload) -> str:
     return summary + " · " + _json.dumps(res)[:3500]
 
 
+@handler("merge_duplicates")
+def merge_duplicates(db, payload) -> str:
+    """Once, started by an admin: same person with two records on the same side - fold the extras in (dry first)."""
+    import json as _json
+
+    from .domain import switch_side
+    actor = db.one("SELECT * FROM users WHERE id = ? AND is_active = 1", (int(payload.get("actor_id") or 0),)) or db.one(
+        "SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    dry = bool(payload.get("dry", True))
+    res = switch_side.merge_duplicates(db, actor, dry=dry)
+    summary = (f"{'Would merge' if dry else 'Merged'} {len(res['merged'])} duplicate records of {res['people']} "
+               f"people; left for review {len(res['left_for_review'])}")
+    if not dry:
+        for a in db.all("SELECT id FROM users WHERE is_active = 1 AND role = 'super_admin'"):
+            T.notify(db, a["id"], "system", f"Duplicate clean-up: {summary}", "/admin/jobs")
+    return summary + " · " + _json.dumps(res)[:3500]
+
+
 @handler("noop")
 def noop(db, payload) -> str:
     if payload.get("fail"):

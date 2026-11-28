@@ -181,7 +181,9 @@ def check_csrf() -> None:
     sess = g.get("session")
     sent = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     if not sess or not sent or not secrets.compare_digest(sent, sess["csrf_token"]):
-        abort(400, description="Security token missing or expired. Reload the page and try again.")
+        abort(400, description="This page was open for a long time or your session ended, so it could not be "
+                                "saved. Go back - everything you typed is kept on this device - and press Save again "
+                                "(sign in first if asked).")
 
 
 def safe_next(target: str | None, default: str) -> str:

@@ -13,9 +13,9 @@
   {% elif q.kind in ('scale5', 'scale10') %}{% set top = 5 if q.kind == 'scale5' else 10 %}
     <div class="chips scale" role="radiogroup">{% if top == 10 %}<span class="small muted scale-end">weak</span>{% endif %}{% for n in range(1, top + 1) %}<label class="chip"><input type="radio" name="{{ q.key }}" value="{{ n }}" {{ 'checked' if v|string == n|string }}{% if loop.first %} id="q-{{ q.key }}"{% endif %}><span>{{ n }}{{ '★' if top == 5 }}</span></label>{% endfor %}{% if top == 10 %}<span class="small muted scale-end">strong</span>{% endif %}</div>
   {% elif q.kind == 'long' %}<textarea id="q-{{ q.key }}" name="{{ q.key }}" maxlength="2000" rows="2">{{ v or '' }}</textarea>
-  {% elif q.kind == 'money' %}<div class="inr"><span class="inr-sym">₹</span><input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="40" inputmode="decimal" placeholder="e.g. 45000 or 45k or 1.5L" data-inr></div><div class="inr-words help" aria-live="polite"></div>
-  {% elif q.kind == 'number' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="numeric">
-  {% elif q.kind == 'phone' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="tel" autocomplete="tel">
+  {% elif q.kind == 'money' %}<div class="inr"><span class="inr-sym">₹</span><input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="12" inputmode="numeric" data-num="int" placeholder="in rupees, e.g. 45000" data-inr></div><div class="inr-words help" aria-live="polite"></div>
+  {% elif q.kind == 'number' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="20" inputmode="numeric" data-num="int">
+  {% elif q.kind == 'phone' %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="16" inputmode="tel" data-num="tel" autocomplete="tel">
   {% elif q.kind == 'url' %}<input id="q-{{ q.key }}" type="url" name="{{ q.key }}" value="{{ v or '' }}" maxlength="500" inputmode="url" placeholder="https://drive.google.com/…">
   {% elif q.kind == 'email' %}<input id="q-{{ q.key }}" type="email" name="{{ q.key }}" value="{{ v or '' }}" maxlength="200" autocomplete="email">
   {% elif q.key in ('location', 'areas', 'city') %}<input id="q-{{ q.key }}" name="{{ q.key }}" value="{{ v or '' }}" maxlength="300" list="area-names" autocomplete="off" placeholder="Start typing — e.g. Kondapur">
