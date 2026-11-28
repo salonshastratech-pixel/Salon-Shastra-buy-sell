@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ ui_theme }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}TeamOS{% endblock %} · Salon Shastra</title>
 {% if brand_fonts %}<link rel="stylesheet" href="{{ brand_fonts }}">{% endif %}
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#c04000">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="{{ '#3b1a0e' if ui_theme == 'dark' else '#c04000' }}">
 {% include "_icons.html" %}
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="TeamOS">
 </head>
@@ -51,7 +51,7 @@
         <a class="bell" href="{{ url_for('main.my_day') }}#notifications" aria-label="Alerts">{{ icon('bell') }}{% if unread_count %}<b>{{ unread_count }}</b>{% endif %}</a>
         <details class="pop user-pop"><summary class="avatar" title="{{ current_user.full_name }}">{{ (current_user.full_name or '?')[:1] }}</summary>
           <div class="pop-body"><strong>{{ current_user.full_name }}</strong><div class="small muted">{{ ROLE_LABELS[current_user.role] }}</div>
-            <a href="{{ url_for('team.mine') }}">My availability</a><a href="{{ url_for('main.notification_settings') }}">Phone alerts</a><a href="{{ url_for('auth.change_password') }}">Change password</a>
+            <a href="{{ url_for('team.mine') }}">My availability</a><a href="{{ url_for('main.notification_settings') }}">Phone alerts</a><a href="{{ url_for('auth.change_password') }}">Change password</a><button type="button" class="theme-switch" data-theme-toggle>{{ '☀️ Light mode' if ui_theme == 'dark' else '🌙 Dark mode' }}</button>
             <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm">Sign out</button></form></div></details>
       </div>
     </header>

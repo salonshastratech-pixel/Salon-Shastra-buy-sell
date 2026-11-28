@@ -153,7 +153,8 @@ def create_app(overrides: dict | None = None) -> Flask:
     @app.context_processor
     def _ctx():
         local_logo = os.path.join(app.static_folder, "brand", "logo.png")
-        ctx = {"brand_logo": ("/static/brand/logo.png" if os.path.exists(local_logo) else app.config["BRAND_LOGO_URL"]),
+        ctx = {"ui_theme": "light" if request.cookies.get("teamos_theme") == "light" else "dark",
+               "brand_logo": ("/static/brand/logo.png" if os.path.exists(local_logo) else app.config["BRAND_LOGO_URL"]),
                "brand_fonts": app.config["BRAND_FONTS_URL"],
                "current_user": g.get("user"), "csrf_token": (g.session["csrf_token"] if g.get("session") else ""),
                "app_env": app.config["APP_ENV"]}

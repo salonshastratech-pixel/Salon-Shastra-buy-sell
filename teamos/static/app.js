@@ -615,3 +615,15 @@ document.addEventListener("focusin", function (e) {
     setTimeout(function () { try { el.select(); } catch (x) {} }, 0);
   }
 });
+
+// Light / dark: dark is the default; this device can switch (kept for a year in a cookie the server reads)
+document.addEventListener("click", function (e) {
+  var b = e.target.closest && e.target.closest("[data-theme-toggle]");
+  if (!b) return;
+  var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  document.cookie = "teamos_theme=" + next + "; path=/; max-age=31536000; samesite=lax";
+  b.textContent = next === "dark" ? "\u2600\ufe0f Light mode" : "\ud83c\udf19 Dark mode";
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute("content", next === "dark" ? "#3b1a0e" : "#c04000");
+});

@@ -173,7 +173,7 @@ def install():
 def manifest():
     body = {
         "name": "Salon Shastra TeamOS", "short_name": "TeamOS", "start_url": "/", "scope": "/",
-        "display": "standalone", "background_color": "#fbf7f1", "theme_color": "#c04000",
+        "display": "standalone", "background_color": "#2c130a", "theme_color": "#3b1a0e",
         "description": "Salon Shastra team workspace: sellers, buyers, matches and deals.",
         "icons": [{"src": url_for("static", filename="icons/icon-192.png"), "sizes": "192x192", "type": "image/png",
                    "purpose": "any"},
