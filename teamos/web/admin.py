@@ -343,14 +343,17 @@ def integrations():
         if not norm:
             flash("Enter your own mobile number to receive the test.", "error")
         else:
-            st = messaging.whatsapp_status(current_app.config)
-            res = messaging.provider(current_app.config).send(norm, "TeamOS test message", None,
-                                                              template_name="hello_world" if st["live"] else None,
-                                                              language="en_US")
+            res = messaging.send_test(norm, current_app.config)       # real message to the admin's own phone
             audit.record(db, g.user["id"], "integration.whatsapp_test", None, None, {"status": res["status"]})
             flash(f"Test message to {norm}: {res['status'].replace('_', ' ')}"
                   + (f" — {res.get('detail')}" if res.get("detail") else ""),
                   "ok" if res["status"] != "failed" else "error")
+        return redirect(url_for("admin.integrations") + "#whatsapp")
+    if act == "wa_connect":
+        lines = messaging.connect_and_check(current_app.config)
+        audit.record(db, g.user["id"], "integration.whatsapp_connect", None, None, {"ok": all(l[1] for l in lines)})
+        for label, ok_, detail in lines:
+            flash(f"{'✅' if ok_ else '⚠️'} {label}: {detail}", "ok" if ok_ else "error")
         return redirect(url_for("admin.integrations") + "#whatsapp")
     if request.method == "POST" and request.form.get("action") == "team_number":
         f = request.form

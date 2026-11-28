@@ -45,6 +45,7 @@
         <li>Submit each message template to Meta; when approved, record its Meta name in <a href="{{ url_for('admin.templates') }}">Message templates</a>.</li>
         <li>Send a test to your own phone, then switch on live.</li>
       </ol>
+      <form method="post" class="inline" style="margin-bottom:8px">{{ csrf() }}<input type="hidden" name="action" value="wa_connect"><button class="btn sm primary" title="Makes sure Meta sends this account's customer messages to TeamOS, and shows the number's status">🔗 Connect &amp; check with Meta</button></form>
       <form method="post" class="inline">{{ csrf() }}<input type="hidden" name="action" value="test_whatsapp">
         <input name="to" placeholder="Your mobile (if not set below)" inputmode="tel" aria-label="Test number"><button class="btn sm">Send me a test message</button></form>
     </div>

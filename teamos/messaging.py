@@ -172,6 +172,75 @@ class MetaCloudProvider:
 WA_SETTINGS = ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"]
 
 
+def _graph(method: str, path: str, token: str, timeout: float = 15) -> tuple[bool, dict]:
+    """One Graph API call with the saved token (never shown). Returns (ok, json or {'error': text})."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(f"https://graph.facebook.com/{GRAPH_VERSION}/{path}", method=method,
+                                 data=b"" if method == "POST" else None,
+                                 headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return True, json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read().decode()).get("error", {})
+            return False, {"error": f"{err.get('message', e.code)} (code {err.get('code', e.code)})"}
+        except Exception:  # noqa: BLE001
+            return False, {"error": f"HTTP {e.code}"}
+    except Exception as e:  # noqa: BLE001 — network trouble is reported, never raised to the page
+        return False, {"error": str(e)[:200]}
+
+
+def connect_and_check(config=None) -> list[tuple[str, bool, str]]:
+    """Admin button: make sure Meta sends this WhatsApp account's messages to our app (subscribed_apps), and report
+    the number's state. Only uses the saved IDs and token; returns readable lines (label, ok, detail)."""
+    token = _cfg("WHATSAPP_ACCESS_TOKEN", config)
+    waba = _cfg("WHATSAPP_BUSINESS_ACCOUNT_ID", config)
+    pid = _cfg("WHATSAPP_PHONE_NUMBER_ID", config)
+    if not (token and waba and pid):
+        return [("Settings", False, "Fill in the WhatsApp Business account ID, phone number ID and access token first.")]
+    out = []
+    ok, num = _graph("GET", f"{pid}?fields=display_phone_number,verified_name,name_status,quality_rating,"
+                            "platform_type,code_verification_status,status", token)
+    if ok:
+        plat = num.get("platform_type")
+        out.append(("Number", True, f"{num.get('display_phone_number')} · {num.get('verified_name')} · name "
+                    f"{(num.get('name_status') or '').lower().replace('_', ' ') or '—'} · quality "
+                    f"{(num.get('quality_rating') or '—').lower()}"))
+        out.append(("On the Cloud API", plat == "CLOUD_API",
+                    "Yes" if plat == "CLOUD_API" else f"No ({plat or 'unknown'}) — the number is registered elsewhere "
+                    "(e.g. another provider's system or the WhatsApp Business app). It must be moved to the Cloud API."))
+    else:
+        out.append(("Number", False, num["error"] + " — check the phone number ID and that the token has "
+                    "whatsapp_business_management and whatsapp_business_messaging."))
+    ok, sub = _graph("POST", f"{waba}/subscribed_apps", token)
+    out.append(("Messages sent to TeamOS", ok and sub.get("success", False),
+                "Yes — this WhatsApp account's messages now come to TeamOS" if ok and sub.get("success")
+                else (sub.get("error") or "Meta did not confirm")))
+    ok, apps = _graph("GET", f"{waba}/subscribed_apps", token)
+    if ok:
+        names = [(a.get("whatsapp_business_api_data") or {}).get("name") or (a.get("whatsapp_business_api_data") or {}).get("id")
+                 for a in apps.get("data", [])]
+        out.append(("Apps receiving this account's messages", True, ", ".join(n for n in names if n) or "none"))
+    return out
+
+
+def send_test(to_phone: str, config=None) -> dict:
+    """The admin's own test - goes through Meta for real once the settings are filled in, even before 'live'
+    (nothing reaches customers). Inside 24 h of the admin messaging the number: a text; otherwise Meta's
+    hello_world template."""
+    missing = [k for k in ("WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_ACCESS_TOKEN") if not _cfg(k, config)]
+    if missing:
+        return MockWhatsAppProvider().send(to_phone, "TeamOS test message", None)
+    p = MetaCloudProvider(_cfg("WHATSAPP_PHONE_NUMBER_ID", config), _cfg("WHATSAPP_ACCESS_TOKEN", config))
+    res = p.send(to_phone, "✅ TeamOS test message — Salon Shastra WhatsApp is connected.", None)
+    if res["status"] == "failed" and ("131047" in res.get("detail", "") or "re-engagement" in res.get("detail", "").lower()
+                                      or "24 hours" in res.get("detail", "")):
+        res = p.send(to_phone, "", None, template_name="hello_world", language="en_US")
+    return res
+
+
 def _cfg(key, config=None):
     """Server config / environment first (operators can always override), then values saved by an admin in
     Admin → Integrations (secrets decrypted only here)."""
