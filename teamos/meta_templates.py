@@ -22,7 +22,7 @@ META_CATEGORY = {
     "next_steps": "UTILITY", "inactive_followup": "MARKETING", "market_update": "MARKETING", "optout_confirm": "REPLY",
 }
 # Example values Meta asks for when a template is submitted.
-SAMPLES = {"name": "Ravi", "sender": "Harika", "link": "https://team.salonshastra.in/f/i/abc123",
+SAMPLES = {"name": "Ravi", "sender": "Harika", "link": "https://team.salonshastra.com/f/i/abc123",
            "expires": "30 Nov 2026", "when": "Sat 30 Nov, 11:00 AM", "area": "Kondapur"}
 MARKETING_WORDS = re.compile(r"\b(offer|discount|deal of|limited time|new salons available|still exploring|"
                              r"hurry|best price|free)\b", re.I)
@@ -91,6 +91,54 @@ def fetch_meta_templates(config) -> list[dict]:
             data = json.loads(r.read().decode())
         out.extend(data.get("data", []))
         url = (data.get("paging") or {}).get("next")
+    return out
+
+
+def submit_all(db, actor_id: int | None, config) -> dict:
+    """Submit every template Meta does not have yet, exactly as TeamOS will send it (name, category, English,
+    wording with {{1}}…, sample values). Templates already in Meta (any status) are left alone. Returns counts and the
+    reason for each one Meta refused."""
+    import urllib.error
+    import urllib.request
+    waba = messaging._cfg("WHATSAPP_BUSINESS_ACCOUNT_ID", config)
+    token = messaging._cfg("WHATSAPP_ACCESS_TOKEN", config)
+    if not (waba and token):
+        raise ValueError("Fill in the WhatsApp Business account ID and access token in Integrations first.")
+    have = {m.get("name") for m in fetch_meta_templates(config)}
+    out = {"submitted": [], "already": 0, "failed": []}
+    for t in db.all("SELECT * FROM message_templates WHERE status IN ('approved_local', 'provider_approved') ORDER BY key"):
+        cat = META_CATEGORY.get(t["key"])
+        if cat == "REPLY" or not cat:
+            continue
+        name = t["provider_name"] or meta_name(t["key"])
+        if name in have:
+            out["already"] += 1
+            continue
+        text, order = to_meta(t["body"])
+        body = {"type": "BODY", "text": text}
+        if order:
+            body["example"] = {"body_text": [[SAMPLES.get(p, "Ravi") for p in order]]}
+        payload = {"name": name, "category": cat, "language": t["language"] or "en", "components": [body]}
+        req = urllib.request.Request(
+            f"https://graph.facebook.com/{messaging.GRAPH_VERSION}/{waba}/message_templates",
+            data=json.dumps(payload).encode(), method="POST",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                json.loads(r.read().decode() or "{}")
+            out["submitted"].append(name)
+        except urllib.error.HTTPError as e:
+            try:
+                err = json.loads(e.read().decode()).get("error", {})
+                why = err.get("error_user_msg") or err.get("message") or f"HTTP {e.code}"
+            except Exception:  # noqa: BLE001
+                why = f"HTTP {e.code}"
+            out["failed"].append((name, why[:200]))
+        except Exception as e:  # noqa: BLE001 — one failure must not stop the rest
+            out["failed"].append((name, str(e)[:200]))
+    from . import audit
+    audit.record(db, actor_id, "templates.meta_submit", None, None,
+                 {"submitted": out["submitted"], "failed": [n for n, _ in out["failed"]]})
     return out
 
 

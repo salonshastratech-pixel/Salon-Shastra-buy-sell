@@ -2,7 +2,8 @@
 {% block title %}Message templates{% endblock %}
 {% block content %}
 <div class="ph"><div><h1>Message templates</h1><div class="sub">Only templates that Meta has approved — with exactly the same wording — can be sent once WhatsApp is live. In test mode every approved-internally template is simulated.</div></div>
-  <div class="actions"><form method="post">{{ csrf() }}<input type="hidden" name="action" value="meta_check"><button class="btn primary" {{ 'disabled' if not can_check }}>Check with Meta</button></form></div></div>
+  <div class="actions"><form method="post" data-confirm="Send every template Meta does not have yet to Meta for approval? Nothing is sent to customers.">{{ csrf() }}<input type="hidden" name="action" value="meta_submit"><button class="btn" {{ 'disabled' if not can_check }} title="Creates each missing template in your WhatsApp account, with the exact wording, category and sample values">📤 Submit all to Meta</button></form>
+  <form method="post">{{ csrf() }}<input type="hidden" name="action" value="meta_check"><button class="btn primary" {{ 'disabled' if not can_check }}>Check with Meta</button></form></div></div>
 <div class="card small">
   <strong>Live-ready: {{ ready }} of {{ rows|length - replies }}</strong>{% if last_check %} · last checked with Meta {{ last_check|rel }}{% endif %}.
   {% if not can_check %}<span class="muted">To check, fill in the WhatsApp Business account ID and access token in <a href="{{ url_for('admin.integrations') }}#whatsapp">Integrations</a>.</span>{% endif %}

@@ -388,6 +388,20 @@ def templates():
     db = get_db()
     I.ensure_templates(db)
     from .. import meta_templates as MT
+    if request.method == "POST" and request.form.get("action") == "meta_submit":
+        try:
+            r = MT.submit_all(db, g.user["id"], current_app.config)
+            flash(f"Sent to Meta for approval: {len(r['submitted'])} template(s)"
+                  + (f" ({', '.join(r['submitted'])})" if r["submitted"] else "")
+                  + (f"; {r['already']} were already in Meta" if r["already"] else "")
+                  + ". Approval usually takes minutes to a day — then press Check with Meta.", "ok")
+            for name, why in r["failed"]:
+                flash(f"Meta did not accept {name}: {why}", "error")
+        except ValueError as e:
+            flash(str(e), "error")
+        except Exception as e:  # network / Meta error
+            flash(f"Could not reach Meta: {type(e).__name__}. Nothing was sent.", "error")
+        return redirect(url_for("admin.templates"))
     if request.method == "POST" and request.form.get("action") == "meta_check":
         try:
             c = MT.cross_check(db, g.user["id"], MT.fetch_meta_templates(current_app.config))

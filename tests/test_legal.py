@@ -50,3 +50,41 @@ def test_connect_and_check_and_real_test_message(db, login, monkeypatch):
                         sent.append((to, template_name)) or {"status": "provider_accepted"})
     page = c.post("/admin/integrations", {"action": "test_whatsapp", "to": "9876543210"}, follow_redirects=True).data.decode()
     assert sent == [("+919876543210", None)] and "provider accepted" in page      # real send, not the simulation
+
+
+def test_submit_all_templates_to_meta(db, login, monkeypatch):
+    import io
+    import json as _json
+    import urllib.error
+
+    from conftest import user
+    from teamos import integrations as IG
+    from teamos import meta_templates as MT
+    IG.save(db, user(db, "admin@t.test"), {"WHATSAPP_BUSINESS_ACCOUNT_ID": "1364860231191250"})
+    monkeypatch.setenv("WHATSAPP_ACCESS_TOKEN", "tok")
+    monkeypatch.setattr(MT, "fetch_meta_templates", lambda config: [{"name": "enquiry_ack", "status": "PENDING"}])
+    sent = []
+
+    class R:
+        def __init__(self, data): self.data = data
+        def read(self): return self.data
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_open(req, timeout=20):
+        body = _json.loads(req.data.decode())
+        sent.append(body)
+        if body["name"] == "market_update":
+            raise urllib.error.HTTPError(req.full_url, 400, "bad", {}, io.BytesIO(
+                _json.dumps({"error": {"error_user_msg": "Too many variables for the text"}}).encode()))
+        return R(b'{"id": "1", "status": "PENDING"}')
+    monkeypatch.setattr("urllib.request.urlopen", fake_open)
+    page = login("admin@t.test").post("/admin/templates", {"action": "meta_submit"}, follow_redirects=True).data.decode()
+    names = [b["name"] for b in sent]
+    assert "enquiry_ack" not in names and "optout_confirm" not in names and "deep_form_link" in names
+    form = next(b for b in sent if b["name"] == "deep_form_link")
+    assert form["category"] == "UTILITY" and form["language"] == "en"
+    assert form["components"][0]["text"].startswith("Hello {{1}}, this is {{2}} from Salon Shastra.")
+    assert form["components"][0]["example"]["body_text"][0][2].startswith("https://team.salonshastra.com/")
+    assert next(b for b in sent if b["name"] == "inactive_followup")["category"] == "MARKETING"
+    assert "Sent to Meta for approval: 15 template(s)" in page and "Meta did not accept market_update" in page
