@@ -87,4 +87,6 @@ def test_submit_all_templates_to_meta(db, login, monkeypatch):
     assert form["components"][0]["text"].startswith("Hello {{1}}, this is {{2}} from Salon Shastra.")
     assert form["components"][0]["example"]["body_text"][0][2].startswith("https://team.salonshastra.com/")
     assert next(b for b in sent if b["name"] == "inactive_followup")["category"] == "MARKETING"
-    assert "Sent to Meta for approval: 15 template(s)" in page and "Meta did not accept market_update" in page
+    alert = db.scalar("SELECT title FROM notifications WHERE kind = 'system' ORDER BY id DESC")
+    assert "Sending the templates to Meta now" in page
+    assert "Templates sent to Meta for approval: 15" in alert and "market_update (Too many variables" in alert

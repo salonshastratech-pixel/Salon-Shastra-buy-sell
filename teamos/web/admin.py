@@ -389,18 +389,27 @@ def templates():
     I.ensure_templates(db)
     from .. import meta_templates as MT
     if request.method == "POST" and request.form.get("action") == "meta_submit":
-        try:
-            r = MT.submit_all(db, g.user["id"], current_app.config)
-            flash(f"Sent to Meta for approval: {len(r['submitted'])} template(s)"
-                  + (f" ({', '.join(r['submitted'])})" if r["submitted"] else "")
-                  + (f"; {r['already']} were already in Meta" if r["already"] else "")
-                  + ". Approval usually takes minutes to a day — then press Check with Meta.", "ok")
-            for name, why in r["failed"]:
-                flash(f"Meta did not accept {name}: {why}", "error")
-        except ValueError as e:
-            flash(str(e), "error")
-        except Exception as e:  # network / Meta error
-            flash(f"Could not reach Meta: {type(e).__name__}. Nothing was sent.", "error")
+        # Meta takes a few seconds per template - more than one page request may last - so it runs in the background
+        # and the admin gets an alert with the result.
+        from .. import background
+        from ..domain import tasks as T
+        uid = g.user["id"]
+
+        def go(bdb):
+            try:
+                r = MT.submit_all(bdb, uid, current_app.config)
+                msg = (f"Templates sent to Meta for approval: {len(r['submitted'])}"
+                       + (f"; already in Meta: {r['already']}" if r["already"] else "")
+                       + (f"; refused: " + "; ".join(f"{n} ({w})" for n, w in r["failed"]) if r["failed"] else "")
+                       + ". Press Check with Meta once they are approved.")
+            except Exception as e:  # noqa: BLE001
+                msg = f"Sending templates to Meta stopped: {str(e)[:160]}"
+            T.notify(bdb, uid, "system", msg[:480], "/admin/templates")
+        if background.run(current_app._get_current_object(), "meta_submit", go):
+            flash("Sending the templates to Meta now — it takes about a minute. You'll get an alert (🔔) with the "
+                  "result; then press Check with Meta.", "ok")
+        else:
+            flash("Templates are already being sent to Meta — wait for the alert.", "ok")
         return redirect(url_for("admin.templates"))
     if request.method == "POST" and request.form.get("action") == "meta_check":
         try:
