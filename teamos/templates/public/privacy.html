@@ -1,0 +1,68 @@
+{% extends "public/layout.html" %}
+{% block title %}Privacy policy{% endblock %}
+{% block content %}
+<article class="card legal">
+  <h1>Privacy policy</h1>
+  <p class="small muted">Salon Shastra Innovations Private Limited · Hyderabad, Telangana, India · Last updated {{ updated }}</p>
+
+  <p>Salon Shastra helps salon owners sell, grow or get support for their salons, helps investors and buyers find the
+    right salon, and helps people find salon jobs and beauty and hair training. This page explains what information
+    we collect when you contact us — by phone, WhatsApp, our website forms or our advertisements — and how we use it.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Contact details:</strong> your name, mobile / WhatsApp number, e-mail address, city and area.</li>
+    <li><strong>What you tell us about your salon or plans:</strong> for salon owners — salon details, rent, lease, staff,
+      sales and the price you are looking for; for investors and buyers — budget, preferred areas and the kind of salon
+      you want; for job seekers — role, experience, skills, current and expected salary; for students — courses,
+      timing and budget.</li>
+    <li><strong>Messages and calls:</strong> WhatsApp messages you send to our business number, and notes our team
+      writes after speaking with you.</li>
+    <li><strong>Documents you choose to share</strong>, such as photos of your salon or a rent agreement.</li>
+  </ul>
+
+  <h2>How we use it</h2>
+  <ul>
+    <li>To reply to your enquiry, call you back and send you the forms and information you asked for.</li>
+    <li>To match salon owners with suitable buyers or investors, and job seekers with suitable salons.</li>
+    <li>To send service messages on WhatsApp (for example a call-back confirmation, a form link or a visit
+      confirmation). Promotional messages are sent only if you agreed to receive them — reply <strong>STOP</strong>
+      at any time and they end.</li>
+    <li>To keep a record of our work for you, and to meet legal and accounting duties.</li>
+  </ul>
+
+  <h2>Who can see it</h2>
+  <ul>
+    <li>Only the Salon Shastra team working on your enquiry.</li>
+    <li><strong>Salon owners:</strong> your salon's name and identity are never shared with a buyer or investor without
+      your permission. Before that, only a confidential summary without your name is shared.</li>
+    <li>Service providers that run our systems for us — hosting (Render), database (Supabase) and messaging (Meta's
+      WhatsApp Business Platform, which processes WhatsApp messages under Meta's own terms). They may use the data
+      only to provide that service.</li>
+    <li>We do <strong>not</strong> sell your information, and we do not share it with advertisers.</li>
+  </ul>
+
+  <h2>How long we keep it, and how it is protected</h2>
+  <p>We keep your information for as long as we are working with you and for a reasonable time afterwards, or longer
+    only where the law requires it (for example invoices). It is stored on secure servers, sent over encrypted
+    connections, and only signed-in team members can see it.</p>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>Ask us what information we hold about you, and ask us to correct it.</li>
+    <li>Ask us to delete your information — see <a href="{{ url_for('main.data_deletion') }}">how to delete your data</a>.</li>
+    <li>Stop WhatsApp messages at any time by replying <strong>STOP</strong>.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>Our services are meant for adults. Students under 18 should contact us together with a parent or guardian.</p>
+
+  <h2>Changes</h2>
+  <p>If we change this policy, the new version will be published on this page with a new date.</p>
+
+  <h2>Contact</h2>
+  <p>Salon Shastra Innovations Private Limited<br>
+    E-mail: <a href="mailto:support@salonshastra.com">support@salonshastra.com</a><br>
+    WhatsApp: <a href="https://wa.me/918686878090">+91 86868 78090</a></p>
+</article>
+{% endblock %}

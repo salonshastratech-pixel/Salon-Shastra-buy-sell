@@ -121,7 +121,7 @@ def mfa_required(user: dict) -> bool:
     return user["role"] in roles or bool(user.get("mfa_enabled_at"))
 
 
-MFA_EXEMPT = {"auth.mfa", "auth.mfa_setup", "auth.logout", "static", "main.healthz"}
+MFA_EXEMPT = {"auth.mfa", "auth.mfa_setup", "auth.logout", "static", "main.healthz", "main.privacy", "main.data_deletion"}
 
 
 def enforce_mfa():

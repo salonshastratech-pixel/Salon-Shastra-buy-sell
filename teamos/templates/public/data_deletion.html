@@ -1,0 +1,35 @@
+{% extends "public/layout.html" %}
+{% block title %}Delete your data{% endblock %}
+{% block content %}
+<article class="card legal">
+  <h1>How to delete your data</h1>
+  <p class="small muted">Salon Shastra Innovations Private Limited · Last updated {{ updated }}</p>
+
+  <p>You can ask Salon Shastra to delete the information we hold about you at any time — your contact details, the
+    answers you gave in our forms, notes about your enquiry and your WhatsApp conversation with our business number.</p>
+
+  <h2>Send us your request</h2>
+  <ol>
+    <li><strong>On WhatsApp:</strong> send <strong>DELETE MY DATA</strong> to
+      <a href="https://wa.me/918686878090?text=DELETE%20MY%20DATA">+91 86868 78090</a> from the number you used with us,
+      <em>or</em></li>
+    <li><strong>By e-mail:</strong> write to <a href="mailto:support@salonshastra.com?subject=Delete%20my%20data">support@salonshastra.com</a>
+      with your name and the mobile number you used with us.</li>
+  </ol>
+
+  <h2>What happens next</h2>
+  <ul>
+    <li>We may call or message you once to confirm the request really comes from you.</li>
+    <li>We delete your information within <strong>30 days</strong> and confirm on WhatsApp or e-mail when it is done.</li>
+    <li>We stop all messages to you straight away — you can also reply <strong>STOP</strong> at any time.</li>
+    <li>We keep only what the law requires us to keep (for example invoices for services you paid for), for as long
+      as the law requires, and use it for nothing else.</li>
+  </ul>
+
+  <h2>Messages you sent on WhatsApp</h2>
+  <p>Deleting your data with us does not remove messages from your own phone. Meta's handling of WhatsApp data is
+    described in <a href="https://www.whatsapp.com/legal/privacy-policy" rel="noopener" target="_blank">WhatsApp's privacy policy</a>.</p>
+
+  <p>Read our full <a href="{{ url_for('main.privacy') }}">privacy policy</a>.</p>
+</article>
+{% endblock %}

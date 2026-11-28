@@ -9,6 +9,7 @@
 </header>
 {% if app_env != 'production' %}<div class="env-banner">{{ app_env|upper }} environment · test form · do not enter real customer data</div>{% endif %}
 <main class="pub-main">{% block content %}{% endblock %}</main>
-<footer class="pub-foot small muted">{{ _('Salon Shastra - Your details are used only to respond to this enquiry and are not shared without your permission.') }}</footer>
+<footer class="pub-foot small muted">{{ _('Salon Shastra - Your details are used only to respond to this enquiry and are not shared without your permission.') }}
+  <div class="legal-links"><a href="{{ url_for('main.privacy') }}">{{ _('Privacy policy') }}</a> · <a href="{{ url_for('main.data_deletion') }}">{{ _('Delete my data') }}</a></div></footer>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body></html>

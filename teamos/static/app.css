@@ -1266,3 +1266,10 @@ html[data-theme="dark"] .voice-mic.on { background: #d9534a; border-color: #ff8a
 html[data-theme="dark"] .tag-menu { background: #4a2414; border-color: rgba(255, 196, 160, .3); box-shadow: 0 18px 44px rgba(18, 5, 1, .55); }
 html[data-theme="dark"] .tag-opt.on, html[data-theme="dark"] .tag-opt:hover { background: rgba(255, 138, 76, .22); }
 html[data-theme="dark"] .tag { color: #ffb48a; background: rgba(255, 138, 76, .14); }
+
+/* privacy policy / data deletion pages */
+.legal { max-width: 760px; margin: 0 auto; line-height: 1.65; }
+.legal h2 { margin-top: 22px; font-size: 17px; }
+.legal ul, .legal ol { padding-left: 20px; }
+.legal li { margin-bottom: 6px; }
+.legal-links { margin-top: 6px; }

@@ -210,6 +210,28 @@ def planned(module):
     return render_template("planned.html", name=names[module][0], milestone=names[module][1])
 
 
+LEGAL_UPDATED = "28 November 2026"
+
+
+def _legal(template):
+    """Public pages (no sign-in): the privacy policy and how to delete your data — linked from Meta's app settings,
+    the sign-in page and every customer form."""
+    from flask import make_response
+    resp = make_response(render_template(template, updated=LEGAL_UPDATED, lang="en", LANGS=None, _=lambda s: s))
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
+@bp.route("/privacy")
+def privacy():
+    return _legal("public/privacy.html")
+
+
+@bp.route("/data-deletion")
+def data_deletion():
+    return _legal("public/data_deletion.html")
+
+
 @bp.route("/healthz")
 def healthz():
     """Uptime check for monitoring. Reveals no business data."""
