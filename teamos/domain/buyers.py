@@ -209,7 +209,8 @@ def _set_importance(db, actor_id, mandate_id, dimension, choice, importance, ver
 def _validate_contact(data: dict) -> tuple[dict, str | None, dict]:
     errors = {}
     name = (data.get("full_name") or "").strip()
-    city = (data.get("city") or "").strip()
+    from .common import clean_place
+    city = clean_place(data.get("city"))
     if not name:
         errors["full_name"] = "Contact name is required."
     if not city:
@@ -722,6 +723,7 @@ def change_stage(db, actor, opp: dict, to: str, reason: str | None, follow_up_du
             T.create_task(db, actor, title=f"{STAGE_LABELS[to]} follow-up: {opp['contact_name']}",
                           assignee_id=opp["primary_owner_id"] or actor["id"], due_at=follow_up_due,
                           task_type="follow_up", priority="low", entity_type="opportunity", entity_id=opp["id"])
+        T.ensure_next_action(db, actor, opp, status)
         audit.record(db, actor["id"], "buyer.stage", "opportunity", opp["id"],
                      {"from": opp["stage"], "to": to, "reason": reason})
 
@@ -741,6 +743,15 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
         if outcome == "do_not_contact":
             change_stage(db, actor, opp, "do_not_contact", (note or "").strip() or "Requested on call")
             return
+        # Not interested / not a fit and no next step given: close it properly with the call note as the
+        # reason, instead of making the caller invent a task. A next step given (e.g. "try again in
+        # 3 months") keeps it open.
+        if outcome in CLOSE_ON_CALL and not (next_title or "").strip() and opp["stage"] not in CLOSED_STAGES:
+            change_stage(db, actor, opp, CLOSE_ON_CALL[outcome],
+                         (note or "").strip() or T.CALL_OUTCOME_LABELS[outcome] + " (on the call)")
+            return
+        if outcome in S.NO_ANSWER and not (next_title or "").strip():
+            next_title, next_due = S.retry_slot(outcome)
         if next_title and next_title.strip():
             T.create_task(db, actor, title=next_title, assignee_id=opp["primary_owner_id"] or actor["id"],
                           due_at=next_due, task_type="call" if outcome in S.NO_ANSWER else "follow_up",
@@ -756,6 +767,8 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
                      "AND status = 'open'", (opp["id"],)) == 0:
             raise ValidationError({"next_title": "Add a next action — every active buyer needs one."})
 
+
+CLOSE_ON_CALL = {"not_interested": "closed_lost", "disqualified": "unqualified"}
 
 def _auto_stage(db, actor, opp, to):
     now = now_iso()
@@ -790,8 +803,10 @@ def assign_owner(db, actor, opp, new_owner_id: int, reason: str) -> None:
         raise ValidationError({"reason": "Give a reason for the handoff."})
     with db:
         db.update("opportunities", opp["id"], {"primary_owner_id": new_owner_id, "updated_at": now_iso()})
+        moved_tasks = T.hand_over_tasks(db, opp["id"], opp["primary_owner_id"], new_owner_id)
         T.add_activity(db, actor["id"], "opportunity", opp["id"], "assignment",
-                       f"Primary owner: {opp['owner_name'] or 'none'} → {new['full_name']}. {reason.strip()}")
+                       f"Primary owner: {opp['owner_name'] or 'none'} → {new['full_name']}. {reason.strip()}"
+                       + (f" ({moved_tasks} open task(s) moved to them)" if moved_tasks else ""))
         T.notify(db, new_owner_id, "assignment", f"You now own buyer {opp['ref_code']} ({opp['contact_name']})",
                  f"/buyers/{opp['id']}")
         audit.record(db, actor["id"], "buyer.assign", "opportunity", opp["id"],

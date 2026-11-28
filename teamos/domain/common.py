@@ -44,6 +44,15 @@ def format_inr(amount: int | float | None, short: bool = True) -> str:
 PLACEHOLDER_PLACES = {"city not given", "area not given", "not given", "salon name not given"}
 
 
+def clean_place(v) -> str:
+    """A city / area as typed: spaces tidied and a word typed twice made one - the City box starts with
+    'Hyderabad', so typing the city again gave 'HyderabadHyderabad'."""
+    import re as _re
+    s = " ".join(str(v or "").split()).strip(" ,")
+    m = _re.fullmatch(r"(?i)(.+?)[ ,]*\1", s)
+    return m.group(1).strip(" ,") if m and len(m.group(1)) >= 3 else s
+
+
 def known_place(v):
     """None for placeholder text like 'City not given' (imports with missing values)."""
     return None if not v or str(v).strip().lower() in PLACEHOLDER_PLACES else v

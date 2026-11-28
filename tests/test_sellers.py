@@ -142,13 +142,14 @@ def test_call_logging_auto_progresses_and_enforces_next_action(login, db):
     _create(c)
     opp_id = db.scalar("SELECT id FROM opportunities")
     tid = db.scalar("SELECT id FROM tasks")
-    # completing the only task with no next action is refused
-    c.post(f"/sellers/{opp_id}/call", {"outcome": "no_answer", "complete_task_id": tid})
+    # completing the only task after speaking to them, with no next action, is refused
+    c.post(f"/sellers/{opp_id}/call", {"outcome": "connected", "complete_task_id": tid})
     assert db.scalar("SELECT status FROM tasks WHERE id = ?", (tid,)) == "open"
     assert db.scalar("SELECT COUNT(*) FROM activities WHERE kind = 'call'") == 0  # rolled back
-    c.post(f"/sellers/{opp_id}/call", {"outcome": "no_answer", "complete_task_id": tid,
-                                       "next_title": "Try again", "next_due": "2030-01-01T10:00"})
+    # no answer: the retry is planned for them
+    c.post(f"/sellers/{opp_id}/call", {"outcome": "no_answer", "complete_task_id": tid})
     assert db.scalar("SELECT stage FROM opportunities") == "contact_attempted"
+    assert db.scalar("SELECT title FROM tasks WHERE status = 'open'").startswith("Try again")
     c.post(f"/sellers/{opp_id}/call", {"outcome": "connected", "note": "Spoke to owner"})
     assert db.scalar("SELECT stage FROM opportunities") == "connected"
 

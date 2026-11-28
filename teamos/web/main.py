@@ -6,6 +6,7 @@ from ..domain import progress as P
 from ..domain import tasks as T
 from ..domain.buyers import STAGE_LABELS as BUYER_STAGE_LABELS
 from ..domain.sellers import STAGE_LABELS as SELLER_STAGE_LABELS
+from ..permissions import user_can
 from ..security import login_required, require, safe_next
 from datetime import timedelta
 
@@ -225,7 +226,9 @@ def notification_settings():
         PU.save_prefs(db, g.user["id"], request.form.getlist("on"))
         flash("Saved. You'll be alerted only for what is ticked.", "ok")
         return redirect(url_for("main.notification_settings"))
-    return render_template("me_notifications.html", prefs=PU.prefs(db, g.user["id"]), cats=PU.CATEGORIES,
+    is_admin = user_can(db, g.user, "users.manage")      # team screenshots alert is only for admins
+    cats = [c for c in PU.CATEGORIES if is_admin or c[0] != "team_work"]
+    return render_template("me_notifications.html", prefs=PU.prefs(db, g.user["id"]), cats=cats,
                            devices=PU.devices(db, g.user["id"]))
 
 

@@ -606,3 +606,12 @@
     });
   });
 })();
+
+// A box that starts with a suggested value (City: Hyderabad): clicking in selects it, so typing replaces it instead
+// of adding to it.
+document.addEventListener("focusin", function (e) {
+  var el = e.target;
+  if (el && el.hasAttribute && el.hasAttribute("data-select-on-focus") && el.value === el.defaultValue) {
+    setTimeout(function () { try { el.select(); } catch (x) {} }, 0);
+  }
+});

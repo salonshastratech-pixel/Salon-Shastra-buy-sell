@@ -152,7 +152,8 @@ def test_lead_review_explains_why_and_admin_removes(app, db, login):
                                         lead("Old Untouched", "9300200003"), lead("Fine Lead", "9300200004"),
                                         lead("Test Person", "9300200005"))
     c = login("seller@t.test")
-    c.post(f"/sellers/{said_no}/call", {"outcome": "not_interested"})
+    c.post(f"/sellers/{said_no}/call", {"outcome": "not_interested", "next_title": "Ask again in March",
+                                        "next_due": "2030-01-01T10:00"})        # kept open: still listed for review
     for _ in range(3):
         c.post(f"/sellers/{missed}/call", {"outcome": "no_answer", "next_title": "Try again",
                                              "next_due": "2030-01-01T10:00"})

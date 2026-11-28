@@ -99,4 +99,5 @@ def test_alerts_have_their_own_push_choices(db, login):
     from teamos.domain import push as PU
     assert PU.KIND_CATEGORY["status_check"] == "reminders" and PU.KIND_CATEGORY["work_proof"] == "team_work"
     page = login("seller@t.test").get("/me/notifications").data.decode()
-    assert "Hourly status check" in page and "Team screenshots uploaded" in page
+    assert "Hourly status check" in page and "Team screenshots uploaded" not in page    # admin-only choice
+    assert "Team screenshots uploaded" in login("admin@t.test").get("/me/notifications").data.decode()

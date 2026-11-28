@@ -49,7 +49,8 @@ def update(db, actor: dict, opp: dict, data) -> list[str]:
     if email and ("@" not in email or "." not in email.split("@")[-1]):
         errors["email"] = "Enter a valid e-mail (or leave it empty)."
     contact["email"] = email[:200] or None
-    city, area = (data.get("city") or "").strip()[:80], (data.get("locality") or "").strip()[:80]
+    from .common import clean_place
+    city, area = clean_place(data.get("city"))[:80], clean_place(data.get("locality"))[:80]
     if kind == "seller":
         salon = (data.get("salon_name") or "").strip()
         if not salon:
@@ -81,7 +82,8 @@ def update(db, actor: dict, opp: dict, data) -> list[str]:
             db.execute("UPDATE salon_businesses SET " + ", ".join(f"{k} = ?" for k in b_set) + " WHERE id = ?",
                        (*b_set.values(), opp["business_id"]))
             changed += [{"name": "Salon name", "city": "City", "locality": "Area"}[k] for k in b_set]
-        o_set = {k: v for k, v in mark.items() if before_o.get(k) != v}
+        was = {**before_o, "lead_temperature": before_o.get("lead_temperature") or "normal"}  # not set = normal
+        o_set = {k: v for k, v in mark.items() if was.get(k) != v}
         if o_set:
             db.execute("UPDATE opportunities SET " + ", ".join(f"{k} = ?" for k in o_set) + ", updated_at = ? WHERE id = ?",
                        (*o_set.values(), now_iso(), opp["id"]))

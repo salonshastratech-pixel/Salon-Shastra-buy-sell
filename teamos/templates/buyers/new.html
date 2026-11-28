@@ -26,7 +26,7 @@
       <div class="field {{ 'has-err' if errors.full_name }}"><label>Contact name *</label><input name="full_name" value="{{ form.full_name or '' }}" required>{{ err(errors, 'full_name') }}</div>
       <div class="field {{ 'has-err' if errors.phone }}"><label>Mobile *</label><input name="phone" value="{{ form.phone or '' }}" inputmode="tel" placeholder="98xxxxxxxx" required>{{ err(errors, 'phone') }}</div>
       <div class="field"><label>Email</label><input type="email" name="email" value="{{ form.email or '' }}"></div>
-      <div class="field {{ 'has-err' if errors.city }}"><label>City *</label><input name="city" value="{{ form.city or 'Hyderabad' }}" required>{{ err(errors, 'city') }}</div>
+      <div class="field {{ 'has-err' if errors.city }}"><label>City *</label><input name="city" value="{{ form.city or 'Hyderabad' }}" required data-select-on-focus>{{ err(errors, 'city') }}</div>
       <div class="field"><label>Most-preferred locality</label><input name="locality" value="{{ form.locality or '' }}" placeholder="e.g. Kondapur"><div class="help">Becomes preferred locality #1. Add more, rank them and add exclusions on the buyer's page.</div></div>
     </div>
   </div>

@@ -189,6 +189,32 @@ def reassign_task(db, actor: dict, task_id: int, new_assignee_id: int, reason: s
                      {"from": task["assignee_id"], "to": new_assignee_id, "reason": reason})
 
 
+def hand_over_tasks(db, entity_id: int, old_owner: int | None, new_owner: int) -> int:
+    """A record handed to a colleague: the open tasks the previous owner had on it go with it."""
+    if not old_owner or old_owner == new_owner:
+        return 0
+    rows = db.all("SELECT id FROM tasks WHERE entity_type = 'opportunity' AND entity_id = ? AND status = 'open' "
+                  "AND assignee_id = ?", (entity_id, old_owner))
+    for r in rows:
+        db.execute("UPDATE tasks SET assignee_id = ?, updated_at = ? WHERE id = ?", (new_owner, now_iso(), r["id"]))
+    return len(rows)
+
+
+def ensure_next_action(db, actor, opp: dict, status: str) -> None:
+    """Every open record has a next step: one moved back to an active stage (reopened when they call back, or
+    after nurture) with nothing planned gets a follow-up for tomorrow morning."""
+    if status != "active" or db.scalar("SELECT COUNT(*) FROM tasks WHERE entity_type = 'opportunity' AND "
+                                       "entity_id = ? AND status = 'open'", (opp["id"],)):
+        return
+    from datetime import timedelta
+
+    from ..timeutil import IST, now_utc, to_iso
+    t = (now_utc().astimezone(IST) + timedelta(days=1)).replace(hour=10, minute=30, second=0, microsecond=0)
+    create_task(db, actor, title="Follow up — record reopened, plan the next step",
+                assignee_id=opp.get("primary_owner_id") or actor["id"], due_at=to_iso(t), task_type="follow_up",
+                priority="normal", entity_type="opportunity", entity_id=opp["id"])
+
+
 def cancel_open_tasks(db, actor_id, entity_type, entity_id, reason: str) -> None:
     for t in db.all("SELECT id FROM tasks WHERE entity_type = ? AND entity_id = ? AND status = 'open'",
                     (entity_type, entity_id)):

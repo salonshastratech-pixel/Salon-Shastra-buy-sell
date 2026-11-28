@@ -33,7 +33,7 @@
   <div class="card"><h2>Salon</h2>
     <div class="form-grid">
       <div class="field full {{ 'has-err' if errors.salon_name }}"><label>Salon name *</label><input name="salon_name" value="{{ form.salon_name or '' }}" required>{{ err(errors, 'salon_name') }}</div>
-      <div class="field {{ 'has-err' if errors.city }}"><label>City *</label><input name="city" value="{{ form.city or 'Hyderabad' }}" required>{{ err(errors, 'city') }}</div>
+      <div class="field {{ 'has-err' if errors.city }}"><label>City *</label><input name="city" value="{{ form.city or 'Hyderabad' }}" required data-select-on-focus>{{ err(errors, 'city') }}</div>
       <div class="field {{ 'has-err' if errors.locality }}"><label>Locality *</label><input name="locality" value="{{ form.locality or '' }}" placeholder="e.g. Kondapur" required>{{ err(errors, 'locality') }}</div>
       {% for f in SF.FIELDS if f.quick %}
       <div class="field {{ 'has-err' if errors[f.key] }}" {% if f.show_if %}data-show-if="{{ f.show_attr }}"{% endif %}{% if f.also_if %} data-also-if="{{ f.also_attr }}"{% endif %}><label>{{ f.label }}</label>

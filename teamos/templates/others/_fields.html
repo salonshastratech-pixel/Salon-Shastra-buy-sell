@@ -5,7 +5,7 @@
   <div class="field {{ 'has-err' if errors.phone }}"><label for="c-phone">Mobile *</label><input id="c-phone" name="phone" value="{{ v.phone or v.phone_normalized or '' }}" inputmode="tel" required placeholder="10-digit mobile"></div>
   <div class="field {{ 'has-err' if errors.alt_phone }}"><label for="c-alt">WhatsApp / other number</label><input id="c-alt" name="alt_phone" value="{{ v.alt_phone or '' }}" inputmode="tel" placeholder="if different"></div>
   <div class="field"><label for="c-area">Area where they live now</label><input id="c-area" name="locality" value="{{ v.locality or '' }}" placeholder="e.g. Kukatpally"></div>
-  <div class="field"><label for="c-city">City</label><input id="c-city" name="city" value="{{ v.city or 'Hyderabad' }}"></div>
+  <div class="field"><label for="c-city">City</label><input id="c-city" name="city" value="{{ v.city or 'Hyderabad' }}" data-select-on-focus></div>
   <div class="field"><label for="c-home">Where they are from (hometown)</label><input id="c-home" name="hometown" value="{{ v.hometown or '' }}" placeholder="e.g. Vijayawada, Kolkata"></div>
   <div class="field"><label for="c-email">E-mail</label><input id="c-email" name="email" type="email" value="{{ v.email or '' }}"></div>
   <div class="field"><label for="c-src">How they reached us</label><select id="c-src" name="source">{% for k, l in Q.SOURCES %}<option value="{{ k }}" {{ 'selected' if (v.source or 'incoming_call') == k }}>{{ l }}</option>{% endfor %}</select></div>

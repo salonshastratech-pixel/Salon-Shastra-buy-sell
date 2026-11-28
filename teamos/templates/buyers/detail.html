@@ -71,7 +71,7 @@
         <div class="field full"><label>What was said</label><textarea name="note" placeholder="Budget, must-haves, objections, commitments"></textarea></div>
         <div class="field"><label>Next action</label><input name="next_title" placeholder="e.g. Send detailed buyer form"></div>
         <div class="field"><label>Next action due (IST)</label><input type="datetime-local" name="next_due"></div>
-        <div class="full"><button class="btn primary">Save call</button> <span class="small muted">A next action is required unless another task stays open.</span></div>
+        <div class="full"><button class="btn primary">Save call</button> <span class="small muted">A next action is required unless another task stays open. "Not interested" or "Disqualified" with no next action closes the record, with your note as the reason.</span></div>
       </form>{% endif %}
     </div>
 
@@ -187,7 +187,7 @@
     <input type="hidden" name="action" value="add">
     <select name="kind"><option value="preferred">Add preferred</option><option value="excluded">Add exclusion</option></select>
     <input name="locality" placeholder="Locality, e.g. Gachibowli" required>
-    <input name="city" value="{{ mandate.preferred_city or opp.contact_city or 'Hyderabad' }}" required>
+    <input name="city" value="{{ mandate.preferred_city or opp.contact_city or 'Hyderabad' }}" required data-select-on-focus>
     <input name="note" placeholder="Why (optional)">
     <button class="btn">Add</button></form>
 </div>

@@ -12,7 +12,7 @@ from .. import audit
 from ..permissions import can_view_restricted_seller, user_can
 from ..timeutil import now_iso, now_utc
 from . import tasks as T
-from .common import known_place, normalize_indian_mobile, parse_float, parse_inr, parse_int
+from .common import clean_place, known_place, normalize_indian_mobile, parse_float, parse_inr, parse_int
 from .errors import PermissionDenied, ValidationError
 from .seller_fields import (ANSWER_STATE_LABELS, BY_KEY, CHECKLIST_STATUSES, FIELDS, LISTING_CHECKLIST,
                             MATERIAL_KEYS, RESTRICTED_KEYS, SECTIONS, is_applicable)
@@ -117,8 +117,8 @@ def create_lead(db, actor: dict, data: dict, dedupe_decision: str | None = None,
     errors = {}
     name = (data.get("full_name") or "").strip()
     salon = (data.get("salon_name") or "").strip()
-    city = (data.get("city") or "").strip()
-    locality = (data.get("locality") or "").strip()
+    city = clean_place(data.get("city"))
+    locality = clean_place(data.get("locality"))
     source = data.get("source") or ""
     if not name:
         errors["full_name"] = "Contact name is required."
@@ -303,6 +303,7 @@ def update_fields(db, actor: dict, opp: dict, data: dict, section: str) -> list[
             for col in ("salon_name", "city", "locality"):
                 if col in data:
                     new = (data.get(col) or "").strip()
+                    new = clean_place(new) if col != "salon_name" else new
                     if not new:
                         raise ValidationError({col: "Required."})
                     dbcol = "name" if col == "salon_name" else col
@@ -572,11 +573,11 @@ def check_transition(db, user, opp, listing, prov, to: str) -> tuple[bool, str |
     if to == "basic_qualified":
         missing = []
         if prov.get("ownership_role", {}).get("answer_state") != "value":
-            missing.append("respondent role")
+            missing.append("who you spoke to - owner, partner or manager (Detailed intake → Ownership & decision)")
         if listing.get("sale_purpose") not in ("sell_entire", "partnership", "franchise_transfer"):
-            missing.append("a sale intent (help-seeking owners are not sellers)")
+            missing.append("that they want to sell (Sale purpose: sell / partnership / franchise; owners only asking for help stay at Connected or go to the Pilot program)")
         if missing:
-            return False, "Needs " + " and ".join(missing)
+            return False, "Before Basic qualified, fill in " + " and ".join(missing)
     if to in ("verification_pending",):
         pct = completeness(listing, prov)["pct"]
         if pct < 50:
@@ -620,12 +621,24 @@ def change_stage(db, actor, opp: dict, to: str, reason: str | None, follow_up_du
             T.create_task(db, actor, title=f"Nurture follow-up: {opp['contact_name']}",
                           assignee_id=opp["primary_owner_id"] or actor["id"], due_at=follow_up_due,
                           task_type="follow_up", priority="low", entity_type="opportunity", entity_id=opp["id"])
+        T.ensure_next_action(db, actor, opp, status)
         audit.record(db, actor["id"], "seller.stage", "opportunity", opp["id"],
                      {"from": opp["stage"], "to": to, "reason": reason})
 
 
 # -- Calls & notes -------------------------------------------------------------------
 NO_ANSWER = {"no_answer", "switched_off", "busy"}
+
+
+def retry_slot(outcome: str) -> tuple[str, str]:
+    """No answer and no next step typed: 'Try again' in 3 hours, or tomorrow 10:30 if that falls after 7 pm (IST)."""
+    from datetime import timedelta
+
+    from ..timeutil import IST, to_iso
+    t = now_utc().astimezone(IST) + timedelta(hours=3)
+    if t.hour >= 19 or t.hour < 9:
+        t = (t + timedelta(days=1 if t.hour >= 19 else 0)).replace(hour=10, minute=30, second=0, microsecond=0)
+    return f"Try again — last time: {T.CALL_OUTCOME_LABELS[outcome].lower()}", to_iso(t)
 
 
 def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: int | None,
@@ -642,6 +655,15 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
         if outcome == "do_not_contact":
             change_stage(db, actor, opp, "do_not_contact", (note or "").strip() or "Requested on call")
             return
+        # Not interested / not a fit and no next step given: close it properly with the call note as the
+        # reason, instead of making the caller invent a task. A next step given (e.g. "try again in
+        # 3 months") keeps it open.
+        if outcome in CLOSE_ON_CALL and not (next_title or "").strip() and opp["stage"] not in CLOSED_STAGES:
+            change_stage(db, actor, opp, CLOSE_ON_CALL[outcome],
+                         (note or "").strip() or T.CALL_OUTCOME_LABELS[outcome] + " (on the call)")
+            return
+        if outcome in NO_ANSWER and not (next_title or "").strip():
+            next_title, next_due = retry_slot(outcome)
         if next_title and next_title.strip():
             T.create_task(db, actor, title=next_title, assignee_id=opp["primary_owner_id"] or actor["id"],
                           due_at=next_due, task_type="call" if outcome in NO_ANSWER else "follow_up",
@@ -659,6 +681,8 @@ def log_call(db, actor, opp: dict, outcome: str, note: str, complete_task_id: in
         if open_count == 0:
             raise ValidationError({"next_title": "Add a next action — every active seller needs one."})
 
+
+CLOSE_ON_CALL = {"not_interested": "closed_lost", "disqualified": "unqualified"}
 
 def _auto_stage(db, actor, opp, to):
     now = now_iso()
@@ -694,8 +718,10 @@ def assign_owner(db, actor, opp, new_owner_id: int, reason: str) -> None:
         raise ValidationError({"reason": "Give a reason for the handoff."})
     with db:
         db.update("opportunities", opp["id"], {"primary_owner_id": new_owner_id, "updated_at": now_iso()})
+        moved_tasks = T.hand_over_tasks(db, opp["id"], opp["primary_owner_id"], new_owner_id)
         T.add_activity(db, actor["id"], "opportunity", opp["id"], "assignment",
-                       f"Primary owner: {opp['owner_name'] or 'none'} → {new['full_name']}. {reason.strip()}")
+                       f"Primary owner: {opp['owner_name'] or 'none'} → {new['full_name']}. {reason.strip()}"
+                       + (f" ({moved_tasks} open task(s) moved to them)" if moved_tasks else ""))
         T.notify(db, new_owner_id, "assignment", f"You now own {opp['ref_code']} ({opp['salon_name']})",
                  f"/sellers/{opp['id']}")
         audit.record(db, actor["id"], "seller.assign", "opportunity", opp["id"],
@@ -829,8 +855,8 @@ def submit_respondent_form(db, payload: dict, source: str = "landing_page", is_s
     errors = {}
     name = (payload.get("full_name") or "").strip()
     salon = (payload.get("salon_name") or "").strip()
-    city = (payload.get("city") or "").strip()
-    locality = (payload.get("locality") or "").strip() or city
+    city = clean_place(payload.get("city"))
+    locality = clean_place(payload.get("locality")) or city
     if not name:
         errors["full_name"] = "Please enter your name."
     if not salon:

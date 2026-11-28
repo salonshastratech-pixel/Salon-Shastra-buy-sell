@@ -152,7 +152,7 @@ def detail(opp_id):
         ctx["unblock"] = MM.unblock_suggestions(db, opp)
     from ..domain import advisor
     from ..domain import timeline as TL
-    ctx.update(timeline=TL.build(db, opp), lead_speed=TL.speed(opp), price_guide=advisor.price_guide(raw_listing))
+    ctx.update(crm_timeline=TL.build(db, opp), lead_speed=TL.speed(opp), price_guide=advisor.price_guide(raw_listing))
     return render_template("sellers/detail.html", **ctx)
 
 
