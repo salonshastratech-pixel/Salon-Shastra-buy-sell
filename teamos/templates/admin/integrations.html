@@ -8,11 +8,14 @@
     {% if k in from_server %}<input id="s-{{ k }}" disabled placeholder="Managed by the server's environment settings">
     {% elif secret %}<input id="s-{{ k }}" name="{{ k }}" type="password" autocomplete="new-password" placeholder="{{ 'Saved — leave empty to keep' if saved.get(k) else '' }}">
     {% else %}<input id="s-{{ k }}" name="{{ k }}" value="{{ saved.get(k, '') }}" autocomplete="off">{% endif %}
-    {% if help %}<div class="help">{{ help }}</div>{% endif %}</div>
+    {% if help %}<div class="help">{{ help }}</div>{% endif %}
+    {% if k == 'WHATSAPP_VERIFY_TOKEN' and k not in from_server %}<div class="inline" style="margin-top:6px"><button class="btn sm" form="gen-verify" title="Makes a long random token, saves it, and shows it once to copy into Meta">Generate one for me</button></div>
+      <div class="help">Meta → Use cases → Connect on WhatsApp → Customise → Configuration → Webhook: Callback URL <code class="copy">{{ webhook_url }}</code> and this verify token.</div>{% endif %}</div>
   {% endfor %}
   <div class="full"><button class="btn primary">Save {{ c.name.split(' (')[0] }} settings</button>
     <span class="small muted">Secrets are stored encrypted and never shown again. Type a single "-" to clear a value.</span></div>
 </form>
+{% if c.key == 'whatsapp' %}<form id="gen-verify" method="post" hidden>{{ csrf() }}<input type="hidden" name="action" value="verify_token"></form>{% endif %}
 {% endmacro %}
 {% block content %}
 <div class="ph"><div><h1>Integrations</h1><div class="sub">Everything the app connects to, set up here by an admin. Nothing is shown as live unless it is.</div></div></div>
